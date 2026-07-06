@@ -1,0 +1,25 @@
+# Dependency directories
+node_modules/
+target/
+dist/
+build/
+
+# IDE settings
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment and secrets
+.env
+*.log
+*.sql
+
+# Build artifacts
+*.class
+*.jar
+*.war
