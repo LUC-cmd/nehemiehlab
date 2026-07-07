@@ -10,6 +10,8 @@ import java.util.List;
 public interface ModuleFormationRepository extends JpaRepository<ModuleFormation, Long> {
     List<ModuleFormation> findByCentreIdOrderByDateDesc(Long centreId);
     List<ModuleFormation> findByFormateurIdOrderByDateDesc(Long formateurId);
+    List<ModuleFormation> findByFormateurId(Long formateurId);
+    long countByFormateurId(Long formateurId);
     List<ModuleFormation> findByCentreIdAndDateBetween(Long centreId, LocalDate debut, LocalDate fin);
     List<ModuleFormation> findByFormateurIdAndDateBetween(Long formateurId, LocalDate debut, LocalDate fin);
 }

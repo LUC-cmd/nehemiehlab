@@ -11,4 +11,5 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     List<Transaction> findByStatutOrderByCreatedAtDesc(String statut);
     List<Transaction> findByFormateurIdAndStatutOrderByCreatedAtDesc(Long formateurId, String statut);
     long countByStatut(String statut);
+    long countByFormateurIdAndStatut(Long formateurId, String statut);
 }

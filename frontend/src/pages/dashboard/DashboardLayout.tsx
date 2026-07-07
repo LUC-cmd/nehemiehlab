@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Building2, Users, BookOpen, CreditCard,
   BarChart3, Bell, LogOut, Menu, X, ChevronDown, User,
-  AlertTriangle, Settings, GraduationCap
+  AlertTriangle, Settings, GraduationCap, Timer
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { notificationService } from '../../services/api';
@@ -17,6 +17,7 @@ const navByRole = {
     { to: '/dashboard/centres', label: 'Centres', icon: <Building2 className="w-5 h-5" /> },
     { to: '/dashboard/formateurs', label: 'Formateurs', icon: <GraduationCap className="w-5 h-5" /> },
     { to: '/dashboard/eleves', label: 'Élèves', icon: <Users className="w-5 h-5" /> },
+    { to: '/dashboard/sessions', label: 'Sessions', icon: <Timer className="w-5 h-5" /> },
     { to: '/dashboard/formations', label: 'Formations', icon: <BookOpen className="w-5 h-5" /> },
     { to: '/dashboard/transactions', label: 'Transactions', icon: <CreditCard className="w-5 h-5" /> },
     { to: '/dashboard/rapports', label: 'Rapports', icon: <BarChart3 className="w-5 h-5" /> },
@@ -26,6 +27,7 @@ const navByRole = {
     { to: '/dashboard', label: 'Vue d\'ensemble', icon: <LayoutDashboard className="w-5 h-5" />, exact: true },
     { to: '/dashboard/mes-centres', label: 'Mes Centres', icon: <Building2 className="w-5 h-5" /> },
     { to: '/dashboard/eleves', label: 'Mes Élèves', icon: <Users className="w-5 h-5" /> },
+    { to: '/dashboard/sessions', label: 'Mes Sessions', icon: <Timer className="w-5 h-5" /> },
     { to: '/dashboard/formations', label: 'Journal de formation', icon: <BookOpen className="w-5 h-5" /> },
     { to: '/dashboard/transactions', label: 'Mes Paiements', icon: <CreditCard className="w-5 h-5" /> },
     { to: '/dashboard/rapports', label: 'Mes Rapports', icon: <BarChart3 className="w-5 h-5" /> },

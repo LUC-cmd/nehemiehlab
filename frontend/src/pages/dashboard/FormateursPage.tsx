@@ -52,10 +52,16 @@ export default function FormateursPage() {
   }
 
   const isDir = hasRole('DIRECTEUR');
-  const filtered = formateurs.filter(f => 
-    `${f.prenom} ${f.nom}`.toLowerCase().includes(search.toLowerCase()) ||
-    f.email.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = formateurs.filter(f => {
+    const searchLower = search.toLowerCase();
+    const matchName = `${f.prenom} ${f.nom}`.toLowerCase().includes(searchLower) || f.email.toLowerCase().includes(searchLower);
+    const matchCentre = f.centres?.some(c => 
+      c.nom.toLowerCase().includes(searchLower) || 
+      (c.region && c.region.toLowerCase().includes(searchLower)) ||
+      c.ville.toLowerCase().includes(searchLower)
+    );
+    return matchName || matchCentre;
+  });
 
   return (
     <div className="space-y-6">
@@ -75,7 +81,7 @@ export default function FormateursPage() {
       {/* Barre de recherche */}
       <div className="relative max-w-md">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
-        <input type="text" placeholder="Rechercher un formateur..." className="input-field pl-11"
+        <input type="text" placeholder="Rechercher par nom, centre, région..." className="input-field pl-11"
           value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
@@ -107,6 +113,25 @@ export default function FormateursPage() {
                 <Shield className="w-4 h-4 text-dark-400" />
                 <span className="text-xs uppercase tracking-wider font-semibold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded">Formateur</span>
               </div>
+            </div>
+
+            {/* Centres affectés */}
+            <div className="mt-4 pt-4 border-t border-dark-800">
+              <span className="text-xs font-semibold text-dark-400 uppercase tracking-wider block mb-2">Centres d'affectation</span>
+              {formateur.centres && formateur.centres.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  {formateur.centres.map(c => (
+                    <div key={c.id} className="text-xs p-2 rounded-lg bg-dark-800 border border-dark-700">
+                      <div className="font-semibold text-white">{c.nom}</div>
+                      <div className="text-dark-400 mt-0.5">
+                        {c.ville} {c.region ? `— ${c.region}` : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-dark-500 italic">Aucun centre assigné</p>
+              )}
             </div>
           </div>
         ))}

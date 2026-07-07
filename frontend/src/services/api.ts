@@ -101,9 +101,9 @@ export const userService = {
 export const centreService = {
   getAll: () => api.get('/centres'),
   getById: (id: number) => api.get(`/centres/${id}`),
-  create: (data: { nom: string; adresse: string; ville: string }) =>
+  create: (data: { nom: string; adresse: string; ville: string; region?: string }) =>
     api.post('/centres', data),
-  update: (id: number, data: { nom?: string; adresse?: string; ville?: string }) =>
+  update: (id: number, data: { nom?: string; adresse?: string; ville?: string; region?: string }) =>
     api.put(`/centres/${id}`, data),
   delete: (id: number) => api.delete(`/centres/${id}`),
   assignerFormateur: (centreId: number, formateurId: number) =>
@@ -168,6 +168,26 @@ export const formationService = {
     api.get(`/formations/centre/${centreId}`, { params }),
   getMesFormations: (params?: { debut?: string; fin?: string }) =>
     api.get('/formations/mes-formations', { params }),
+};
+
+// ============================================================
+//  Services Sessions
+// ============================================================
+export const sessionService = {
+  getAll: () => api.get('/sessions'),
+  getById: (id: number) => api.get(`/sessions/${id}`),
+  create: (data: { titre: string; centre: { id: number }; dureePrevueMinutes: number }) => api.post('/sessions', data),
+  cloturer: (id: number) => api.put(`/sessions/${id}/cloturer`),
+  updateEvaluations: (id: number, data: { id: number; present: boolean; note?: number }[]) => api.put(`/sessions/${id}/evaluations`, data),
+  uploadRapport: (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(`/sessions/${id}/rapport`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
 };
 
 // ============================================================

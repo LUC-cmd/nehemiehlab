@@ -13,7 +13,8 @@ export default function CentresPage() {
   
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newCentre, setNewCentre] = useState({ nom: '', adresse: '', ville: '' });
+  const [newCentre, setNewCentre] = useState({ nom: '', adresse: '', ville: '', region: '' });
+  const [regionFilter, setRegionFilter] = useState('');
   
   const [selectedCentre, setSelectedCentre] = useState<Centre | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -27,14 +28,23 @@ export default function CentresPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [centresRes, formateursRes, coordRes] = await Promise.all([
-        centreService.getAll(),
-        userService.getFormateurs(),
-        userService.getCoordinateurs()
-      ]);
+      const isDirecteur = hasRole('DIRECTEUR');
+
+      // Le formateur ne voit que ses propres centres
+      const centresRes = isDirecteur
+        ? await centreService.getAll()
+        : await centreService.getMesCentres();
       setCentres(centresRes.data);
-      setFormateurs(formateursRes.data);
-      setCoordinateurs(coordRes.data);
+
+      // Seul le directeur a accès à la liste des formateurs/coordinateurs
+      if (isDirecteur) {
+        const [formateursRes, coordRes] = await Promise.all([
+          userService.getFormateurs(),
+          userService.getCoordinateurs()
+        ]);
+        setFormateurs(formateursRes.data);
+        setCoordinateurs(coordRes.data);
+      }
     } catch {
       toast.error('Erreur lors du chargement des données.');
     } finally {
@@ -48,7 +58,7 @@ export default function CentresPage() {
       await centreService.create(newCentre);
       toast.success('Centre créé avec succès.');
       setShowAddModal(false);
-      setNewCentre({ nom: '', adresse: '', ville: '' });
+      setNewCentre({ nom: '', adresse: '', ville: '', region: '' });
       fetchData();
     } catch {
       toast.error('Erreur lors de la création du centre.');
@@ -107,24 +117,46 @@ export default function CentresPage() {
   }
 
   const isDir = hasRole('DIRECTEUR');
+  
+  const filteredCentres = regionFilter ? centres.filter(c => c.region === regionFilter) : centres;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Centres de formation</h1>
-          <p className="text-dark-400 mt-1">Gérez les centres de Nehemiah Lab, leurs formateurs et coordinateurs.</p>
+          <h1 className="text-2xl font-bold text-white">
+            {isDir ? 'Centres de formation' : 'Mes Centres'}
+          </h1>
+          <p className="text-dark-400 mt-1">
+            {isDir
+              ? 'Gérez les centres de Nehemiah Lab, leurs formateurs et coordinateurs.'
+              : 'Les centres auxquels vous êtes affecté.'}
+          </p>
         </div>
-        {isDir && (
-          <button onClick={() => setShowAddModal(true)} className="btn-primary">
-            <Plus className="w-4 h-4" />
-            Nouveau centre
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          <select 
+            value={regionFilter} 
+            onChange={e => setRegionFilter(e.target.value)}
+            className="input-field py-2"
+          >
+            <option value="">Toutes les régions</option>
+            <option value="Maritime">Maritime</option>
+            <option value="Plateaux">Plateaux</option>
+            <option value="Centrale">Centrale</option>
+            <option value="Kara">Kara</option>
+            <option value="Savanes">Savanes</option>
+          </select>
+          {isDir && (
+            <button onClick={() => setShowAddModal(true)} className="btn-primary py-2">
+              <Plus className="w-4 h-4" />
+              Nouveau centre
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {centres.map((centre) => (
+        {filteredCentres.map((centre) => (
           <div key={centre.id} className="card border border-dark-700 hover:border-dark-600 transition-all flex flex-col justify-between">
             <div>
               <div className="flex items-start justify-between mb-4">
@@ -139,6 +171,11 @@ export default function CentresPage() {
               </div>
 
               <h3 className="text-lg font-bold text-white mb-1">{centre.nom}</h3>
+              {centre.region && (
+                <span className="inline-block px-2 py-0.5 mb-2 text-xs font-medium bg-dark-800 border border-dark-700 rounded-lg text-primary-400">
+                  Région {centre.region}
+                </span>
+              )}
               <p className="text-dark-400 text-sm flex items-center gap-1 mb-4">
                 <MapPin className="w-3.5 h-3.5" />
                 {centre.adresse}, {centre.ville}
@@ -187,6 +224,13 @@ export default function CentresPage() {
             )}
           </div>
         ))}
+
+        {filteredCentres.length === 0 && (
+          <div className="col-span-full card text-center py-12 text-dark-500 border border-dashed border-dark-700">
+            <Building2 className="w-10 h-10 mx-auto mb-3 opacity-20" />
+            <p>{isDir ? 'Aucun centre créé pour le moment.' : "Vous n'êtes affecté à aucun centre. Contactez le directeur."}</p>
+          </div>
+        )}
       </div>
 
       {/* Modal Ajout */}
@@ -212,6 +256,17 @@ export default function CentresPage() {
                 <label className="label">Ville</label>
                 <input type="text" required placeholder="Ex: Lomé" className="input-field"
                   value={newCentre.ville} onChange={e => setNewCentre({ ...newCentre, ville: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">Région du Togo</label>
+                <select className="input-field" required value={newCentre.region} onChange={e => setNewCentre({ ...newCentre, region: e.target.value })}>
+                  <option value="">Sélectionner une région...</option>
+                  <option value="Maritime">Maritime</option>
+                  <option value="Plateaux">Plateaux</option>
+                  <option value="Centrale">Centrale</option>
+                  <option value="Kara">Kara</option>
+                  <option value="Savanes">Savanes</option>
+                </select>
               </div>
               <button type="submit" className="btn-primary w-full justify-center">Créer le centre</button>
             </form>

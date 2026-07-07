@@ -14,6 +14,7 @@ import DashboardIndex from './pages/dashboard/DashboardIndex';
 import CentresPage from './pages/dashboard/CentresPage';
 import FormateursPage from './pages/dashboard/FormateursPage';
 import ElevesPage from './pages/dashboard/ElevesPage';
+import SessionsPage from './pages/dashboard/SessionsPage';
 import FormationsPage from './pages/dashboard/FormationsPage';
 import TransactionsPage from './pages/dashboard/TransactionsPage';
 import RapportsPage from './pages/dashboard/RapportsPage';
@@ -62,6 +63,13 @@ export default function App() {
             <Route path="eleves" element={
               <ProtectedRoute roles={['DIRECTEUR', 'FORMATEUR', 'COORDINATEUR']}>
                 <ElevesPage />
+              </ProtectedRoute>
+            } />
+
+            {/* Sessions */}
+            <Route path="sessions" element={
+              <ProtectedRoute roles={['DIRECTEUR', 'FORMATEUR']}>
+                <SessionsPage />
               </ProtectedRoute>
             } />
 

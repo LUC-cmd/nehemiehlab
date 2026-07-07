@@ -52,6 +52,9 @@ public class Eleve {
     @JoinColumn(name = "projet_id")
     private Projet projet;
 
+    @Transient
+    private Double performanceMoyenne;
+
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 }

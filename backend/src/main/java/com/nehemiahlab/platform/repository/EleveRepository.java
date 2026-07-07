@@ -10,4 +10,5 @@ import java.util.List;
 public interface EleveRepository extends JpaRepository<Eleve, Long> {
     List<Eleve> findByCentre(Centre centre);
     List<Eleve> findByCentreId(Long centreId);
+    long countByCentreId(Long centreId);
 }

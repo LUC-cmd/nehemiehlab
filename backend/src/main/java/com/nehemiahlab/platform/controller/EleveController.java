@@ -39,17 +39,41 @@ public class EleveController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private EvaluationSessionRepository evaluationSessionRepository;
 
     @GetMapping("/centre/{centreId}")
     public ResponseEntity<List<Eleve>> getByCentre(@PathVariable Long centreId) {
-        return ResponseEntity.ok(eleveRepository.findByCentreId(centreId));
+        List<Eleve> eleves = eleveRepository.findByCentreId(centreId);
+        for (Eleve e : eleves) {
+            calculateAndSetPerformance(e);
+        }
+        return ResponseEntity.ok(eleves);
+    }
+
+    private void calculateAndSetPerformance(Eleve e) {
+        List<EvaluationSession> evals = evaluationSessionRepository.findByEleveId(e.getId());
+        double total = 0;
+        int count = 0;
+        for (EvaluationSession eval : evals) {
+            if (eval.getNote() != null) {
+                total += eval.getNote();
+                count++;
+            }
+        }
+        if (count > 0) {
+            e.setPerformanceMoyenne(Math.round((total / count) * 10.0) / 10.0);
+        } else {
+            e.setPerformanceMoyenne(null);
+        }
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Eleve> getById(@PathVariable Long id) {
-        return eleveRepository.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return eleveRepository.findById(id).map(e -> {
+            calculateAndSetPerformance(e);
+            return ResponseEntity.ok(e);
+        }).orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping

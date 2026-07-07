@@ -61,6 +61,7 @@ public class CentreController {
                     centre.setNom(updateData.getNom());
                     centre.setAdresse(updateData.getAdresse());
                     centre.setVille(updateData.getVille());
+                    centre.setRegion(updateData.getRegion());
                     return ResponseEntity.ok(centreRepository.save(centre));
                 })
                 .orElse(ResponseEntity.notFound().build());

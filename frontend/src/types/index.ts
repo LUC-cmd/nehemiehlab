@@ -15,6 +15,7 @@ export interface User {
   telephone?: string;
   avatar?: string;
   actif: boolean;
+  centres?: Centre[];
   createdAt: string;
 }
 
@@ -24,6 +25,7 @@ export interface Centre {
   nom: string;
   adresse: string;
   ville: string;
+  region?: string;
   coordinateur?: User;
   formateurs: User[];
   nombreEleves: number;
@@ -47,7 +49,33 @@ export interface Eleve {
   commentaires?: Commentaire[];
   signalements?: Signalement[];
   presences?: Presence[];
+  performanceMoyenne?: number;
   createdAt: string;
+}
+
+// --- Session de Cours ---
+export interface SessionCours {
+  id: number;
+  titre: string;
+  centre: Centre;
+  formateur: User;
+  heureDebut: string;
+  dureePrevueMinutes: number;
+  statut: 'EN_COURS' | 'CLOTUREE';
+  dureeReelleMinutes?: number;
+  rapportUrl?: string;
+  nbPresents?: number;
+  nbTotalEleves?: number;
+  createdAt: string;
+}
+
+// --- Evaluation Session ---
+export interface EvaluationSession {
+  id: number;
+  sessionCours: SessionCours;
+  eleve: Eleve;
+  present: boolean;
+  note?: number;
 }
 
 // --- Projet élève ---
@@ -161,6 +189,7 @@ export interface CreateCentreForm {
   nom: string;
   adresse: string;
   ville: string;
+  region?: string;
   coordinateurId?: number;
 }
 

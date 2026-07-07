@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -38,36 +39,66 @@ public class DashboardController {
         User user = (User) auth.getPrincipal();
         Map<String, Object> stats = new HashMap<>();
 
-        long totalCentres = centreRepository.count();
-        long totalFormateurs = userRepository.findByRole(Role.FORMATEUR).size();
-        long totalEleves = eleveRepository.count();
-        
-        double totalHeures = eleveRepository.findAll().stream()
-                .mapToDouble(e -> e.getTotalHeures() != null ? e.getTotalHeures() : 0.0)
-                .sum();
+        if (user.getRole() == Role.FORMATEUR) {
+            // Stats personnalisées pour le formateur : uniquement ses propres données
+            List<Centre> mesCentres = centreRepository.findByFormateurId(user.getId());
+            long totalCentres = mesCentres.size();
 
-        long txEnAttente = transactionRepository.countByStatut("EN_ATTENTE");
-        long txValidees = transactionRepository.countByStatut("VALIDEE");
-        long txRefusees = transactionRepository.countByStatut("REFUSEE");
+            // Élèves dans ses centres
+            long totalEleves = mesCentres.stream()
+                    .mapToLong(c -> eleveRepository.countByCentreId(c.getId()))
+                    .sum();
 
-        double montantTotal = transactionRepository.findAll().stream()
-                .filter(t -> "VALIDEE".equals(t.getStatut()))
-                .mapToDouble(Transaction::getMontant)
-                .sum();
+            // Heures de formation (modules enregistrés par ce formateur)
+            double totalHeures = moduleFormationRepository.findByFormateurId(user.getId()).stream()
+                    .mapToDouble(ModuleFormation::getDureeHeures)
+                    .sum();
 
-        long signalementsActifs = signalementRepository.countByStatut("EN_ATTENTE");
-        long totalFormations = moduleFormationRepository.count();
+            // Formations enregistrées par ce formateur
+            long totalFormations = moduleFormationRepository.countByFormateurId(user.getId());
 
-        stats.put("totalCentres", totalCentres);
-        stats.put("totalFormateurs", totalFormateurs);
-        stats.put("totalEleves", totalEleves);
-        stats.put("totalHeuresFormation", Math.round(totalHeures * 10.0) / 10.0);
-        stats.put("transactionsEnAttente", txEnAttente);
-        stats.put("transactionsValidees", txValidees);
-        stats.put("transactionsRefusees", txRefusees);
-        stats.put("montantTotalTransactions", montantTotal);
-        stats.put("signalementsNonTraites", signalementsActifs);
-        stats.put("totalFormations", totalFormations);
+            // Transactions de ce formateur
+            long txEnAttente = transactionRepository.countByFormateurIdAndStatut(user.getId(), "EN_ATTENTE");
+
+            stats.put("totalCentres", totalCentres);
+            stats.put("totalEleves", totalEleves);
+            stats.put("totalHeuresFormation", Math.round(totalHeures * 10.0) / 10.0);
+            stats.put("totalFormations", totalFormations);
+            stats.put("transactionsEnAttente", txEnAttente);
+
+        } else {
+            // Stats globales pour Directeur, Coordinateur, Comptable
+            long totalCentres = centreRepository.count();
+            long totalFormateurs = userRepository.findByRole(Role.FORMATEUR).size();
+            long totalEleves = eleveRepository.count();
+
+            double totalHeures = eleveRepository.findAll().stream()
+                    .mapToDouble(e -> e.getTotalHeures() != null ? e.getTotalHeures() : 0.0)
+                    .sum();
+
+            long txEnAttente = transactionRepository.countByStatut("EN_ATTENTE");
+            long txValidees = transactionRepository.countByStatut("VALIDEE");
+            long txRefusees = transactionRepository.countByStatut("REFUSEE");
+
+            double montantTotal = transactionRepository.findAll().stream()
+                    .filter(t -> "VALIDEE".equals(t.getStatut()))
+                    .mapToDouble(Transaction::getMontant)
+                    .sum();
+
+            long signalementsActifs = signalementRepository.countByStatut("EN_ATTENTE");
+            long totalFormations = moduleFormationRepository.count();
+
+            stats.put("totalCentres", totalCentres);
+            stats.put("totalFormateurs", totalFormateurs);
+            stats.put("totalEleves", totalEleves);
+            stats.put("totalHeuresFormation", Math.round(totalHeures * 10.0) / 10.0);
+            stats.put("transactionsEnAttente", txEnAttente);
+            stats.put("transactionsValidees", txValidees);
+            stats.put("transactionsRefusees", txRefusees);
+            stats.put("montantTotalTransactions", montantTotal);
+            stats.put("signalementsNonTraites", signalementsActifs);
+            stats.put("totalFormations", totalFormations);
+        }
 
         return ResponseEntity.ok(stats);
     }

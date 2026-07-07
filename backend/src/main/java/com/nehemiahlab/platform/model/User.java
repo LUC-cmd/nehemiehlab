@@ -43,4 +43,11 @@ public class User {
 
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @ManyToMany(mappedBy = "formateurs", fetch = FetchType.EAGER)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties("formateurs")
+    @Builder.Default
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private java.util.Set<Centre> centres = new java.util.HashSet<>();
 }
