@@ -8,7 +8,6 @@ services:
   - type: web
     name: nehemiahlab-backend
     env: docker
-    rootDir: backend
     envVars:
       # Render injecte automatiquement ces variables pour la base de données
       - key: SPRING_DATASOURCE_URL
