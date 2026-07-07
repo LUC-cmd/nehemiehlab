@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 
-import HomePage from './pages/HomePage';
+// HomePage a été supprimé
 import LoginPage from './pages/LoginPage';
 import InscriptionFormateurPage from './pages/InscriptionFormateurPage';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -28,7 +28,7 @@ export default function App() {
       <Router>
         <Routes>
           {/* Site Public */}
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<Navigate to="/connexion" replace />} />
           <Route path="/connexion" element={<LoginPage />} />
           <Route path="/inscription-formateur" element={<InscriptionFormateurPage />} />
 
