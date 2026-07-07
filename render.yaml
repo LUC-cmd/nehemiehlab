@@ -1,0 +1,41 @@
+databases:
+  - name: nehemiahlab-db
+    databaseName: nehemiahlab
+    user: nehemiah
+
+services:
+  # 1. Backend Web Service
+  - type: web
+    name: nehemiahlab-backend
+    env: docker
+    dockerContext: backend
+    dockerfilePath: ./Dockerfile
+    envVars:
+      # Render injecte automatiquement ces variables pour la base de données
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: nehemiahlab-db
+          property: connectionString
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: nehemiahlab-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: nehemiahlab-db
+          property: password
+
+  # 2. Frontend Static Site
+  - type: web
+    name: nehemiahlab-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      # Injecte l'URL publique du backend dans le build du frontend
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: nehemiahlab-backend
+          envVarKey: RENDER_EXTERNAL_URL
