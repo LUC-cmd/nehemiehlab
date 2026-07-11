@@ -13,7 +13,7 @@ FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 RUN useradd --system --uid 10001 --no-create-home appuser
 COPY --from=build --chown=appuser:appuser /app/target/*.jar app.jar
-ENV SPRING_PROFILES_ACTIVE=prod
+ENV SPRING_PROFILES_ACTIVE=demo
 USER appuser
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

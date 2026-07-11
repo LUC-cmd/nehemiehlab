@@ -1,0 +1,53 @@
+# Blueprint Render — hébergement gratuit pour présentation
+# https://render.com/docs/blueprint-spec
+
+services:
+  # API Spring Boot (Docker)
+  - type: web
+    name: nehemiahlab-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    healthCheckPath: /api/actuator/health
+    autoDeploy: true
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: demo
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: APP_SEED_ENABLED
+        value: "true"
+      - key: APP_SEED_DIRECTOR_PASSWORD
+        value: password123
+      - key: APP_SEED_DEMO_PASSWORD
+        value: password123
+
+  # Site React (statique)
+  - type: web
+    name: nehemiahlab-web
+    runtime: static
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    rootDir: frontend
+    autoDeploy: true
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
