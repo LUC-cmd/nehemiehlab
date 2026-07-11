@@ -27,6 +27,7 @@ export default function EnfantsProfilesShowcase({
 }: Props) {
   const { hasRole } = useAuth();
   const isDirecteur = hasRole('DIRECTEUR');
+  const isCoordinateur = hasRole('COORDINATEUR');
   const [profiles, setProfiles] = useState<EnfantProfilePublic[]>([]);
   const [centres, setCentres] = useState<Centre[]>([]);
   const [region, setRegion] = useState('');
@@ -38,8 +39,14 @@ export default function EnfantsProfilesShowcase({
       .then((r) => setProfiles(r.data || []))
       .catch(() => setProfiles([]));
     const loadCentres = isDirecteur ? centreService.getAll() : centreService.getMesCentres();
-    loadCentres.then((r) => setCentres(r.data || [])).catch(() => setCentres([]));
-  }, [isDirecteur]);
+    loadCentres.then((r) => {
+      const list = r.data || [];
+      setCentres(list);
+      if (isCoordinateur && list.length === 1) {
+        setCentreId(String(list[0].id));
+      }
+    }).catch(() => setCentres([]));
+  }, [isDirecteur, isCoordinateur]);
 
   const regions = useMemo(
     () => Array.from(new Set(centres.map((c) => c.region).filter(Boolean))) as string[],
@@ -60,9 +67,15 @@ export default function EnfantsProfilesShowcase({
   );
 
   const filtered = useMemo(() => {
+    const allowedCentreIds = new Set(
+      isDirecteur ? centres.map((c) => c.id) : centres.map((c) => c.id),
+    );
     return profiles
       .filter((p) => p.actif !== false)
       .filter((p) => {
+        if (!isDirecteur && allowedCentreIds.size > 0 && p.centreId != null) {
+          if (!allowedCentreIds.has(p.centreId)) return false;
+        }
         if (region) {
           const matchRegion =
             p.region === region ||

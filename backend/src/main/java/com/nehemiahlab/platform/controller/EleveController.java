@@ -96,7 +96,7 @@ public class EleveController {
     private MatriculeService matriculeService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR')")
+    @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER')")
     public ResponseEntity<?> create(@RequestBody Map<String, Object> body, Authentication auth) {
         User creator = (User) auth.getPrincipal();
         Long centreId = Long.valueOf(body.get("centreId").toString());
@@ -105,6 +105,14 @@ public class EleveController {
 
         if (centreOpt.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Centre non trouvé."));
+        }
+
+        Centre centre = centreOpt.get();
+        User formateur = null;
+        if (creator.getRole() == Role.FORMATEUR) {
+            formateur = creator;
+        } else if (centre.getFormateurs() != null && !centre.getFormateurs().isEmpty()) {
+            formateur = centre.getFormateurs().iterator().next();
         }
 
         String matricule = matriculeService.generateUniqueMatricule();
@@ -116,8 +124,8 @@ public class EleveController {
                 .age(Integer.valueOf(body.get("age").toString()))
                 .sexe(body.get("sexe").toString())
                 .classe(body.get("classe").toString())
-                .centre(centreOpt.get())
-                .formateur(creator.getRole() == Role.FORMATEUR ? creator : null)
+                .centre(centre)
+                .formateur(formateur)
                 .dateDebutFormation(LocalDate.parse(body.get("dateDebutFormation").toString()))
                 .build();
 

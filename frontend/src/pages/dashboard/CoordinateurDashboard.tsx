@@ -10,12 +10,14 @@ import EnfantsProfilesShowcase from '../../components/dashboard/EnfantsProfilesS
 import LocalisationDashboardSection from '../../components/dashboard/LocalisationDashboardSection';
 
 export default function CoordinateurDashboard() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [stats, setStats] = useState<Record<string, number>>({});
   const [recentSignalements, setRecentSignalements] = useState<Signalement[]>([]);
   const [recentFormations, setRecentFormations] = useState<ModuleFormation[]>([]);
   const [mesCentres, setMesCentres] = useState<Centre[]>([]);
   const [usingOfflineCache, setUsingOfflineCache] = useState(false);
+
+  const monCentre = role === 'COORDINATEUR' ? mesCentres.slice(0, 1) : mesCentres;
 
   useEffect(() => {
     const load = async () => {
@@ -63,7 +65,11 @@ export default function CoordinateurDashboard() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-white">Bonjour, {user?.prenom}</h1>
-        <p className="text-dark-400 mt-1">Suivi de votre centre de formation.</p>
+        <p className="text-dark-400 mt-1">
+          {monCentre[0]
+            ? <>Suivi de votre centre : <span className="text-white font-medium">{monCentre[0].nom}</span></>
+            : 'Suivi de votre centre de formation.'}
+        </p>
         {usingOfflineCache && (
           <p className="text-xs text-amber-400 mt-2">Mode hors ligne: affichage des dernières données enregistrées.</p>
         )}
@@ -71,13 +77,13 @@ export default function CoordinateurDashboard() {
 
       <EnfantsProfilesShowcase
         limit={6}
-        showFilters
+        showFilters={role !== 'COORDINATEUR'}
         title="Profils des enfants du centre"
-        subtitle="Consultez et filtrez les profils — déposez les projets terminés"
+        subtitle="Uniquement les enfants inscrits dans votre centre"
       />
 
       <LocalisationDashboardSection
-        centres={mesCentres}
+        centres={monCentre}
         centresHref="/dashboard/mes-centres"
         title="Localisation du centre"
         subtitle="Fixez le point GPS une fois : toute l’équipe pourra s’y rendre via Google Maps."

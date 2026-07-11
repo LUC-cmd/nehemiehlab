@@ -229,7 +229,26 @@ public class TogoDemoDataSeeder {
     }
 
     private User ensureUser(String email, String nom, String prenom, Role role, String encoded, String phone, String assignedCluster) {
-        return userRepository.findByEmail(email).orElseGet(() -> {
+        return userRepository.findByEmail(email).map(existing -> {
+            boolean changed = false;
+            if (existing.getRole() != role) {
+                existing.setRole(role);
+                changed = true;
+            }
+            if (assignedCluster != null && !assignedCluster.isBlank()
+                    && !assignedCluster.equals(existing.getAssignedCluster())) {
+                existing.setAssignedCluster(assignedCluster);
+                changed = true;
+            }
+            if (!existing.isActif()) {
+                existing.setActif(true);
+                changed = true;
+            }
+            if (changed) {
+                return userRepository.save(existing);
+            }
+            return existing;
+        }).orElseGet(() -> {
             User.UserBuilder builder = User.builder()
                     .email(email)
                     .nom(nom)

@@ -214,8 +214,10 @@ export default function ElevesPage() {
 
   const isFormateur = hasRole('FORMATEUR');
   const isDir = hasRole('DIRECTEUR');
+  const isCoordinateur = hasRole('COORDINATEUR');
   const canIssueParentCode = hasRole('DIRECTEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER');
   const canEdit = (isDir || isFormateur || hasRole('COORDINATEUR', 'RESPONSABLE_CLUSTER')) && hasFeature('create_eleve');
+  const showCentrePicker = !(isCoordinateur && centres.length <= 1);
 
   const filtered = eleves.filter(e =>
     `${e.prenom} ${e.nom}`.toLowerCase().includes(search.toLowerCase()) ||
@@ -246,11 +248,15 @@ export default function ElevesPage() {
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <label className="text-sm text-dark-400 whitespace-nowrap">Centre :</label>
-          <select className="input-field py-2 text-sm" value={selectedCentreId} onChange={e => setSelectedCentreId(e.target.value)}>
-            {centres.map(c => (
-              <option key={c.id} value={c.id}>{c.nom} ({c.ville})</option>
-            ))}
-          </select>
+          {showCentrePicker ? (
+            <select className="input-field py-2 text-sm" value={selectedCentreId} onChange={e => setSelectedCentreId(e.target.value)}>
+              {centres.map(c => (
+                <option key={c.id} value={c.id}>{c.nom}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-sm text-white font-medium">{centres[0]?.nom || '—'}</span>
+          )}
         </div>
 
         <div className="relative w-full sm:w-80">
