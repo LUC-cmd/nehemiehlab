@@ -28,11 +28,11 @@ public class EmailNotificationService {
         this.mailUsername = mailUsername == null ? "" : mailUsername.trim();
     }
 
-    public void sendSafe(String to, String subject, String body) {
-        if (to == null || to.isBlank()) return;
+    public boolean sendSafe(String to, String subject, String body) {
+        if (to == null || to.isBlank()) return false;
         if (mailUsername.isBlank()) {
             log.warn("Email non envoye (SMTP non configure) vers {}", to);
-            return;
+            return false;
         }
         try {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
@@ -43,8 +43,37 @@ public class EmailNotificationService {
             helper.setText(body, false);
             mailSender.send(mimeMessage);
             log.info("Email envoye vers {}", to);
+            return true;
         } catch (Exception e) {
             log.warn("Envoi email echoue vers {}: {}", to, e.getMessage());
+            return false;
         }
+    }
+
+    public boolean sendFormateurInscriptionConfirmation(String email, String prenom, String nom) {
+        String name = (prenom == null ? "" : prenom.trim()) + " " + (nom == null ? "" : nom.trim());
+        return sendSafe(
+                email,
+                "Inscription Smart Kids Academy — en attente de validation",
+                "Bonjour " + name.trim() + ",\n\n"
+                        + "Votre inscription formateur sur Smart Kids Academy a bien ete enregistree.\n\n"
+                        + "Votre compte est en attente de validation par le Directeur. "
+                        + "Vous recevrez un second email des que votre compte sera active.\n\n"
+                        + "En attendant, vous ne pouvez pas encore vous connecter.\n\n"
+                        + "Smart Kids Academy — Nehemiah Lab"
+        );
+    }
+
+    public boolean sendFormateurCompteValide(String email, String prenom, String nom) {
+        String name = (prenom == null ? "" : prenom.trim()) + " " + (nom == null ? "" : nom.trim());
+        return sendSafe(
+                email,
+                "Compte Smart Kids Academy valide — vous pouvez vous connecter",
+                "Bonjour " + name.trim() + ",\n\n"
+                        + "Bonne nouvelle : le Directeur a valide votre compte formateur.\n\n"
+                        + "Vous pouvez maintenant vous connecter sur la plateforme avec votre email "
+                        + "et le mot de passe choisi lors de l'inscription.\n\n"
+                        + "Smart Kids Academy — Nehemiah Lab"
+        );
     }
 }

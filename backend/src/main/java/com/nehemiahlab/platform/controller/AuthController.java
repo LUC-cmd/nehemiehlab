@@ -8,6 +8,7 @@ import com.nehemiahlab.platform.repository.UserRepository;
 import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.security.PasswordPolicy;
 import com.nehemiahlab.platform.security.SecureFileStorage;
+import com.nehemiahlab.platform.service.EmailNotificationService;
 import com.nehemiahlab.platform.service.InscriptionSettingsService;
 import com.nehemiahlab.platform.service.MatriculeService;
 import com.nehemiahlab.platform.service.ParentActivationService;
@@ -58,6 +59,9 @@ public class AuthController {
 
     @Autowired
     private SecureFileStorage secureFileStorage;
+
+    @Autowired
+    private EmailNotificationService emailNotificationService;
 
     @Value("${app.auth.disable-lockout:false}")
     private boolean disableLoginLockout;
@@ -304,9 +308,15 @@ public class AuthController {
 
         userRepository.save(formateur);
 
+        boolean emailEnvoye = emailNotificationService.sendFormateurInscriptionConfirmation(
+                email, formateur.getPrenom(), formateur.getNom());
+
         return ResponseEntity.ok(Map.of(
                 "success", true,
-                "message", "Inscription enregistrée. Le Directeur doit valider votre compte avant la connexion."
+                "message", emailEnvoye
+                        ? "Inscription enregistrée. Un email de confirmation vous a été envoyé. Le Directeur doit encore valider votre compte."
+                        : "Inscription enregistrée. Le Directeur doit valider votre compte avant la connexion.",
+                "emailEnvoye", emailEnvoye
         ));
     }
 

@@ -33,6 +33,16 @@ services:
         value: password123
       - key: APP_SEED_DEMO_PASSWORD
         value: password123
+      - key: MAIL_HOST
+        value: smtp.gmail.com
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
 
   # Site React (statique)
   - type: web

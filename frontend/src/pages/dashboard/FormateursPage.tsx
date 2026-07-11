@@ -111,8 +111,8 @@ export default function FormateursPage() {
   const handleValider = async (id: number) => {
     setValidatingId(id);
     try {
-      await userService.validerFormateur(id);
-      toast.success('Formateur validé. Vous pouvez lui assigner un ou plusieurs centres.');
+      const { data } = await userService.validerFormateur(id);
+      toast.success(data?.message || 'Formateur validé. Vous pouvez lui assigner un ou plusieurs centres.');
       await fetchAll();
       setDetailFormateur((prev) => (prev?.id === id ? { ...prev, actif: true } : prev));
     } catch {

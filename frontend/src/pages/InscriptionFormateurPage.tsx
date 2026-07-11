@@ -57,6 +57,7 @@ export default function InscriptionFormateurPage() {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [cniRecto, setCniRecto] = useState<File | null>(null);
@@ -167,7 +168,7 @@ export default function InscriptionFormateurPage() {
     setFieldErrors({});
     setLoading(true);
     try {
-      await authService.inscriptionFormateur({
+      const { data } = await authService.inscriptionFormateur({
         nom: form.nom,
         prenom: form.prenom,
         email: form.email.trim().toLowerCase(),
@@ -179,6 +180,10 @@ export default function InscriptionFormateurPage() {
         carteIdentiteVerso: cniVerso,
       });
       setSuccess(true);
+      setSuccessMessage(
+        data?.message
+          || 'Votre compte est en attente de validation par le Directeur.'
+      );
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       const message = e?.response?.data?.message || 'Impossible de créer le compte. Réessayez plus tard.';
@@ -218,8 +223,12 @@ export default function InscriptionFormateurPage() {
           </div>
           <h2 className="text-2xl font-bold text-slate-900 mb-3">Inscription enregistrée</h2>
           <p className="text-slate-500 mb-8 leading-relaxed">
-            Votre compte est en attente de validation par le Directeur. Vous pourrez compléter
-            votre carte d&apos;identité plus tard depuis votre profil, si ce n&apos;est pas déjà fait.
+            {successMessage || (
+              <>
+                Votre compte est en attente de validation par le Directeur. Vous pourrez compléter
+                votre carte d&apos;identité plus tard depuis votre profil, si ce n&apos;est pas déjà fait.
+              </>
+            )}
           </p>
           <div className="space-y-3">
             <button onClick={() => navigate('/connexion')} className="btn-primary w-full justify-center">

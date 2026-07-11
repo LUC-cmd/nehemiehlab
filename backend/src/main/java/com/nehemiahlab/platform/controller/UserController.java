@@ -5,6 +5,7 @@ import com.nehemiahlab.platform.model.Role;
 import com.nehemiahlab.platform.model.User;
 import com.nehemiahlab.platform.repository.CentreRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
+import com.nehemiahlab.platform.service.EmailNotificationService;
 import com.nehemiahlab.platform.service.InscriptionSettingsService;
 import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.security.SecureFileStorage;
@@ -40,6 +41,9 @@ public class UserController {
 
     @Autowired
     private SecureFileStorage secureFileStorage;
+
+    @Autowired
+    private EmailNotificationService emailNotificationService;
 
     @GetMapping
     @PreAuthorize("hasRole('DIRECTEUR')")
@@ -104,8 +108,13 @@ public class UserController {
         }
         user.setActif(true);
         userRepository.save(user);
+        boolean emailEnvoye = emailNotificationService.sendFormateurCompteValide(
+                user.getEmail(), user.getPrenom(), user.getNom());
         return ResponseEntity.ok(Map.of(
-                "message", "Formateur validé. Il peut maintenant se connecter. Affectez-lui un centre ensuite.",
+                "message", emailEnvoye
+                        ? "Formateur validé. Un email de confirmation lui a été envoyé. Affectez-lui un centre ensuite."
+                        : "Formateur validé. Il peut maintenant se connecter. Affectez-lui un centre ensuite.",
+                "emailEnvoye", emailEnvoye,
                 "user", user
         ));
     }

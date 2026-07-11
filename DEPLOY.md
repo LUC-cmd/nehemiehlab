@@ -28,6 +28,14 @@ Guide pour déployer **Smart Kids Academy** gratuitement avant de passer à un h
 
 ## Étape 2 — Déployer sur Render
 
+Vous voyez *« You haven't created any services yet »* ? Suivez ces étapes :
+
+1. Menu gauche → **Blueprints** (ou bouton **New** en haut à droite → **Blueprint**).
+2. **Connect GitHub** → autorisez Render → choisissez le dépôt **`LUC-cmd/nehemiehlab`**.
+3. Render lit `render.yaml` et propose **2 services** : `nehemiahlab-api` + `nehemiahlab-web`.
+4. Renseignez les variables **sync: false** (voir tableaux ci-dessous).
+5. Cliquez **Apply Blueprint** → attendez ~10 minutes.
+
 ### Option A — Blueprint (recommandé)
 
 1. Allez sur [dashboard.render.com](https://dashboard.render.com).
@@ -57,6 +65,24 @@ Guide pour déployer **Smart Kids Academy** gratuitement avant de passer à un h
 (Remplacez par l’URL réelle de votre service API une fois créé.)
 
 6. **Apply** et attendez le premier déploiement (~10 min).
+
+### E-mails (inscription, validation, mot de passe oublié)
+
+Pour que les utilisateurs reçoivent des e-mails, configurez le **SMTP Gmail** sur `nehemiahlab-api` :
+
+| Variable | Valeur |
+|----------|--------|
+| `MAIL_HOST` | `smtp.gmail.com` |
+| `MAIL_PORT` | `587` |
+| `MAIL_USERNAME` | Votre Gmail |
+| `MAIL_PASSWORD` | Mot de passe d'application Gmail (16 caractères) |
+| `MAIL_FROM` | `no-reply@nehemiahlab.com` ou votre Gmail |
+
+Gmail → **Sécurité** → **Validation en 2 étapes** → **Mots de passe des applications**.
+
+Sans SMTP :
+- Inscription / validation : message à l'écran uniquement
+- Mot de passe oublié (OTP) : **ne fonctionne pas**
 
 ### Option B — Manuel
 
