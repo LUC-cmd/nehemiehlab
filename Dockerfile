@@ -6,11 +6,14 @@ COPY backend/pom.xml .
 RUN mvn dependency:go-offline -B
 # Copie du code source et compilation
 COPY backend/src ./src
-RUN mvn clean package -DskipTests
+RUN mvn clean verify -B
 
 # Run stage
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
+RUN useradd --system --uid 10001 --no-create-home appuser
+COPY --from=build --chown=appuser:appuser /app/target/*.jar app.jar
+ENV SPRING_PROFILES_ACTIVE=prod
+USER appuser
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

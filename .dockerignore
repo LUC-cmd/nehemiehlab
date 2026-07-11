@@ -1,0 +1,11 @@
+.git
+.github
+.cursor
+.env
+**/.env
+**/application-local.properties
+**/node_modules
+**/target
+**/dist
+*.log
+*.sql

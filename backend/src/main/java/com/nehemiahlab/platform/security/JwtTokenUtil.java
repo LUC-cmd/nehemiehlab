@@ -7,14 +7,20 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Component
 public class JwtTokenUtil {
+
+    public static final String TYPE_ACCESS = "access";
+    public static final String TYPE_REFRESH = "refresh";
 
     @Value("${security.jwt.secret-key}")
     private String secret;
@@ -26,7 +32,10 @@ public class JwtTokenUtil {
     private long refreshExpiration;
 
     private Key getSigningKey() {
-        byte[] keyBytes = secret.getBytes();
+        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("Le secret JWT doit contenir au moins 32 octets.");
+        }
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
@@ -36,6 +45,15 @@ public class JwtTokenUtil {
 
     public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
+    }
+
+    public String extractTokenType(String token) {
+        try {
+            Object typ = extractAllClaims(token).get("typ");
+            return typ == null ? null : String.valueOf(typ);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
@@ -60,16 +78,20 @@ public class JwtTokenUtil {
         claims.put("role", user.getRole().name());
         claims.put("prenom", user.getPrenom());
         claims.put("nom", user.getNom());
+        claims.put("typ", TYPE_ACCESS);
         return createToken(claims, user.getEmail(), jwtExpiration);
     }
 
     public String generateRefreshToken(User user) {
-        return createToken(new HashMap<>(), user.getEmail(), refreshExpiration);
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("typ", TYPE_REFRESH);
+        return createToken(claims, user.getEmail(), refreshExpiration);
     }
 
     private String createToken(Map<String, Object> claims, String subject, long expiration) {
         return Jwts.builder()
                 .setClaims(claims)
+                .setId(UUID.randomUUID().toString())
                 .setSubject(subject)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + expiration))
@@ -78,7 +100,22 @@ public class JwtTokenUtil {
     }
 
     public Boolean validateToken(String token, String email) {
-        final String username = extractUsername(token);
-        return (username.equals(email) && !isTokenExpired(token));
+        return validateToken(token, email, TYPE_ACCESS);
+    }
+
+    public Boolean validateToken(String token, String email, String expectedType) {
+        try {
+            final String username = extractUsername(token);
+            final String typ = extractTokenType(token);
+            if (!username.equals(email) || isTokenExpired(token)) {
+                return false;
+            }
+            if (expectedType == null) {
+                return true;
+            }
+            return expectedType.equals(typ);
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

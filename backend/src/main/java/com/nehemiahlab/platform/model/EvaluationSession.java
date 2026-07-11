@@ -22,11 +22,29 @@ public class EvaluationSession {
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "eleve_id", nullable = false)
-    @JsonIgnoreProperties({"centre", "formateur", "projet"})
+    @JsonIgnoreProperties({"centre", "formateur"})
     private Eleve eleve;
 
+    /** Par défaut OFF (absent) — le formateur active la présence en séance */
     @Builder.Default
-    private boolean present = true;
+    private boolean present = false;
 
-    private Double note; // Note sur 20 (peut être null si pas de note)
+    /** Note de participation sur 10 (obligatoire si présent) */
+    private Double note;
+
+    /** Commentaire libre (optionnel) */
+    @Column(columnDefinition = "TEXT")
+    private String commentaire;
+
+    /** Projet travaillé par l'enfant pendant cette séance (optionnel si pas de projet) */
+    private String projetTravaille;
+
+    /** Heure d'arrivée réelle (quand le formateur passe sur ON — gère les retards) */
+    private java.time.LocalDateTime heureArrivee;
+
+    /** Heure de départ (fixée à la clôture de la séance si présent) */
+    private java.time.LocalDateTime heureDepart;
+
+    /** Minutes réellement effectuées par l'enfant dans cette séance */
+    private Long dureeMinutes;
 }

@@ -30,6 +30,28 @@ public class Centre {
     @Column
     private String region;
 
+    @Column
+    private String cluster;
+
+    private Double latitude;
+
+    private Double longitude;
+
+    /** Numéro du responsable / contact principal du centre */
+    private String telephoneResponsable;
+
+    /** Infos coordinateur du centre (sans créer de compte utilisateur) */
+    private String coordinateurNom;
+
+    private String coordinateurPrenom;
+
+    /** Numéro du coordinateur (affiché aux formateurs) */
+    private String telephoneCoordinateur;
+
+    /** Numéro du formateur du centre (affiché aux coordinateurs) */
+    private String telephoneFormateur;
+
+    /** Compte coordinateur optionnel (assigné plus tard par le Directeur) */
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "coordinateur_id")
     private User coordinateur;

@@ -1,28 +1,106 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { userService } from '../../services/api';
-import type { User } from '../../types';
-import { Plus, X, GraduationCap, Mail, Phone, Shield, Search, Loader2 } from 'lucide-react';
+import { centreService, userService } from '../../services/api';
+import type { Centre, User } from '../../types';
+import {
+  Mail, Phone, Shield, Search, CheckCircle2,
+  Building2, Clock, Calendar, MapPin, FileImage, Eye,
+  Trash2, Play, Filter,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
+import { PageLoadingSkeleton } from '../../components/ui/DashboardSkeletons';
+import { useMinDelayLoading } from '../../hooks/useMinDelayLoading';
+import InscriptionsToggle from '../../components/dashboard/InscriptionsToggle';
+import UserAvatar from '../../components/ui/UserAvatar';
+import Modal from '../../components/ui/Modal';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import SecureImage from '../../components/ui/SecureImage';
+
+function formatDate(value?: string) {
+  if (!value) return 'Non renseigné';
+  try {
+    return new Date(value).toLocaleDateString('fr-FR');
+  } catch {
+    return String(value).slice(0, 10);
+  }
+}
+
+type AssignPicker = { region: string; cluster: string; centreId: string };
+
+const emptyPicker = (): AssignPicker => ({ region: '', cluster: '', centreId: '' });
+
+function centreLabel(c: Centre): string {
+  const parts = [c.nom, c.ville];
+  if (c.region) parts.push(c.region);
+  if (c.cluster) parts.push(c.cluster);
+  return parts.filter(Boolean).join(' · ');
+}
+
+function centreHasOtherFormateur(centre: Centre, formateurId: number): boolean {
+  return (centre.formateurs ?? []).some((f) => f.id !== formateurId);
+}
+function CniBadge({ formateur }: { formateur: User }) {
+  const ok = Boolean(formateur.carteIdentiteRecto && formateur.carteIdentiteVerso);
+  const partial = Boolean(formateur.carteIdentiteRecto || formateur.carteIdentiteVerso);
+  if (ok) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+        <FileImage className="w-3 h-3" /> CNI complète
+      </span>
+    );
+  }
+  if (partial) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+        <FileImage className="w-3 h-3" /> CNI partielle
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+      <FileImage className="w-3 h-3" /> CNI manquante
+    </span>
+  );
+}
 
 export default function FormateursPage() {
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
+  const navigate = useNavigate();
   const [formateurs, setFormateurs] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newFormateur, setNewFormateur] = useState({ nom: '', prenom: '', email: '', telephone: '' });
+  const [regionFilter, setRegionFilter] = useState('');
+  const [clusterFilter, setClusterFilter] = useState('');
+  const [centreFilter, setCentreFilter] = useState('');
+  const [validatingId, setValidatingId] = useState<number | null>(null);
+  const [centres, setCentres] = useState<Centre[]>([]);
+  const [assignPickers, setAssignPickers] = useState<Record<number, AssignPicker>>({});
+  const [assigningId, setAssigningId] = useState<number | null>(null);
+  const [removingKey, setRemovingKey] = useState<string | null>(null);
+  const [confirmRemoveCentre, setConfirmRemoveCentre] = useState<{
+    formateurId: number;
+    centreId: number;
+    formateurName: string;
+    centreName: string;
+  } | null>(null);
+  const [detailFormateur, setDetailFormateur] = useState<User | null>(null);
+  const assignSectionRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const skeletonLoading = useMinDelayLoading(loading, 220);
 
   useEffect(() => {
-    fetchFormateurs();
+    fetchAll();
   }, []);
 
-  const fetchFormateurs = async () => {
+  const fetchAll = async () => {
     setLoading(true);
     try {
-      const res = await userService.getFormateurs();
-      setFormateurs(res.data);
+      const [formateursRes, centresRes] = await Promise.all([
+        userService.getFormateurs(),
+        hasRole('DIRECTEUR') ? centreService.getAll() : Promise.resolve({ data: [] }),
+      ]);
+      setFormateurs(formateursRes.data);
+      setCentres(centresRes.data);
     } catch {
       toast.error('Erreur lors du chargement des formateurs.');
     } finally {
@@ -30,158 +108,656 @@ export default function FormateursPage() {
     }
   };
 
-  const handlePreRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleValider = async (id: number) => {
+    setValidatingId(id);
     try {
-      await userService.preEnregistrerFormateur(newFormateur);
-      toast.success('Formateur pré-enregistré avec succès. Il peut maintenant créer son compte.');
-      setShowAddModal(false);
-      setNewFormateur({ nom: '', prenom: '', email: '', telephone: '' });
-      fetchFormateurs();
+      await userService.validerFormateur(id);
+      toast.success('Formateur validé. Vous pouvez lui assigner un ou plusieurs centres.');
+      await fetchAll();
+      setDetailFormateur((prev) => (prev?.id === id ? { ...prev, actif: true } : prev));
     } catch {
-      toast.error('Erreur lors du pré-enregistrement.');
+      toast.error('Erreur lors de la validation.');
+    } finally {
+      setValidatingId(null);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
-      </div>
-    );
-  }
+  const handleAssigner = async (formateurId: number) => {
+    const picker = assignPickers[formateurId] || emptyPicker();
+    const centreId = Number(picker.centreId);
+    if (!centreId) {
+      toast.error('Sélectionnez un centre.');
+      return;
+    }
+    setAssigningId(formateurId);
+    try {
+      await centreService.assignerFormateur(centreId, formateurId);
+      toast.success('Centre assigné au formateur.');
+      setAssignPickers((current) => ({
+        ...current,
+        [formateurId]: emptyPicker(),
+      }));
+      await fetchAll();
+      requestAnimationFrame(() => {
+        assignSectionRefs.current[formateurId]?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      });
+    } catch (err: unknown) {
+      const data = (err as { response?: { data?: { message?: string } | string } })?.response?.data;
+      const message =
+        (typeof data === 'string' ? data : data?.message) ||
+        'Impossible d’assigner ce centre au formateur.';
+      toast.error(message);
+    } finally {
+      setAssigningId(null);
+    }
+  };
+
+  const handleRetirer = async () => {
+    if (!confirmRemoveCentre) return;
+    const { formateurId, centreId } = confirmRemoveCentre;
+    const key = `${formateurId}-${centreId}`;
+    setConfirmRemoveCentre(null);
+    setRemovingKey(key);
+    try {
+      await centreService.retirerFormateur(centreId, formateurId);
+      toast.success('Centre retiré de l’affectation.');
+      await fetchAll();
+    } catch {
+      toast.error('Impossible de retirer ce centre.');
+    } finally {
+      setRemovingKey(null);
+    }
+  };
+
+  const startSessionForCentre = (centreId: number) => {
+    navigate(`/dashboard/sessions?centreId=${centreId}&action=new`);
+  };
+
+  const getPicker = (formateurId: number): AssignPicker =>
+    assignPickers[formateurId] || emptyPicker();
+
+  const setPickerField = (
+    formateurId: number,
+    field: keyof AssignPicker,
+    value: string,
+  ) => {
+    setAssignPickers((current) => {
+      const prev = current[formateurId] || emptyPicker();
+      const next = { ...prev, [field]: value };
+      if (field === 'region') {
+        next.cluster = '';
+        next.centreId = '';
+      }
+      if (field === 'cluster') {
+        next.centreId = '';
+      }
+      return { ...current, [formateurId]: next };
+    });
+  };
 
   const isDir = hasRole('DIRECTEUR');
-  const filtered = formateurs.filter(f => {
-    const searchLower = search.toLowerCase();
-    const matchName = `${f.prenom} ${f.nom}`.toLowerCase().includes(searchLower) || f.email.toLowerCase().includes(searchLower);
-    const matchCentre = f.centres?.some(c => 
-      c.nom.toLowerCase().includes(searchLower) || 
-      (c.region && c.region.toLowerCase().includes(searchLower)) ||
-      c.ville.toLowerCase().includes(searchLower)
-    );
-    return matchName || matchCentre;
-  });
+  const isFormateur = hasRole('FORMATEUR');
+  const enAttente = formateurs.filter((f) => !f.actif);
+  const actifs = formateurs.filter((f) => f.actif);
+
+  const regions = useMemo(() => {
+    const source = isDir && centres.length > 0
+      ? centres
+      : formateurs.flatMap((f) => f.centres || []);
+    return [...new Set(source.map((c) => c.region).filter(Boolean) as string[])].sort();
+  }, [centres, formateurs, isDir]);
+
+  const pageClusters = useMemo(() => {
+    const source = isDir && centres.length > 0
+      ? centres
+      : formateurs.flatMap((f) => f.centres || []);
+    let list = source;
+    if (regionFilter) list = list.filter((c) => c.region === regionFilter);
+    return [...new Set(list.map((c) => c.cluster).filter(Boolean) as string[])].sort();
+  }, [centres, formateurs, isDir, regionFilter]);
+
+  const pageCentresOptions = useMemo(() => {
+    const source = isDir && centres.length > 0
+      ? centres
+      : formateurs.flatMap((f) => f.centres || []);
+    let list = source;
+    if (regionFilter) list = list.filter((c) => c.region === regionFilter);
+    if (clusterFilter) list = list.filter((c) => c.cluster === clusterFilter);
+    const unique = [...new Map(list.map((c) => [c.id, c])).values()];
+    return unique.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+  }, [centres, formateurs, isDir, regionFilter, clusterFilter]);
+
+  const availableCentresFor = (formateur: User, picker: AssignPicker): Centre[] => {
+    const assignedIds = new Set((formateur.centres || []).map((c) => c.id));
+    return centres
+      .filter((c) => {
+        if (assignedIds.has(c.id)) return false;
+        if (centreHasOtherFormateur(c, formateur.id)) return false;
+        if (picker.region && c.region !== picker.region) return false;
+        if (picker.cluster && c.cluster !== picker.cluster) return false;
+        return true;
+      })
+      .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+  };
+
+  const pickerClusters = (region: string) => {
+    const list = region ? centres.filter((c) => c.region === region) : centres;
+    return [...new Set(list.map((c) => c.cluster).filter(Boolean) as string[])].sort();
+  };
+
+  const filtered = useMemo(() => formateurs.filter((f) => {
+    const searchLower = search.toLowerCase().trim();
+    const matchName =
+      !searchLower ||
+      `${f.prenom} ${f.nom}`.toLowerCase().includes(searchLower) ||
+      f.email.toLowerCase().includes(searchLower);
+    const matchCentre =
+      searchLower &&
+      f.centres?.some(
+        (c) =>
+          c.nom.toLowerCase().includes(searchLower) ||
+          (c.region && c.region.toLowerCase().includes(searchLower)) ||
+          (c.cluster && c.cluster.toLowerCase().includes(searchLower)) ||
+          c.ville.toLowerCase().includes(searchLower),
+      );
+
+    if (searchLower && !matchName && !matchCentre) return false;
+
+    if (regionFilter && !f.centres?.some((c) => c.region === regionFilter)) return false;
+    if (clusterFilter && !f.centres?.some((c) => c.cluster === clusterFilter)) return false;
+    if (centreFilter && !f.centres?.some((c) => c.id === Number(centreFilter))) return false;
+
+    return true;
+  }), [formateurs, search, regionFilter, clusterFilter, centreFilter]);
+
+  if (skeletonLoading) {
+    return <PageLoadingSkeleton cardCount={6} />;
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Formateurs</h1>
-          <p className="text-dark-400 mt-1">Liste des formateurs de la plateforme.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Formateurs</h1>
+          <p className="text-slate-500 mt-1">
+            Un formateur peut intervenir sur un ou plusieurs centres. Chaque centre ne peut avoir
+            qu&apos;un seul formateur à la fois.
+          </p>
         </div>
-        {isDir && (
-          <button onClick={() => setShowAddModal(true)} className="btn-primary">
-            <Plus className="w-4 h-4" />
-            Pré-enregistrer un formateur
-          </button>
-        )}
       </div>
 
-      {/* Barre de recherche */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
-        <input type="text" placeholder="Rechercher par nom, centre, région..." className="input-field pl-11"
-          value={search} onChange={e => setSearch(e.target.value)} />
-      </div>
-
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((formateur) => (
-          <div key={formateur.id} className="card border border-dark-700 hover:border-dark-600 transition-all">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center">
-                <GraduationCap className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-white font-bold">{formateur.prenom} {formateur.nom}</h3>
-                <span className={`badge mt-1 ${formateur.actif ? 'badge-success' : 'badge-warning'}`}>
-                  {formateur.actif ? 'Compte actif' : 'En attente d\'inscription'}
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-4 border-t border-dark-800 text-sm">
-              <div className="flex items-center gap-2 text-dark-300">
-                <Mail className="w-4 h-4 text-dark-400" />
-                <span className="truncate">{formateur.email}</span>
-              </div>
-              <div className="flex items-center gap-2 text-dark-300">
-                <Phone className="w-4 h-4 text-dark-400" />
-                <span>{formateur.telephone || 'Non renseigné'}</span>
-              </div>
-              <div className="flex items-center gap-2 text-dark-300">
-                <Shield className="w-4 h-4 text-dark-400" />
-                <span className="text-xs uppercase tracking-wider font-semibold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded">Formateur</span>
-              </div>
-            </div>
-
-            {/* Centres affectés */}
-            <div className="mt-4 pt-4 border-t border-dark-800">
-              <span className="text-xs font-semibold text-dark-400 uppercase tracking-wider block mb-2">Centres d'affectation</span>
-              {formateur.centres && formateur.centres.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  {formateur.centres.map(c => (
-                    <div key={c.id} className="text-xs p-2 rounded-lg bg-dark-800 border border-dark-700">
-                      <div className="font-semibold text-white">{c.nom}</div>
-                      <div className="text-dark-400 mt-0.5">
-                        {c.ville} {c.region ? `— ${c.region}` : ''}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-dark-500 italic">Aucun centre assigné</p>
-              )}
-            </div>
-          </div>
-        ))}
-
-        {filtered.length === 0 && (
-          <div className="col-span-full card text-center py-12 text-dark-500">
-            Aucun formateur trouvé.
-          </div>
-        )}
-      </div>
-
-      {/* Modal Pré-enregistrement */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="card max-w-md w-full border border-dark-700">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Pré-enregistrer un formateur</h2>
-              <button onClick={() => setShowAddModal(false)} className="text-dark-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
-            <form onSubmit={handlePreRegister} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="label">Prénom</label>
-                  <input type="text" required placeholder="Prénom" className="input-field"
-                    value={newFormateur.prenom} onChange={e => setNewFormateur({ ...newFormateur, prenom: e.target.value })} />
-                </div>
-                <div>
-                  <label className="label">Nom</label>
-                  <input type="text" required placeholder="Nom" className="input-field"
-                    value={newFormateur.nom} onChange={e => setNewFormateur({ ...newFormateur, nom: e.target.value })} />
-                </div>
-              </div>
-              <div>
-                <label className="label">Adresse email</label>
-                <input type="email" required placeholder="formateur@email.com" className="input-field"
-                  value={newFormateur.email} onChange={e => setNewFormateur({ ...newFormateur, email: e.target.value })} />
-              </div>
-              <div>
-                <label className="label">Téléphone (optionnel)</label>
-                <input type="tel" placeholder="+228 XX XX XX XX" className="input-field"
-                  value={newFormateur.telephone} onChange={e => setNewFormateur({ ...newFormateur, telephone: e.target.value })} />
-              </div>
-              <p className="text-xs text-dark-400">
-                En pré-enregistrant ce formateur, vous lui permettez de créer son propre compte formateur avec le même nom, prénom et email.
+      {isDir && (
+        <div className="card border border-slate-200 bg-white">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-slate-900 font-semibold">Inscriptions formateurs (site public)</p>
+              <p className="text-sm text-slate-500 mt-1">
+                ON = bouton Inscription visible sur le site. OFF = masqué. Les nouveaux comptes
+                restent inactifs jusqu&apos;à votre validation.
               </p>
-              <button type="submit" className="btn-primary w-full justify-center">Pré-enregistrer</button>
-            </form>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <InscriptionsToggle variant="page" />
+              <span className="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium">
+                {enAttente.length} en attente
+              </span>
+              <span className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium">
+                {actifs.length} validés
+              </span>
+            </div>
           </div>
         </div>
       )}
+
+      <div className="space-y-3">
+        <div className="relative max-w-md">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
+          <input
+            type="text"
+            placeholder="Rechercher par nom, email, centre..."
+            className="input-field pl-11"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {(centres.length > 0 || regions.length > 0) && (
+          <div className="card border border-dark-700 p-4 space-y-3">
+            <p className="text-sm font-semibold text-white inline-flex items-center gap-2">
+              <Filter className="w-4 h-4 text-[#5ED9FF]" />
+              Filtrer les formateurs
+            </p>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs text-dark-400 mb-1">Région</label>
+                <select
+                  className="input-field text-sm"
+                  value={regionFilter}
+                  onChange={(e) => {
+                    setRegionFilter(e.target.value);
+                    setClusterFilter('');
+                    setCentreFilter('');
+                  }}
+                >
+                  <option value="">Toutes les régions</option>
+                  {regions.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-dark-400 mb-1">Cluster</label>
+                <select
+                  className="input-field text-sm"
+                  value={clusterFilter}
+                  onChange={(e) => {
+                    setClusterFilter(e.target.value);
+                    setCentreFilter('');
+                  }}
+                  disabled={!regionFilter && pageClusters.length === 0}
+                >
+                  <option value="">Tous les clusters</option>
+                  {pageClusters.map((cl) => (
+                    <option key={cl} value={cl}>{cl}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-dark-400 mb-1">Centre</label>
+                <select
+                  className="input-field text-sm"
+                  value={centreFilter}
+                  onChange={(e) => setCentreFilter(e.target.value)}
+                >
+                  <option value="">Tous les centres</option>
+                  {pageCentresOptions.map((c) => (
+                    <option key={c.id} value={c.id}>{centreLabel(c)}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {(regionFilter || clusterFilter || centreFilter) && (
+              <button
+                type="button"
+                className="text-xs text-[#5ED9FF] hover:underline"
+                onClick={() => {
+                  setRegionFilter('');
+                  setClusterFilter('');
+                  setCentreFilter('');
+                }}
+              >
+                Réinitialiser les filtres
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {isDir && enAttente.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <Clock className="w-5 h-5 text-amber-400" />
+            À valider ({enAttente.filter((f) => filtered.includes(f)).length})
+          </h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered
+              .filter((f) => !f.actif)
+              .map((formateur) => (
+                <div key={formateur.id} className="card border border-amber-500/30 bg-amber-500/5">
+                  <div className="flex items-center gap-4 mb-4">
+                    <UserAvatar user={formateur} size="md" rounded="xl" />
+                    <div>
+                      <h3 className="text-white font-bold">
+                        {formateur.prenom} {formateur.nom}
+                      </h3>
+                      <span className="badge badge-warning mt-1">En attente de validation</span>
+                      <div className="mt-2">
+                        <CniBadge formateur={formateur} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-sm text-dark-300 mb-4">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-dark-400" />
+                      <span className="truncate">{formateur.email}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-dark-400" />
+                      <span>{formateur.telephone || 'Non renseigné'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-dark-400" />
+                      <span>{formatDate(formateur.dateNaissance)}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDetailFormateur(formateur)}
+                      className="btn-ghost w-full justify-center"
+                    >
+                      <Eye className="w-4 h-4" />
+                      Voir le dossier
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleValider(formateur.id)}
+                      disabled={validatingId === formateur.id}
+                      className="btn-primary w-full justify-center disabled:opacity-50"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      {validatingId === formateur.id ? 'Validation...' : 'Valider le compte'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold text-white">Formateurs ({filtered.filter((f) => f.actif || !isDir).length})</h2>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filtered
+            .filter((f) => (isDir ? f.actif : true))
+            .map((formateur) => (
+              <div key={formateur.id} className="card border border-dark-700 hover:border-dark-600 transition-all">
+                <div className="flex items-center gap-4 mb-4">
+                  <UserAvatar user={formateur} size="md" rounded="xl" />
+                  <div>
+                    <h3 className="text-white font-bold">
+                      {formateur.prenom} {formateur.nom}
+                    </h3>
+                    <span className={`badge mt-1 ${formateur.actif ? 'badge-success' : 'badge-warning'}`}>
+                      {formateur.actif ? 'Compte validé' : 'En attente'}
+                    </span>
+                    {formateur.centres && formateur.centres.length > 0 && (
+                      <span className="ml-2 badge bg-blue-500/10 text-blue-400 border-blue-500/20 text-[10px]">
+                        {formateur.centres.length} centre{formateur.centres.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {isDir && (
+                      <div className="mt-2">
+                        <CniBadge formateur={formateur} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-4 border-t border-dark-800 text-sm">
+                  <div className="flex items-center gap-2 text-dark-300">
+                    <Mail className="w-4 h-4 text-dark-400" />
+                    <span className="truncate">{formateur.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-dark-300">
+                    <Phone className="w-4 h-4 text-dark-400" />
+                    <span>{formateur.telephone || 'Non renseigné'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-dark-300">
+                    <Shield className="w-4 h-4 text-dark-400" />
+                    <span className="text-xs uppercase tracking-wider font-semibold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded">
+                      Formateur
+                    </span>
+                  </div>
+                </div>
+
+                {isDir && (
+                  <button
+                    type="button"
+                    onClick={() => setDetailFormateur(formateur)}
+                    className="btn-ghost w-full justify-center mt-3"
+                  >
+                    <Eye className="w-4 h-4" />
+                    Voir le dossier / CNI
+                  </button>
+                )}
+
+                <div
+                  className="mt-4 pt-4 border-t border-dark-800"
+                  ref={(el) => {
+                    assignSectionRefs.current[formateur.id] = el;
+                  }}
+                >
+                  <span className="text-xs font-semibold text-dark-400 uppercase tracking-wider block mb-2">
+                    Centres d&apos;affectation
+                  </span>
+
+                  {formateur.centres && formateur.centres.length > 0 ? (
+                    <div className="flex flex-col gap-2 mb-3">
+                      {formateur.centres.map((c) => {
+                        const removeKey = `${formateur.id}-${c.id}`;
+                        const isOwnProfile = isFormateur && user?.id === formateur.id;
+                        return (
+                          <div
+                            key={c.id}
+                            className="text-xs p-2.5 rounded-lg bg-dark-800 border border-dark-700"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="font-semibold text-white">{c.nom}</div>
+                                <div className="text-dark-400 mt-0.5">
+                                  {c.ville}
+                                  {c.region ? ` · ${c.region}` : ''}
+                                  {c.cluster ? ` · ${c.cluster}` : ''}
+                                </div>
+                              </div>
+                              {isDir && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setConfirmRemoveCentre({
+                                      formateurId: formateur.id,
+                                      centreId: c.id,
+                                      formateurName: `${formateur.prenom} ${formateur.nom}`,
+                                      centreName: c.nom,
+                                    })
+                                  }
+                                  disabled={removingKey === removeKey}
+                                  className="shrink-0 p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                                  title="Retirer ce centre"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                            {isOwnProfile && formateur.actif && (
+                              <button
+                                type="button"
+                                onClick={() => startSessionForCentre(c.id)}
+                                className="mt-2 w-full btn-primary py-1.5 text-xs justify-center"
+                              >
+                                <Play className="w-3.5 h-3.5" />
+                                Démarrer une séance
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-dark-500 italic mb-3">Aucun centre assigné</p>
+                  )}
+
+                  {isDir && formateur.actif && (() => {
+                    const picker = getPicker(formateur.id);
+                    const options = availableCentresFor(formateur, picker);
+                    const clusters = pickerClusters(picker.region);
+                    return (
+                      <div className="space-y-2 rounded-xl border border-dashed border-dark-600 p-3 bg-dark-900/30">
+                        <label className="flex items-center gap-1.5 text-xs font-medium text-dark-300">
+                          <Building2 className="w-3.5 h-3.5" />
+                          {formateur.centres?.length ? 'Ajouter un centre' : 'Assigner un centre'}
+                        </label>
+                        <select
+                          className="input-field text-sm"
+                          value={picker.region}
+                          onChange={(e) => setPickerField(formateur.id, 'region', e.target.value)}
+                        >
+                          <option value="">Région…</option>
+                          {regions.map((r) => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
+                        </select>
+                        <select
+                          className="input-field text-sm"
+                          value={picker.cluster}
+                          onChange={(e) => setPickerField(formateur.id, 'cluster', e.target.value)}
+                          disabled={!picker.region}
+                        >
+                          <option value="">Cluster…</option>
+                          {clusters.map((cl) => (
+                            <option key={cl} value={cl}>{cl}</option>
+                          ))}
+                        </select>
+                        <select
+                          className="input-field text-sm"
+                          value={picker.centreId}
+                          onChange={(e) => setPickerField(formateur.id, 'centreId', e.target.value)}
+                          disabled={!picker.region}
+                        >
+                          <option value="">
+                            {options.length === 0
+                              ? 'Aucun centre disponible'
+                              : 'Choisir un centre…'}
+                          </option>
+                          {options.map((centre) => (
+                            <option key={centre.id} value={centre.id}>
+                              {centreLabel(centre)}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-dark-500 leading-relaxed">
+                          Centres sans formateur ou déjà les vôtres. Vous pouvez en ajouter plusieurs.
+                        </p>
+                        <button
+                          type="button"
+                          className="btn-primary w-full justify-center disabled:opacity-50 text-sm py-2"
+                          disabled={
+                            !picker.centreId || assigningId === formateur.id || options.length === 0
+                          }
+                          onClick={() => handleAssigner(formateur.id)}
+                        >
+                          {assigningId === formateur.id ? 'Assignation…' : 'Assigner'}
+                        </button>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            ))}
+
+          {filtered.filter((f) => (isDir ? f.actif : true)).length === 0 && (
+            <div className="col-span-full card text-center py-12 text-dark-500">
+              Aucun formateur trouvé.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Modal
+        open={Boolean(detailFormateur)}
+        title={detailFormateur ? `${detailFormateur.prenom} ${detailFormateur.nom}` : 'Dossier formateur'}
+        subtitle="Informations d’inscription et carte d’identité"
+        size="lg"
+        onClose={() => setDetailFormateur(null)}
+        footer={
+          detailFormateur && !detailFormateur.actif ? (
+            <button
+              type="button"
+              className="btn-primary w-full sm:w-auto justify-center"
+              disabled={validatingId === detailFormateur.id}
+              onClick={() => handleValider(detailFormateur.id)}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              {validatingId === detailFormateur.id ? 'Validation...' : 'Valider le compte'}
+            </button>
+          ) : undefined
+        }
+      >
+        {detailFormateur && (
+          <div className="space-y-5">
+            <div className="flex items-center gap-4">
+              <UserAvatar user={detailFormateur} size="lg" rounded="xl" />
+              <div>
+                <p className="font-bold text-slate-900 text-lg">
+                  {detailFormateur.prenom} {detailFormateur.nom}
+                </p>
+                <p className="text-sm text-slate-500">{detailFormateur.email}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <span className={`badge ${detailFormateur.actif ? 'badge-success' : 'badge-warning'}`}>
+                    {detailFormateur.actif ? 'Compte validé' : 'En attente'}
+                  </span>
+                  <CniBadge formateur={detailFormateur} />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3 text-sm">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-xs text-slate-500 flex items-center gap-1"><Phone className="w-3 h-3" /> Téléphone</p>
+                <p className="font-medium text-slate-800 mt-0.5">{detailFormateur.telephone || '—'}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-xs text-slate-500 flex items-center gap-1"><Calendar className="w-3 h-3" /> Date de naissance</p>
+                <p className="font-medium text-slate-800 mt-0.5">{formatDate(detailFormateur.dateNaissance)}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-xs text-slate-500 flex items-center gap-1"><MapPin className="w-3 h-3" /> Lieu de naissance</p>
+                <p className="font-medium text-slate-800 mt-0.5">{detailFormateur.lieuNaissance || '—'}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-xs text-slate-500 flex items-center gap-1"><MapPin className="w-3 h-3" /> Adresse</p>
+                <p className="font-medium text-slate-800 mt-0.5">{detailFormateur.adresse || '—'}</p>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                <FileImage className="w-4 h-4 text-[#004b57]" />
+                Carte d’identité
+              </h3>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {([
+                  ['Recto', detailFormateur.carteIdentiteRecto],
+                  ['Verso', detailFormateur.carteIdentiteVerso],
+                ] as const).map(([label, url]) => (
+                  <div key={label} className="rounded-xl border border-slate-200 p-2 bg-white">
+                    <p className="text-xs font-semibold text-slate-600 mb-1.5">{label}</p>
+                    {url ? (
+                      <SecureImage
+                        path={url}
+                        alt={`CNI ${label}`}
+                        className="w-full h-44 object-cover rounded-lg border border-slate-100"
+                      />
+                    ) : (
+                      <div className="h-44 rounded-lg border border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-400 bg-slate-50">
+                        Non fourni
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        open={confirmRemoveCentre != null}
+        title="Retirer ce centre ?"
+        message={
+          confirmRemoveCentre
+            ? `Retirer le centre « ${confirmRemoveCentre.centreName} » de l’affectation de ${confirmRemoveCentre.formateurName} ?`
+            : ''
+        }
+        confirmLabel="Retirer"
+        danger
+        onConfirm={handleRetirer}
+        onCancel={() => setConfirmRemoveCentre(null)}
+      />
     </div>
   );
 }

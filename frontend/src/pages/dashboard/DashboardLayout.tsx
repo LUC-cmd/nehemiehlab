@@ -4,59 +4,54 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Building2, Users, BookOpen, CreditCard,
   BarChart3, Bell, LogOut, Menu, X, ChevronDown, User,
-  AlertTriangle, Settings, GraduationCap, Timer
+  AlertTriangle, Settings, GraduationCap, Timer, Megaphone, Sparkles, Image as ImageIcon, Library, UsersRound, ClipboardCheck, Shield, History
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useAccess } from '../../context/AccessContext';
 import { notificationService } from '../../services/api';
-import type { Notification } from '../../types';
+import { LOGO_SRC, BRAND_TEAL } from '../../constants/branding';
+import { buildNavForRole, ROLE_LABELS } from '../../constants/roleAccess';
+import InscriptionsToggle from '../../components/dashboard/InscriptionsToggle';
+import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
+import UserAvatar from '../../components/ui/UserAvatar';
+import type { Notification, Role } from '../../types';
+import type { DashboardPage } from '../../constants/roleAccess';
 
-// Navigation par rôle
-const navByRole = {
-  DIRECTEUR: [
-    { to: '/dashboard', label: 'Vue d\'ensemble', icon: <LayoutDashboard className="w-5 h-5" />, exact: true },
-    { to: '/dashboard/centres', label: 'Centres', icon: <Building2 className="w-5 h-5" /> },
-    { to: '/dashboard/formateurs', label: 'Formateurs', icon: <GraduationCap className="w-5 h-5" /> },
-    { to: '/dashboard/eleves', label: 'Élèves', icon: <Users className="w-5 h-5" /> },
-    { to: '/dashboard/sessions', label: 'Sessions', icon: <Timer className="w-5 h-5" /> },
-    { to: '/dashboard/formations', label: 'Formations', icon: <BookOpen className="w-5 h-5" /> },
-    { to: '/dashboard/transactions', label: 'Transactions', icon: <CreditCard className="w-5 h-5" /> },
-    { to: '/dashboard/rapports', label: 'Rapports', icon: <BarChart3 className="w-5 h-5" /> },
-    { to: '/dashboard/utilisateurs', label: 'Utilisateurs', icon: <Settings className="w-5 h-5" /> },
-  ],
-  FORMATEUR: [
-    { to: '/dashboard', label: 'Vue d\'ensemble', icon: <LayoutDashboard className="w-5 h-5" />, exact: true },
-    { to: '/dashboard/mes-centres', label: 'Mes Centres', icon: <Building2 className="w-5 h-5" /> },
-    { to: '/dashboard/eleves', label: 'Mes Élèves', icon: <Users className="w-5 h-5" /> },
-    { to: '/dashboard/sessions', label: 'Mes Sessions', icon: <Timer className="w-5 h-5" /> },
-    { to: '/dashboard/formations', label: 'Journal de formation', icon: <BookOpen className="w-5 h-5" /> },
-    { to: '/dashboard/transactions', label: 'Mes Paiements', icon: <CreditCard className="w-5 h-5" /> },
-    { to: '/dashboard/rapports', label: 'Mes Rapports', icon: <BarChart3 className="w-5 h-5" /> },
-  ],
-  COORDINATEUR: [
-    { to: '/dashboard', label: 'Vue d\'ensemble', icon: <LayoutDashboard className="w-5 h-5" />, exact: true },
-    { to: '/dashboard/eleves', label: 'Élèves du centre', icon: <Users className="w-5 h-5" /> },
-    { to: '/dashboard/formations', label: 'Formations', icon: <BookOpen className="w-5 h-5" /> },
-    { to: '/dashboard/signalements', label: 'Signalements', icon: <AlertTriangle className="w-5 h-5" /> },
-  ],
-  COMPTABLE: [
-    { to: '/dashboard', label: 'Vue d\'ensemble', icon: <LayoutDashboard className="w-5 h-5" />, exact: true },
-    { to: '/dashboard/transactions', label: 'Transactions', icon: <CreditCard className="w-5 h-5" /> },
-    { to: '/dashboard/rapports', label: 'Rapports', icon: <BarChart3 className="w-5 h-5" /> },
-  ],
+const pageIcons: Record<DashboardPage, React.ReactNode> = {
+  home: <LayoutDashboard className="w-5 h-5" />,
+  centres: <Building2 className="w-5 h-5" />,
+  'mes-centres': <Building2 className="w-5 h-5" />,
+  formateurs: <GraduationCap className="w-5 h-5" />,
+  eleves: <Users className="w-5 h-5" />,
+  sessions: <Timer className="w-5 h-5" />,
+  formations: <BookOpen className="w-5 h-5" />,
+  'journal-activite': <History className="w-5 h-5" />,
+  transactions: <CreditCard className="w-5 h-5" />,
+  rapports: <BarChart3 className="w-5 h-5" />,
+  publications: <Megaphone className="w-5 h-5" />,
+  actualites: <Sparkles className="w-5 h-5" />,
+  galerie: <ImageIcon className="w-5 h-5" />,
+  ressources: <Library className="w-5 h-5" />,
+  communaute: <UsersRound className="w-5 h-5" />,
+  'profils-enfants': <Users className="w-5 h-5" />,
+  'controle-gestion': <ClipboardCheck className="w-5 h-5" />,
+  utilisateurs: <Settings className="w-5 h-5" />,
+  signalements: <AlertTriangle className="w-5 h-5" />,
+  permissions: <Shield className="w-5 h-5" />,
+  profil: <User className="w-5 h-5" />,
 };
 
-const roleColors: Record<string, string> = {
-  DIRECTEUR: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
-  FORMATEUR: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  COORDINATEUR: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  COMPTABLE: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-};
-
-const roleLabels: Record<string, string> = {
-  DIRECTEUR: 'Directeur',
-  FORMATEUR: 'Formateur',
-  COORDINATEUR: 'Coordinateur',
-  COMPTABLE: 'Comptable',
+const roleColors: Record<Role, string> = {
+  DIRECTEUR: 'bg-purple-50 text-purple-700 border-purple-200',
+  FORMATEUR: 'bg-blue-50 text-blue-700 border-blue-200',
+  COORDINATEUR: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  RESPONSABLE_CLUSTER: 'bg-violet-50 text-violet-700 border-violet-200',
+  COMPTABLE: 'bg-amber-50 text-amber-700 border-amber-200',
+  STAFF_NEHEMIAH: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  ANIMATEUR: 'bg-teal-50 text-teal-700 border-teal-200',
+  PARENT: 'bg-rose-50 text-rose-700 border-rose-200',
+  BENEVOLE: 'bg-lime-50 text-lime-700 border-lime-200',
+  PARTICIPANT: 'bg-sky-50 text-sky-700 border-sky-200',
 };
 
 // ─── Panneau de notifications ───────────────────────────────────
@@ -83,16 +78,16 @@ function NotificationsPanel({ onClose }: { onClose: () => void }) {
   return (
     <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 10, scale: 0.95 }} transition={{ duration: 0.15 }}
-      className="absolute right-0 top-12 w-96 card z-50 shadow-2xl shadow-black/50 border border-dark-600">
-      <div className="flex items-center justify-between mb-4 pb-3 border-b border-dark-700">
-        <h3 className="text-white font-semibold">Notifications</h3>
-        <button onClick={onClose} className="text-dark-400 hover:text-white">
+      className="absolute right-0 top-12 w-[min(24rem,calc(100vw-1.5rem))] card z-50 shadow-xl shadow-slate-900/10 border border-slate-200">
+      <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
+        <h3 className="text-slate-900 font-semibold">Notifications</h3>
+        <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
           <X className="w-4 h-4" />
         </button>
       </div>
 
       {notifs.length === 0 ? (
-        <div className="text-center py-8 text-dark-400">
+        <div className="text-center py-8 text-slate-400">
           <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
           <p className="text-sm">Aucune notification</p>
         </div>
@@ -102,17 +97,17 @@ function NotificationsPanel({ onClose }: { onClose: () => void }) {
             <div key={n.id}
               onClick={() => !n.lu && marquerLu(n.id)}
               className={`p-3 rounded-xl cursor-pointer transition-all ${
-                n.lu ? 'bg-dark-800/40' : 'bg-dark-800 border border-dark-600 hover:border-primary-500/30'
+                n.lu ? 'bg-slate-50' : 'bg-white border border-slate-200 hover:border-primary-300'
               }`}>
               <div className="flex items-start gap-3">
                 <div className="mt-0.5">{typeIcon[n.type]}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <p className={`text-sm font-medium truncate ${n.lu ? 'text-dark-400' : 'text-white'}`}>{n.titre}</p>
+                    <p className={`text-sm font-medium truncate ${n.lu ? 'text-slate-400' : 'text-slate-900'}`}>{n.titre}</p>
                     {!n.lu && <span className="w-2 h-2 rounded-full bg-primary-500 shrink-0" />}
                   </div>
-                  <p className="text-xs text-dark-400 mt-0.5">{n.message}</p>
-                  <p className="text-xs text-dark-500 mt-1">
+                  <p className="text-xs text-slate-500 mt-0.5">{n.message}</p>
+                  <p className="text-xs text-slate-400 mt-1">
                     {new Date(n.createdAt).toLocaleDateString('fr-FR')}
                   </p>
                 </div>
@@ -128,14 +123,20 @@ function NotificationsPanel({ onClose }: { onClose: () => void }) {
 // ─── Layout Principal ────────────────────────────────────────────
 export default function DashboardLayout() {
   const { user, role, logout } = useAuth();
+  const { hasFeature } = useAccess();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  const navItems = role ? navByRole[role] ?? [] : [];
+  const navItems = (role ? buildNavForRole(role, hasFeature) : []).map((item) => ({
+    ...item,
+    icon: pageIcons[item.page],
+  }));
 
   // Polling notifications toutes les 30s
   useEffect(() => {
@@ -149,17 +150,41 @@ export default function DashboardLayout() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleLogout = () => {
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const requestLogout = () => {
+    setShowUserMenu(false);
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutConfirm(false);
     logout();
     navigate('/');
   };
 
+  const cancelLogout = () => {
+    setShowLogoutConfirm(false);
+  };
+
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
-      {/* Logo */}
-      <div className="px-5 py-6 border-b border-dark-800">
-        <img src="http://nehemiahlab.com/assets/img/logo.png" alt="Nehemiah Lab"
-          className={`transition-all duration-300 ${sidebarOpen ? 'h-9' : 'h-8 mx-auto'}`} />
+      {/* Logo centré */}
+      <div className="px-5 py-6 border-b border-slate-200 flex items-center justify-center">
+        <img
+          src={LOGO_SRC}
+          alt="Smart Kids Academy"
+          className={`transition-all duration-300 rounded-lg object-contain mx-auto ${sidebarOpen || mobileSidebar ? 'h-14' : 'h-10'}`}
+        />
       </div>
 
       {/* Navigation */}
@@ -180,17 +205,15 @@ export default function DashboardLayout() {
         ))}
       </nav>
 
-      {/* User info bas de sidebar */}
-      <div className="p-4 border-t border-dark-800">
-        <div className={`flex items-center gap-3 p-3 rounded-xl bg-dark-800 ${!sidebarOpen && !mobileSidebar ? 'justify-center' : ''}`}>
-          <div className="w-9 h-9 rounded-full bg-primary-500/20 border border-primary-500/30 flex items-center justify-center text-primary-400 shrink-0">
-            <User className="w-4 h-4" />
-          </div>
+      {/* Pied de sidebar — fond bleu marque */}
+      <div className="p-4 border-t border-[#003a44] bg-[#004b57]">
+        <div className={`flex items-center gap-3 p-3 rounded-xl bg-white/10 ${!sidebarOpen && !mobileSidebar ? 'justify-center' : ''}`}>
+          <UserAvatar user={user} size="sm" className="shrink-0 ring-2 ring-white/30" />
           {(sidebarOpen || mobileSidebar) && (
             <div className="min-w-0 flex-1">
               <p className="text-white text-sm font-medium truncate">{user?.prenom} {user?.nom}</p>
-              <span className={`badge text-xs border ${role ? roleColors[role] : ''}`}>
-                {role ? roleLabels[role] : ''}
+              <span className="inline-block mt-1 text-[10px] font-semibold uppercase tracking-wide text-white/90 bg-white/15 px-2 py-0.5 rounded-md">
+                {role ? ROLE_LABELS[role] : ''}
               </span>
             </div>
           )}
@@ -200,110 +223,145 @@ export default function DashboardLayout() {
   );
 
   return (
-    <div className="flex h-screen bg-dark-950 overflow-hidden">
-      {/* Sidebar Desktop */}
-      <aside className={`hidden lg:flex flex-col bg-dark-900 border-r border-dark-800 transition-all duration-300 ${
-        sidebarOpen ? 'w-64' : 'w-20'
-      }`}>
-        <SidebarContent />
-      </aside>
+    <>
+      <div className="dashboard-page flex h-screen h-[100dvh] overflow-hidden bg-transparent">
+        {/* Sidebar Desktop */}
+        <aside className={`hidden lg:flex flex-col border-r border-slate-200 transition-all duration-300 bg-white ${
+          sidebarOpen ? 'w-64' : 'w-20'
+        }`}>
+          <SidebarContent />
+        </aside>
 
-      {/* Sidebar Mobile */}
-      <AnimatePresence>
-        {mobileSidebar && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 z-40 lg:hidden"
-              onClick={() => setMobileSidebar(false)} />
-            <motion.aside
-              initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
-              transition={{ type: 'spring', damping: 25 }}
-              className="fixed left-0 top-0 bottom-0 w-72 bg-dark-900 border-r border-dark-800 z-50 lg:hidden flex flex-col">
-              <SidebarContent />
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+        {/* Sidebar Mobile */}
+        <AnimatePresence>
+          {mobileSidebar && (
+            <>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden"
+                onClick={() => setMobileSidebar(false)} />
+              <motion.aside
+                initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
+                transition={{ type: 'spring', damping: 25 }}
+                className="fixed left-0 top-0 bottom-0 w-[min(18rem,88vw)] border-r border-slate-200 z-50 lg:hidden flex flex-col bg-white pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 lg:hidden">
+                  <p className="text-sm font-semibold text-slate-800">Menu</p>
+                  <button
+                    type="button"
+                    onClick={() => setMobileSidebar(false)}
+                    className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 touch-target"
+                    aria-label="Fermer le menu"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <SidebarContent />
+              </motion.aside>
+            </>
+          )}
+        </AnimatePresence>
 
-      {/* Zone principale */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Topbar */}
-        <header className="h-16 bg-dark-900 border-b border-dark-800 px-4 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            {/* Toggle sidebar desktop */}
-            <button onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="hidden lg:flex btn-ghost p-2">
-              <Menu className="w-5 h-5" />
-            </button>
-            {/* Toggle mobile */}
-            <button onClick={() => setMobileSidebar(true)}
-              className="lg:hidden btn-ghost p-2">
-              <Menu className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Notifications */}
-            <div className="relative">
-              <button
-                onClick={() => { setShowNotifs(!showNotifs); setShowUserMenu(false); }}
-                className="btn-ghost p-2 relative">
-                <Bell className="w-5 h-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
+        {/* Zone principale */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Topbar */}
+          <header
+            className="min-h-16 border-b border-white/10 px-3 sm:px-4 flex items-center justify-between shrink-0 text-white relative z-20 pt-[env(safe-area-inset-top)]"
+            style={{ backgroundColor: BRAND_TEAL }}
+          >
+            <div className="flex items-center gap-3">
+              {/* Toggle sidebar desktop */}
+              <button onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="hidden lg:flex p-2 rounded-lg text-white/85 hover:text-white hover:bg-white/10 transition-colors">
+                <Menu className="w-5 h-5" />
               </button>
-              <AnimatePresence>
-                {showNotifs && <NotificationsPanel onClose={() => setShowNotifs(false)} />}
-              </AnimatePresence>
+              {/* Toggle mobile */}
+              <button onClick={() => setMobileSidebar(true)}
+                className="lg:hidden p-2 rounded-lg text-white/85 hover:text-white hover:bg-white/10 transition-colors">
+                <Menu className="w-5 h-5" />
+              </button>
+              {!isOnline && (
+                <span className="hidden sm:inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-300/40 text-amber-100">
+                  Hors ligne
+                </span>
+              )}
             </div>
 
-            {/* Menu utilisateur */}
-            <div className="relative">
-              <button
-                onClick={() => { setShowUserMenu(!showUserMenu); setShowNotifs(false); }}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-dark-800 transition-colors">
-                <div className="w-8 h-8 rounded-full bg-primary-500/20 border border-primary-500/30 flex items-center justify-center">
-                  <User className="w-4 h-4 text-primary-400" />
-                </div>
-                <div className="hidden sm:block text-left">
-                  <p className="text-white text-sm font-medium leading-none">{user?.prenom} {user?.nom}</p>
-                  <p className="text-dark-400 text-xs mt-0.5">{role ? roleLabels[role] : ''}</p>
-                </div>
-                <ChevronDown className={`w-4 h-4 text-dark-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
-              </button>
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Directeur : ouvrir / fermer inscriptions (toujours visible) */}
+              {role === 'DIRECTEUR' && <InscriptionsToggle variant="topbar" />}
 
-              <AnimatePresence>
-                {showUserMenu && (
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-12 w-52 card z-50 shadow-2xl border border-dark-600 p-1">
-                    <NavLink to="/dashboard/profil"
-                      onClick={() => setShowUserMenu(false)}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-dark-800 text-dark-300 hover:text-white text-sm transition-colors">
-                      <User className="w-4 h-4" />
-                      Mon profil
-                    </NavLink>
-                    <hr className="border-dark-700 my-1" />
-                    <button onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-500/10 text-dark-300 hover:text-red-400 text-sm transition-colors">
-                      <LogOut className="w-4 h-4" />
-                      Se déconnecter
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {/* Notifications */}
+              <div className="relative">
+                <button
+                  onClick={() => { setShowNotifs(!showNotifs); setShowUserMenu(false); }}
+                  className="p-2 relative rounded-lg text-white/90 hover:text-white hover:bg-white/10 transition-colors">
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-white text-[#004b57] text-xs rounded-full flex items-center justify-center font-bold">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                <AnimatePresence>
+                  {showNotifs && <NotificationsPanel onClose={() => setShowNotifs(false)} />}
+                </AnimatePresence>
+              </div>
+
+              {/* Menu utilisateur */}
+              <div className="relative">
+                <button
+                  onClick={() => { setShowUserMenu(!showUserMenu); setShowNotifs(false); }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 transition-colors">
+                  <UserAvatar
+                    user={user}
+                    size="sm"
+                    className="!bg-white/15 !border-white/25 !text-white ring-1 ring-white/20"
+                  />
+                  <div className="hidden sm:block text-left">
+                    <p className="text-white text-sm font-medium leading-none">{user?.prenom} {user?.nom}</p>
+                    <p className="text-white/65 text-xs mt-0.5">{role ? ROLE_LABELS[role] : ''}</p>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-white/70 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
+                </button>
+
+                <AnimatePresence>
+                  {showUserMenu && (
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.15 }}
+                      className="absolute right-0 top-12 w-52 card z-50 shadow-xl border border-slate-200 p-1">
+                      <NavLink to="/dashboard/profil"
+                        onClick={() => setShowUserMenu(false)}
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900 text-sm transition-colors">
+                        <User className="w-4 h-4" />
+                        Mon profil
+                      </NavLink>
+                      <hr className="border-slate-200 my-1" />
+                      <button onClick={requestLogout}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-slate-600 hover:text-red-600 text-sm transition-colors">
+                        <LogOut className="w-4 h-4" />
+                        Se déconnecter
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
 
         {/* Contenu */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-          <Outlet />
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 md:p-6 lg:p-8 bg-slate-50 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="mx-auto w-full max-w-7xl min-w-0">
+            <Outlet />
+          </div>
         </main>
+        </div>
       </div>
-    </div>
+
+      <LogoutConfirmDialog
+        open={showLogoutConfirm}
+        userName={user?.prenom}
+        onConfirm={confirmLogout}
+        onCancel={cancelLogout}
+      />
+    </>
   );
 }

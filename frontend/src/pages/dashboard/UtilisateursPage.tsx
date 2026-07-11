@@ -1,9 +1,17 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { userService, centreService } from '../../services/api';
+import { ROLE_LABELS, ROLES_CREABLES_PAR_DIRECTEUR, ROLE_ACCESS_SUMMARY } from '../../constants/roleAccess';
 import type { User, Centre, Role } from '../../types';
-import { Plus, X, Search, Shield, UserCheck, UserX, Loader2 } from 'lucide-react';
+import { Plus, Search, Shield, UserCheck, UserX } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { cleanNameInput, cleanPhoneInput, FIRSTNAME_EXAMPLE, NAME_EXAMPLE } from '../../utils/formInputs';
+import { PageLoadingSkeleton, TableSkeleton } from '../../components/ui/DashboardSkeletons';
+import { useMinDelayLoading } from '../../hooks/useMinDelayLoading';
+import UserAvatar from '../../components/ui/UserAvatar';
+import Modal from '../../components/ui/Modal';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 export default function UtilisateursPage() {
   const { hasRole } = useAuth();
@@ -14,14 +22,35 @@ export default function UtilisateursPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [confirmDesactiverId, setConfirmDesactiverId] = useState<number | null>(null);
+  const skeletonLoading = useMinDelayLoading(loading, 220);
   
   // Form states
-  const [newAccount, setNewAccount] = useState({ nom: '', prenom: '', email: '', role: 'COORDINATEUR' as Role, centreId: '' });
+  const [newAccount, setNewAccount] = useState({
+    nom: '',
+    prenom: '',
+    email: '',
+    telephone: '',
+    dateNaissance: '',
+    lieuNaissance: '',
+    adresse: '',
+    role: 'RESPONSABLE_CLUSTER' as Role,
+    centreId: '',
+    cluster: '',
+    motDePasse: '',
+  });
+  const [clusters, setClusters] = useState<string[]>([]);
 
   useEffect(() => {
     fetchUsers();
     if (hasRole('DIRECTEUR')) {
       centreService.getAll().then(r => setCentres(r.data)).catch(() => {});
+      userService.getClusters().then(r => setClusters(r.data)).catch(() => {
+        centreService.getAll().then((r) => {
+          const distinct = [...new Set((r.data || []).map((c: Centre) => c.cluster).filter(Boolean))] as string[];
+          setClusters(distinct.sort());
+        }).catch(() => {});
+      });
     }
   }, []);
 
@@ -39,22 +68,46 @@ export default function UtilisateursPage() {
 
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (newAccount.role === 'COORDINATEUR' && !newAccount.centreId) {
+      toast.error('Sélectionnez le centre pour le coordinateur.');
+      return;
+    }
+    if (newAccount.role === 'RESPONSABLE_CLUSTER' && !newAccount.cluster) {
+      toast.error('Sélectionnez le cluster pour le responsable.');
+      return;
+    }
     try {
-      await userService.createCompte({
+      const res = await userService.createCompte({
         ...newAccount,
-        centreId: newAccount.centreId ? Number(newAccount.centreId) : undefined
+        centreId: newAccount.centreId ? Number(newAccount.centreId) : undefined,
+        cluster: newAccount.cluster || undefined,
+        motDePasse: newAccount.motDePasse.trim() || undefined,
       });
-      toast.success('Compte créé avec succès.');
+      const pwd = res?.data?.motDePasseInitial;
+      if (pwd) {
+        toast.success(`Compte créé. Mot de passe initial: ${pwd}`);
+      } else {
+        toast.success('Compte créé avec succès.');
+      }
       setShowAddModal(false);
-      setNewAccount({ nom: '', prenom: '', email: '', role: 'COORDINATEUR', centreId: '' });
+      setNewAccount({
+        nom: '', prenom: '', email: '', telephone: '', dateNaissance: '', lieuNaissance: '', adresse: '',
+        role: 'RESPONSABLE_CLUSTER', centreId: '', cluster: '', motDePasse: '',
+      });
       fetchUsers();
     } catch {
       toast.error('Erreur lors de la création du compte.');
     }
   };
 
-  const handleDesactiver = async (id: number) => {
-    if (!window.confirm('Voulez-vous vraiment désactiver ce compte ?')) return;
+  const handleDesactiver = (id: number) => {
+    setConfirmDesactiverId(id);
+  };
+
+  const confirmDesactiver = async () => {
+    if (confirmDesactiverId == null) return;
+    const id = confirmDesactiverId;
+    setConfirmDesactiverId(null);
     try {
       await userService.desactiver(id);
       toast.success('Compte désactivé.');
@@ -64,12 +117,8 @@ export default function UtilisateursPage() {
     }
   };
 
-  if (loading && users.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
-      </div>
-    );
+  if (skeletonLoading && users.length === 0) {
+    return <PageLoadingSkeleton showTable />;
   }
 
   const isDir = hasRole('DIRECTEUR');
@@ -79,13 +128,23 @@ export default function UtilisateursPage() {
   );
 
   const getRoleBadge = (role: Role) => {
-    const badges: Record<Role, React.ReactNode> = {
-      DIRECTEUR: <span className="badge border border-purple-500/30 bg-purple-500/10 text-purple-400 text-xs">Directeur</span>,
-      FORMATEUR: <span className="badge border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs">Formateur</span>,
-      COORDINATEUR: <span className="badge border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-xs">Coordinateur</span>,
-      COMPTABLE: <span className="badge border border-amber-500/30 bg-amber-500/10 text-amber-400 text-xs">Comptable</span>,
+    const colors: Record<Role, string> = {
+      DIRECTEUR: 'border-purple-500/30 bg-purple-500/10 text-purple-400',
+      FORMATEUR: 'border-blue-500/30 bg-blue-500/10 text-blue-400',
+      COORDINATEUR: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
+      RESPONSABLE_CLUSTER: 'border-violet-500/30 bg-violet-500/10 text-violet-400',
+      COMPTABLE: 'border-amber-500/30 bg-amber-500/10 text-amber-400',
+      STAFF_NEHEMIAH: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-400',
+      ANIMATEUR: 'border-teal-500/30 bg-teal-500/10 text-teal-400',
+      PARENT: 'border-rose-500/30 bg-rose-500/10 text-rose-400',
+      BENEVOLE: 'border-lime-500/30 bg-lime-500/10 text-lime-400',
+      PARTICIPANT: 'border-sky-500/30 bg-sky-500/10 text-sky-400',
     };
-    return badges[role] || role;
+    return (
+      <span className={`badge border text-xs ${colors[role] || ''}`}>
+        {ROLE_LABELS[role] || role}
+      </span>
+    );
   };
 
   return (
@@ -93,7 +152,9 @@ export default function UtilisateursPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Gestion des Utilisateurs</h1>
-          <p className="text-dark-400 mt-1">Créez et gérez les comptes d'accès pour les coordinateurs et comptables.</p>
+          <p className="text-dark-400 mt-1">
+            Créez les comptes staff / CEDJ. Les parents se connectent avec le matricule (Espace parent).
+          </p>
         </div>
         {isDir && (
           <button onClick={() => setShowAddModal(true)} className="btn-primary">
@@ -110,11 +171,32 @@ export default function UtilisateursPage() {
           value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center h-48">
-          <Loader2 className="w-6 h-6 text-primary-500 animate-spin" />
-        </div>
+      {skeletonLoading ? (
+        <TableSkeleton rows={6} />
       ) : (
+        <>
+          {isDir && (
+            <div className="card border border-slate-200 bg-white p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                <h2 className="text-sm font-semibold text-slate-900">Qui voit quoi (aperçu)</h2>
+                <Link
+                  to="/dashboard/permissions"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#004b57] hover:underline"
+                >
+                  <Shield className="w-3.5 h-3.5" />
+                  Configurer les permissions
+                </Link>
+              </div>
+              <ul className="grid sm:grid-cols-2 gap-2 text-xs text-slate-600">
+                {(Object.keys(ROLE_ACCESS_SUMMARY) as Role[]).map((r) => (
+                  <li key={r} className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
+                    <span className="font-semibold text-slate-800">{ROLE_LABELS[r]}</span>
+                    <span className="block mt-0.5 leading-snug">{ROLE_ACCESS_SUMMARY[r]}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         <div className="table-wrapper">
           <table>
             <thead>
@@ -130,7 +212,10 @@ export default function UtilisateursPage() {
               {filtered.map((u) => (
                 <tr key={u.id}>
                   <td>
-                    <span className="text-white font-medium">{u.prenom} {u.nom}</span>
+                    <div className="flex items-center gap-3">
+                      <UserAvatar user={u} size="sm" />
+                      <span className="text-white font-medium">{u.prenom} {u.nom}</span>
+                    </div>
                   </td>
                   <td className="text-dark-300">{u.email}</td>
                   <td>{getRoleBadge(u.role)}</td>
@@ -166,60 +251,141 @@ export default function UtilisateursPage() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {/* Modal Créer Compte */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="card max-w-md w-full border border-dark-700">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Nouveau compte</h2>
-              <button onClick={() => setShowAddModal(false)} className="text-dark-400 hover:text-white"><X className="w-5 h-5" /></button>
+      <Modal
+        open={showAddModal}
+        title="Nouveau compte"
+        size="md"
+        onClose={() => setShowAddModal(false)}
+        footer={
+          <>
+            <button type="button" onClick={() => setShowAddModal(false)} className="btn-ghost w-full sm:w-auto justify-center">
+              Annuler
+            </button>
+            <button type="submit" form="create-account-form" className="btn-primary w-full sm:w-auto justify-center">
+              Créer le compte
+            </button>
+          </>
+        }
+      >
+        <form id="create-account-form" onSubmit={handleCreateAccount} className="space-y-3 sm:space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label className="label">Prénom</label>
+              <input type="text" required placeholder={`Ex: ${FIRSTNAME_EXAMPLE}`} className="input-field"
+                value={newAccount.prenom} onChange={e => setNewAccount({ ...newAccount, prenom: cleanNameInput(e.target.value) })} />
             </div>
-            <form onSubmit={handleCreateAccount} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="label">Prénom</label>
-                  <input type="text" required placeholder="Prénom" className="input-field"
-                    value={newAccount.prenom} onChange={e => setNewAccount({ ...newAccount, prenom: e.target.value })} />
-                </div>
-                <div>
-                  <label className="label">Nom</label>
-                  <input type="text" required placeholder="Nom" className="input-field"
-                    value={newAccount.nom} onChange={e => setNewAccount({ ...newAccount, nom: e.target.value })} />
-                </div>
-              </div>
-              <div>
-                <label className="label">Adresse email</label>
-                <input type="email" required placeholder="Ex: email@nehemiahlab.com" className="input-field"
-                  value={newAccount.email} onChange={e => setNewAccount({ ...newAccount, email: e.target.value })} />
-              </div>
-              <div>
-                <label className="label">Rôle</label>
-                <select className="input-field" value={newAccount.role} onChange={e => setNewAccount({ ...newAccount, role: e.target.value as Role })}>
-                  <option value="COORDINATEUR">Coordinateur</option>
-                  <option value="COMPTABLE">Comptable</option>
-                </select>
-              </div>
-              {newAccount.role === 'COORDINATEUR' && (
-                <div>
-                  <label className="label">Affecter au centre (Optionnel)</label>
-                  <select className="input-field" value={newAccount.centreId} onChange={e => setNewAccount({ ...newAccount, centreId: e.target.value })}>
-                    <option value="">Sélectionner le centre...</option>
-                    {centres.map(c => (
-                      <option key={c.id} value={c.id}>{c.nom}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <p className="text-xs text-dark-400">
-                Note : Pour les formateurs, utilisez le menu de pré-enregistrement dans la page "Formateurs".
-              </p>
-              <button type="submit" className="btn-primary w-full justify-center">Créer le compte</button>
-            </form>
+            <div>
+              <label className="label">Nom</label>
+              <input type="text" required placeholder={`Ex: ${NAME_EXAMPLE}`} className="input-field"
+                value={newAccount.nom} onChange={e => setNewAccount({ ...newAccount, nom: cleanNameInput(e.target.value) })} />
+            </div>
           </div>
-        </div>
-      )}
+          <div>
+            <label className="label">Adresse email</label>
+            <input type="email" required placeholder="Ex: email@nehemiahlab.com" className="input-field"
+              value={newAccount.email} onChange={e => setNewAccount({ ...newAccount, email: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">Téléphone</label>
+            <input
+              type="text"
+              placeholder="Ex: 99099509"
+              className="input-field"
+              inputMode="numeric"
+              value={newAccount.telephone}
+              onChange={e => setNewAccount({ ...newAccount, telephone: cleanPhoneInput(e.target.value) })}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label className="label">Date de naissance</label>
+              <input
+                type="date"
+                className="input-field"
+                max={new Date().toISOString().split('T')[0]}
+                value={newAccount.dateNaissance}
+                onChange={e => setNewAccount({ ...newAccount, dateNaissance: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="label">Lieu de naissance</label>
+              <input type="text" className="input-field"
+                value={newAccount.lieuNaissance} onChange={e => setNewAccount({ ...newAccount, lieuNaissance: e.target.value })} />
+            </div>
+          </div>
+          <div>
+            <label className="label">Adresse</label>
+            <input type="text" className="input-field"
+              value={newAccount.adresse} onChange={e => setNewAccount({ ...newAccount, adresse: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">Rôle</label>
+            <select className="input-field" value={newAccount.role} onChange={e => setNewAccount({ ...newAccount, role: e.target.value as Role })}>
+              {ROLES_CREABLES_PAR_DIRECTEUR.map((r) => (
+                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-xs text-dark-400">
+              {ROLE_ACCESS_SUMMARY[newAccount.role]}
+            </p>
+            <p className="mt-1 text-xs text-dark-500">
+              Parent : pas de création ici — connexion via matricule (Espace parent).
+            </p>
+          </div>
+          <div>
+            <label className="label">Mot de passe initial (optionnel)</label>
+            <input
+              type="text"
+              placeholder="Généré automatiquement si vide"
+              className="input-field"
+              value={newAccount.motDePasse}
+              onChange={e => setNewAccount({ ...newAccount, motDePasse: e.target.value })}
+            />
+          </div>
+          {newAccount.role === 'COORDINATEUR' && (
+            <div>
+              <label className="label">Centre assigné *</label>
+              <select className="input-field" required value={newAccount.centreId} onChange={e => setNewAccount({ ...newAccount, centreId: e.target.value })}>
+                <option value="">Sélectionner le centre...</option>
+                {centres.filter(c => !c.coordinateur).map(c => (
+                  <option key={c.id} value={c.id}>{c.nom} — {c.cluster || c.ville}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-dark-500">Un coordinateur ne gère qu&apos;un seul centre.</p>
+            </div>
+          )}
+          {newAccount.role === 'RESPONSABLE_CLUSTER' && (
+            <div>
+              <label className="label">Cluster assigné *</label>
+              <select className="input-field" required value={newAccount.cluster} onChange={e => setNewAccount({ ...newAccount, cluster: e.target.value })}>
+                <option value="">Sélectionner le cluster...</option>
+                {clusters.map((cl) => (
+                  <option key={cl} value={cl}>{cl}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-dark-500">Le responsable voit tous les centres de ce cluster.</p>
+            </div>
+          )}
+          <p className="text-xs text-slate-500">
+            Si aucun mot de passe n&apos;est saisi, un mot de passe temporaire sécurisé sera généré
+            et devra être communiqué au collaborateur.
+          </p>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={confirmDesactiverId != null}
+        title="Désactiver ce compte ?"
+        message="Le compte ne pourra plus se connecter tant qu’il n’est pas réactivé."
+        confirmLabel="Désactiver"
+        danger
+        onConfirm={confirmDesactiver}
+        onCancel={() => setConfirmDesactiverId(null)}
+      />
     </div>
   );
 }

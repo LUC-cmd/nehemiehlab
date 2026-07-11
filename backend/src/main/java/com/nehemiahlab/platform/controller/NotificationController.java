@@ -5,6 +5,7 @@ import com.nehemiahlab.platform.model.User;
 import com.nehemiahlab.platform.repository.NotificationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/notifications")
+@PreAuthorize("isAuthenticated()")
 public class NotificationController {
 
     @Autowired

@@ -1,27 +1,82 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { formationService, centreService, eleveService } from '../../services/api';
-import type { ModuleFormation, Centre, Eleve } from '../../types';
-import { Plus, X, BookOpen, Calendar, Clock, User, Check, Loader2 } from 'lucide-react';
+import { formationService, centreService, eleveService, userService } from '../../services/api';
+import type { ModuleFormation, Centre, Eleve, User as UserType } from '../../types';
+import { Plus, BookOpen, Calendar, Clock, User, Check, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { CardsSkeleton, PageLoadingSkeleton } from '../../components/ui/DashboardSkeletons';
+import { useMinDelayLoading } from '../../hooks/useMinDelayLoading';
+import Modal from '../../components/ui/Modal';
+import {
+  clearOfflineFormations,
+  enqueueOfflineFormation,
+  listOfflineFormations,
+  newLocalId,
+} from '../../utils/offlineSessions';
 
 export default function FormationsPage() {
-  const { role, hasRole } = useAuth();
-  
+  const { hasRole } = useAuth();
+
   const [formations, setFormations] = useState<ModuleFormation[]>([]);
   const [centres, setCentres] = useState<Centre[]>([]);
   const [eleves, setEleves] = useState<Eleve[]>([]);
-  
+  const [formateurs, setFormateurs] = useState<UserType[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  
-  // Form states
+  const [modalStudentsLoading, setModalStudentsLoading] = useState(false);
+  const skeletonLoading = useMinDelayLoading(loading, 220);
+
   const [selectedCentreId, setSelectedCentreId] = useState('');
-  const [newFormation, setNewFormation] = useState({ titre: '', description: '', dureeHeures: '', date: new Date().toISOString().split('T')[0] });
+  const [selectedFormateurId, setSelectedFormateurId] = useState('');
+  const [newFormation, setNewFormation] = useState({
+    titre: '',
+    description: '',
+    dureeHeures: '',
+    date: new Date().toISOString().split('T')[0],
+  });
   const [presents, setPresents] = useState<number[]>([]);
+
+  const isFormateur = hasRole('FORMATEUR');
 
   useEffect(() => {
     fetchInitialData();
+  }, []);
+
+  useEffect(() => {
+    const syncPendingOfflineFormations = async () => {
+      if (!navigator.onLine) return;
+
+      const pending = listOfflineFormations();
+      if (pending.length === 0) return;
+
+      const failures = [];
+      let syncedCount = 0;
+      for (const draft of pending) {
+        try {
+          await formationService.create({
+            centreId: draft.centreId,
+            titre: draft.titre,
+            description: draft.description,
+            dureeHeures: draft.dureeHeures,
+            date: draft.date,
+            elevesPresents: draft.elevesPresents,
+          });
+          syncedCount += 1;
+        } catch {
+          failures.push(draft);
+        }
+      }
+
+      clearOfflineFormations(failures);
+      if (syncedCount > 0) {
+        toast.success(`${syncedCount} module(s) hors ligne synchronisé(s).`);
+      }
+    };
+
+    syncPendingOfflineFormations();
+    window.addEventListener('online', syncPendingOfflineFormations);
+    return () => window.removeEventListener('online', syncPendingOfflineFormations);
   }, []);
 
   useEffect(() => {
@@ -35,29 +90,44 @@ export default function FormationsPage() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      // 1. Charger les formations selon le rôle
       let formRes;
-      if (hasRole('FORMATEUR')) {
+      if (isFormateur) {
         formRes = await formationService.getMesFormations();
       } else {
-        // Directeur et Coordinateur chargent par rapport à un centre ou global. Pour simplifier, on prend les centres d'abord
-        formRes = { data: [] }; // On va charger après avoir sélectionné un centre
+        formRes = { data: [] as ModuleFormation[] };
       }
       setFormations(formRes.data);
 
-      // 2. Charger les centres autorisés
-      let centresRes;
-      if (hasRole('DIRECTEUR')) {
-        centresRes = await centreService.getAll();
-      } else {
-        centresRes = await centreService.getMesCentres();
-      }
+      const centresRes = hasRole('DIRECTEUR')
+        ? await centreService.getAll()
+        : await centreService.getMesCentres();
       setCentres(centresRes.data);
+
+      if (!isFormateur) {
+        const centreFormateurs = Array.from(
+          new Map(
+            centresRes.data
+              .flatMap((centre: Centre) => centre.formateurs ?? [])
+              .map((formateur: UserType) => [formateur.id, formateur]),
+          ).values(),
+        ) as UserType[];
+
+        if (centreFormateurs.length > 0) {
+          setFormateurs(centreFormateurs);
+        } else {
+          try {
+            const formateursRes = await userService.getFormateurs();
+            setFormateurs(formateursRes.data);
+          } catch {
+            setFormateurs([]);
+          }
+        }
+      }
+
       if (centresRes.data.length > 0) {
         const firstCentreId = centresRes.data[0].id;
         setSelectedCentreId(String(firstCentreId));
-        if (!hasRole('FORMATEUR')) {
-          // Si pas formateur, on charge les formations de ce premier centre
+        if (!isFormateur) {
           const res = await formationService.getByCentre(firstCentreId);
           setFormations(res.data);
         }
@@ -70,33 +140,57 @@ export default function FormationsPage() {
   };
 
   const fetchEleves = async (centreId: number) => {
+    setModalStudentsLoading(true);
     try {
       const res = await eleveService.getByCentre(centreId);
       setEleves(res.data);
-      setPresents([]); // Reset
+      setPresents([]);
     } catch {
       toast.error('Erreur lors du chargement des élèves du centre.');
+    } finally {
+      setModalStudentsLoading(false);
     }
   };
 
   const handleCentreChange = async (centreId: string) => {
     setSelectedCentreId(centreId);
-    if (!hasRole('FORMATEUR') && centreId) {
+    if (!isFormateur && centreId) {
       setLoading(true);
       try {
-        const res = await formationService.getByCentre(Number(centreId));
+        const res = await formationService.getByCentre(
+          Number(centreId),
+          selectedFormateurId ? { formateurId: Number(selectedFormateurId) } : undefined,
+        );
         setFormations(res.data);
       } catch {
-        toast.error('Erreur lors du chargement des formations de ce centre.');
+        toast.error('Erreur lors du chargement des modules de ce centre.');
       } finally {
         setLoading(false);
       }
     }
   };
 
+  const handleFormateurChange = async (formateurId: string) => {
+    setSelectedFormateurId(formateurId);
+    if (!selectedCentreId) return;
+
+    setLoading(true);
+    try {
+      const res = await formationService.getByCentre(
+        Number(selectedCentreId),
+        formateurId ? { formateurId: Number(formateurId) } : undefined,
+      );
+      setFormations(res.data);
+    } catch {
+      toast.error('Erreur lors du filtrage des modules par formateur.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const toggleStudentPresence = (id: number) => {
-    setPresents(prev => 
-      prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]
+    setPresents((prev) =>
+      prev.includes(id) ? prev.filter((pId) => pId !== id) : [...prev, id],
     );
   };
 
@@ -106,22 +200,47 @@ export default function FormationsPage() {
       toast.error('Veuillez sélectionner un centre.');
       return;
     }
-    try {
-      await formationService.create({
-        centreId: Number(selectedCentreId),
-        titre: newFormation.titre,
-        description: newFormation.description,
-        dureeHeures: Number(newFormation.dureeHeures),
-        date: newFormation.date,
-        elevesPresents: presents
+
+    const formationData = {
+      centreId: Number(selectedCentreId),
+      titre: newFormation.titre,
+      description: newFormation.description,
+      dureeHeures: Number(newFormation.dureeHeures),
+      date: newFormation.date,
+      elevesPresents: presents,
+    };
+
+    if (!navigator.onLine) {
+      enqueueOfflineFormation({
+        localId: newLocalId('formation'),
+        ...formationData,
+        createdAt: Date.now(),
       });
-      toast.success('Rapport de formation enregistré.');
+      toast.success('Module enregistré hors ligne. Il sera synchronisé au retour de la connexion.');
       setShowAddModal(false);
-      setNewFormation({ titre: '', description: '', dureeHeures: '', date: new Date().toISOString().split('T')[0] });
+      setNewFormation({
+        titre: '',
+        description: '',
+        dureeHeures: '',
+        date: new Date().toISOString().split('T')[0],
+      });
       setPresents([]);
-      
-      // Recharger
-      if (hasRole('FORMATEUR')) {
+      return;
+    }
+
+    try {
+      await formationService.create(formationData);
+      toast.success('Module enseigné enregistré dans le journal.');
+      setShowAddModal(false);
+      setNewFormation({
+        titre: '',
+        description: '',
+        dureeHeures: '',
+        date: new Date().toISOString().split('T')[0],
+      });
+      setPresents([]);
+
+      if (isFormateur) {
         const formRes = await formationService.getMesFormations();
         setFormations(formRes.data);
       } else {
@@ -129,78 +248,115 @@ export default function FormationsPage() {
         setFormations(res.data);
       }
     } catch {
-      toast.error('Erreur lors de l\'enregistrement de la formation.');
+      toast.error("Erreur lors de l'enregistrement du module.");
     }
   };
 
-  const isFormateur = hasRole('FORMATEUR');
-
-  if (loading && centres.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
-      </div>
-    );
+  if (skeletonLoading && centres.length === 0) {
+    return <PageLoadingSkeleton cardCount={4} />;
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Journal des Formations</h1>
-          <p className="text-dark-400 mt-1">Saisie et suivi des modules enseignés dans les centres.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Modules enseignés</h1>
+          <p className="text-slate-500 mt-1 max-w-2xl">
+            {isFormateur
+              ? 'Journal pédagogique : saisissez le contenu enseigné (thème, description, durée). Pour le chrono et les notes en direct, utilisez « Séances terrain ».'
+              : 'Consultation du journal pédagogique des modules enseignés par centre.'}
+          </p>
         </div>
         {isFormateur && (
-          <button onClick={() => setShowAddModal(true)} className="btn-primary">
+          <button type="button" onClick={() => setShowAddModal(true)} className="btn-primary shrink-0">
             <Plus className="w-4 h-4" />
             Saisir un module
           </button>
         )}
       </div>
 
-      {/* Select Centre pour les autres rôles */}
-      {!isFormateur && centres.length > 0 && (
-        <div className="flex items-center gap-2 max-w-xs">
-          <label className="text-sm text-dark-400 whitespace-nowrap">Centre :</label>
-          <select className="input-field py-2 text-sm" value={selectedCentreId} onChange={e => handleCentreChange(e.target.value)}>
-            {centres.map(c => (
-              <option key={c.id} value={c.id}>{c.nom}</option>
-            ))}
-          </select>
+      {isFormateur && (
+        <div className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+          <Info className="w-5 h-5 shrink-0 mt-0.5 text-sky-600" />
+          <div>
+            <p className="font-semibold">Deux outils différents</p>
+            <p className="text-sky-800/90 mt-0.5 text-xs sm:text-sm leading-relaxed">
+              <strong>Séances terrain</strong> = démarrer / clôturer sur place (présences, notes, GPS).{' '}
+              <strong>Modules enseignés</strong> = écrire ce qui a été enseigné (contenu pédagogique).
+              Vous pouvez saisir un module ici même sans avoir démarré une séance.
+            </p>
+          </div>
         </div>
       )}
 
-      {loading ? (
-        <div className="flex items-center justify-center h-48">
-          <Loader2 className="w-6 h-6 text-primary-500 animate-spin" />
+      {!isFormateur && centres.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2 max-w-xs">
+            <label className="text-sm text-slate-500 whitespace-nowrap">Centre :</label>
+            <select
+              className="input-field py-2 text-sm"
+              value={selectedCentreId}
+              onChange={(e) => handleCentreChange(e.target.value)}
+            >
+              {centres.map((c) => (
+                <option key={c.id} value={c.id}>{c.nom}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2 max-w-xs">
+            <label className="text-sm text-slate-500 whitespace-nowrap">Formateur :</label>
+            <select
+              className="input-field py-2 text-sm"
+              value={selectedFormateurId}
+              onChange={(e) => handleFormateurChange(e.target.value)}
+            >
+              <option value="">Tous les formateurs</option>
+              {formateurs.map((formateur) => (
+                <option key={formateur.id} value={formateur.id}>
+                  {formateur.prenom} {formateur.nom}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
+      )}
+
+      {skeletonLoading ? (
+        <CardsSkeleton count={4} />
       ) : (
         <div className="space-y-4">
           {formations.map((f) => (
-            <div key={f.id} className="card border border-dark-700 hover:border-dark-600 transition-all p-5">
+            <div
+              key={f.id}
+              className="card border border-slate-200 bg-white hover:border-slate-300 transition-all p-5"
+            >
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                <div className="space-y-2">
+                <div className="space-y-2 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="p-1.5 rounded-lg bg-primary-500/15 text-primary-400">
+                    <span className="p-1.5 rounded-lg bg-primary-50 text-primary-700 border border-primary-100">
                       <BookOpen className="w-4 h-4" />
                     </span>
-                    <h3 className="text-white font-bold text-lg">{f.titre}</h3>
+                    <h3 className="text-slate-900 font-bold text-lg">{f.titre}</h3>
                   </div>
-                  <p className="text-dark-300 text-sm">{f.description}</p>
+                  <p className="text-slate-600 text-sm whitespace-pre-wrap">{f.description}</p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4 text-xs text-dark-400 shrink-0">
-                  <span className="flex items-center gap-1.5 bg-dark-800 border border-dark-700 px-3 py-1.5 rounded-lg">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 shrink-0">
+                  <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
                     <Calendar className="w-3.5 h-3.5" />
                     {new Date(f.date).toLocaleDateString('fr-FR')}
                   </span>
-                  <span className="flex items-center gap-1.5 bg-dark-800 border border-dark-700 px-3 py-1.5 rounded-lg">
+                  <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
                     <Clock className="w-3.5 h-3.5" />
-                    {f.dureeHeures} heures
+                    {f.dureeHeures} h
                   </span>
-                  <span className="flex items-center gap-1.5 bg-dark-800 border border-dark-700 px-3 py-1.5 rounded-lg text-emerald-400 border-emerald-500/20 bg-emerald-500/5">
+                  <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
                     <User className="w-3.5 h-3.5" />
-                    {f.elevesPresents?.length ?? 0} élèves présents
+                    {[f.formateurPrenom, f.formateurNom].filter(Boolean).join(' ') || 'Formateur inconnu'}
+                  </span>
+                  <span className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 text-emerald-800 px-3 py-1.5 rounded-lg">
+                    <User className="w-3.5 h-3.5" />
+                    {f.elevesPresents?.length ?? 0} présents
                   </span>
                 </div>
               </div>
@@ -208,85 +364,154 @@ export default function FormationsPage() {
           ))}
 
           {formations.length === 0 && (
-            <div className="card text-center py-12 text-dark-500">
-              Aucune formation enregistrée pour ce centre.
+            <div className="card border border-slate-200 bg-white text-center py-12 text-slate-500">
+              {isFormateur
+                ? 'Aucun module saisi pour le moment. Cliquez sur « Saisir un module » pour enregistrer le contenu enseigné.'
+                : 'Aucun module enregistré pour ce centre.'}
             </div>
           )}
         </div>
       )}
 
-      {/* Modal Ajout Formation */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="card max-w-lg w-full border border-dark-700 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Saisir un module enseigné</h2>
-              <button onClick={() => setShowAddModal(false)} className="text-dark-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
-            <form onSubmit={handleAddFormation} className="space-y-4">
-              <div>
-                <label className="label">Centre de formation</label>
-                <select className="input-field" required value={selectedCentreId} onChange={e => handleCentreChange(e.target.value)}>
-                  <option value="">Sélectionner le centre...</option>
-                  {centres.map(c => (
-                    <option key={c.id} value={c.id}>{c.nom}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label">Titre du module / Thème</label>
-                <input type="text" required placeholder="Ex: Introduction au Lean Startup" className="input-field"
-                  value={newFormation.titre} onChange={e => setNewFormation({ ...newFormation, titre: e.target.value })} />
-              </div>
-              <div>
-                <label className="label">Description du contenu enseigné</label>
-                <textarea rows={3} required placeholder="Détails du cours dispensé..." className="input-field"
-                  value={newFormation.description} onChange={e => setNewFormation({ ...newFormation, description: e.target.value })} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="label">Durée (heures)</label>
-                  <input type="number" step="0.5" required placeholder="Ex: 2" className="input-field"
-                    value={newFormation.dureeHeures} onChange={e => setNewFormation({ ...newFormation, dureeHeures: e.target.value })} />
-                </div>
-                <div>
-                  <label className="label">Date de la séance</label>
-                  <input type="date" required className="input-field"
-                    value={newFormation.date} onChange={e => setNewFormation({ ...newFormation, date: e.target.value })} />
-                </div>
-              </div>
-
-              {/* Sélection des élèves présents */}
-              <div>
-                <label className="label">Élèves présents ({presents.length})</label>
-                <div className="border border-dark-700 rounded-xl p-3 bg-dark-800 max-h-40 overflow-y-auto space-y-1.5">
-                  {eleves.map(e => {
-                    const isPresent = presents.includes(e.id);
-                    return (
-                      <div key={e.id} onClick={() => toggleStudentPresence(e.id)}
-                        className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
-                          isPresent ? 'bg-primary-500/10 border border-primary-500/30 text-primary-400' : 'hover:bg-dark-700 text-dark-300'
-                        }`}>
-                        <span className="text-sm font-medium">{e.prenom} {e.nom}</span>
-                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
-                          isPresent ? 'border-primary-500 bg-primary-500 text-white' : 'border-dark-600'
-                        }`}>
-                          {isPresent && <Check className="w-3.5 h-3.5" />}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {eleves.length === 0 && (
-                    <p className="text-xs text-dark-500 italic text-center py-4">Aucun élève dans ce centre.</p>
-                  )}
-                </div>
-              </div>
-
-              <button type="submit" className="btn-primary w-full justify-center">Enregistrer la séance</button>
-            </form>
+      <Modal
+        open={showAddModal}
+        title="Saisir un module enseigné"
+        size="lg"
+        onClose={() => setShowAddModal(false)}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setShowAddModal(false)}
+              className="btn-ghost w-full sm:w-auto justify-center"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              form="add-formation-form"
+              className="btn-primary w-full sm:w-auto justify-center"
+            >
+              Enregistrer le module
+            </button>
+          </>
+        }
+      >
+        <form id="add-formation-form" onSubmit={handleAddFormation} className="space-y-3 sm:space-y-4">
+          <p className="text-xs text-slate-500 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
+            Journal pédagogique (contenu enseigné). Pour démarrer le chrono et noter les élèves en direct, allez dans{' '}
+            <strong>Séances terrain</strong>.
+          </p>
+          <div>
+            <label className="label">Centre</label>
+            <select
+              className="input-field"
+              required
+              value={selectedCentreId}
+              onChange={(e) => handleCentreChange(e.target.value)}
+            >
+              <option value="">Sélectionner le centre...</option>
+              {centres.map((c) => (
+                <option key={c.id} value={c.id}>{c.nom}</option>
+              ))}
+            </select>
           </div>
-        </div>
-      )}
+          <div>
+            <label className="label">Titre du module / thème</label>
+            <input
+              type="text"
+              required
+              placeholder="Ex: Introduction au Lean Startup"
+              className="input-field"
+              value={newFormation.titre}
+              onChange={(e) => setNewFormation({ ...newFormation, titre: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Contenu enseigné</label>
+            <textarea
+              rows={3}
+              required
+              placeholder="Décrivez ce qui a été enseigné…"
+              className="input-field"
+              value={newFormation.description}
+              onChange={(e) => setNewFormation({ ...newFormation, description: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label className="label">Durée (heures)</label>
+              <input
+                type="number"
+                step="0.5"
+                min={0.5}
+                required
+                placeholder="Ex: 2"
+                className="input-field"
+                value={newFormation.dureeHeures}
+                onChange={(e) => setNewFormation({ ...newFormation, dureeHeures: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="label">Date</label>
+              <input
+                type="date"
+                required
+                className="input-field"
+                value={newFormation.date}
+                onChange={(e) => setNewFormation({ ...newFormation, date: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="label">Élèves présents ({presents.length})</label>
+            <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 max-h-40 overflow-y-auto space-y-1.5">
+              {modalStudentsLoading && (
+                <>
+                  <div className="skeleton-block h-9 rounded-lg" />
+                  <div className="skeleton-block h-9 rounded-lg" />
+                  <div className="skeleton-block h-9 rounded-lg" />
+                </>
+              )}
+              {!modalStudentsLoading &&
+                eleves.map((e) => {
+                  const isPresent = presents.includes(e.id);
+                  return (
+                    <div
+                      key={e.id}
+                      onClick={() => toggleStudentPresence(e.id)}
+                      className={`flex items-center justify-between p-2 rounded-lg cursor-pointer border transition-colors ${
+                        isPresent
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                          : 'bg-red-50 border-red-200 text-red-800 hover:bg-red-100'
+                      }`}
+                    >
+                      <span className="text-sm font-medium">
+                        {e.prenom} {e.nom}
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${
+                          isPresent
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-red-600 text-white'
+                        }`}
+                      >
+                        {isPresent && <Check className="w-3 h-3" />}
+                        {isPresent ? 'ON' : 'OFF'}
+                      </span>
+                    </div>
+                  );
+                })}
+              {!modalStudentsLoading && eleves.length === 0 && (
+                <p className="text-xs text-slate-500 italic text-center py-4">
+                  Aucun élève dans ce centre.
+                </p>
+              )}
+            </div>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

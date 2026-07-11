@@ -1,16 +1,24 @@
 package com.nehemiahlab.platform.controller;
 
-import com.nehemiahlab.platform.model.PreRegistration;
+import com.nehemiahlab.platform.model.Centre;
 import com.nehemiahlab.platform.model.Role;
 import com.nehemiahlab.platform.model.User;
-import com.nehemiahlab.platform.repository.PreRegistrationRepository;
+import com.nehemiahlab.platform.repository.CentreRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
+import com.nehemiahlab.platform.service.InscriptionSettingsService;
+import com.nehemiahlab.platform.security.InputSanitizer;
+import com.nehemiahlab.platform.security.SecureFileStorage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -22,10 +30,16 @@ public class UserController {
     private UserRepository userRepository;
 
     @Autowired
-    private PreRegistrationRepository preRegistrationRepository;
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private CentreRepository centreRepository;
+
+    @Autowired
+    private InscriptionSettingsService inscriptionSettingsService;
+
+    @Autowired
+    private SecureFileStorage secureFileStorage;
 
     @GetMapping
     @PreAuthorize("hasRole('DIRECTEUR')")
@@ -34,84 +48,296 @@ public class UserController {
     }
 
     @GetMapping("/formateurs")
+    @PreAuthorize("hasAnyRole('DIRECTEUR', 'COORDINATEUR', 'COMPTABLE', 'FORMATEUR')")
     public ResponseEntity<List<User>> getFormateurs() {
-        return ResponseEntity.ok(userRepository.findByRole(Role.FORMATEUR));
+        return ResponseEntity.ok(userRepository.findByRoleOrderByCreatedAtDesc(Role.FORMATEUR));
+    }
+
+    @GetMapping("/formateurs/en-attente")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<List<User>> getFormateursEnAttente() {
+        return ResponseEntity.ok(userRepository.findByRoleAndActifFalseOrderByCreatedAtDesc(Role.FORMATEUR));
     }
 
     @GetMapping("/coordinateurs")
+    @PreAuthorize("hasAnyRole('DIRECTEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER')")
     public ResponseEntity<List<User>> getCoordinateurs() {
         return ResponseEntity.ok(userRepository.findByRole(Role.COORDINATEUR));
     }
 
-    @PostMapping("/pre-enregistrer-formateur")
+    @GetMapping("/clusters")
     @PreAuthorize("hasRole('DIRECTEUR')")
-    public ResponseEntity<?> preEnregistrerFormateur(@RequestBody Map<String, String> body) {
-        String nom = body.get("nom");
-        String prenom = body.get("prenom");
-        String email = body.get("email");
-        String telephone = body.get("telephone");
+    public ResponseEntity<List<String>> getClusters() {
+        return ResponseEntity.ok(centreRepository.findDistinctClusters());
+    }
 
-        if (preRegistrationRepository.existsByEmail(email) || userRepository.existsByEmail(email)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Un formateur avec cet email est déjà enregistré."));
+    @GetMapping("/inscriptions-formateurs/statut")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<?> getInscriptionsStatut() {
+        boolean ouverte = inscriptionSettingsService.isInscriptionFormateursOuverte();
+        return ResponseEntity.ok(Map.of("ouverte", ouverte));
+    }
+
+    @PutMapping("/inscriptions-formateurs/statut")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<?> setInscriptionsStatut(@RequestBody Map<String, Object> body) {
+        boolean ouverte = Boolean.parseBoolean(String.valueOf(body.getOrDefault("ouverte", false)));
+        inscriptionSettingsService.setInscriptionFormateursOuverte(ouverte);
+        return ResponseEntity.ok(Map.of(
+                "ouverte", ouverte,
+                "message", ouverte
+                        ? "Les inscriptions formateurs sont ouvertes."
+                        : "Les inscriptions formateurs sont fermées."
+        ));
+    }
+
+    @PutMapping("/{id}/valider-formateur")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<?> validerFormateur(@PathVariable Long id) {
+        Optional<User> userOpt = userRepository.findById(id);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
         }
-
-        PreRegistration preReg = PreRegistration.builder()
-                .nom(nom)
-                .prenom(prenom)
-                .email(email)
-                .telephone(telephone)
-                .utilise(false)
-                .build();
-
-        preRegistrationRepository.save(preReg);
-        return ResponseEntity.ok(Map.of("message", "Formateur pré-enregistré avec succès."));
+        User user = userOpt.get();
+        if (user.getRole() != Role.FORMATEUR) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Cet utilisateur n'est pas un formateur."));
+        }
+        user.setActif(true);
+        userRepository.save(user);
+        return ResponseEntity.ok(Map.of(
+                "message", "Formateur validé. Il peut maintenant se connecter. Affectez-lui un centre ensuite.",
+                "user", user
+        ));
     }
 
     @PostMapping("/creer-compte")
     @PreAuthorize("hasRole('DIRECTEUR')")
-    public ResponseEntity<?> creerCompte(@RequestBody Map<String, String> body) {
-        String nom = body.get("nom");
-        String prenom = body.get("prenom");
-        String email = body.get("email");
-        String roleStr = body.get("role");
+    public ResponseEntity<?> creerCompte(@RequestBody Map<String, Object> body) {
+        String nom = body.get("nom").toString();
+        String prenom = body.get("prenom").toString();
+        String email = body.get("email").toString();
+        String roleStr = body.get("role").toString();
+        String motDePassePropose = body.get("motDePasse") != null ? body.get("motDePasse").toString().trim() : "";
+        String telephone = body.get("telephone") != null ? body.get("telephone").toString() : null;
+        String lieuNaissance = body.get("lieuNaissance") != null ? body.get("lieuNaissance").toString() : null;
+        String adresse = body.get("adresse") != null ? body.get("adresse").toString() : null;
+        LocalDate dateNaissance = null;
+        if (body.get("dateNaissance") != null && !body.get("dateNaissance").toString().isBlank()) {
+            try {
+                dateNaissance = LocalDate.parse(body.get("dateNaissance").toString());
+            } catch (Exception ignored) {
+            }
+        }
 
         if (userRepository.existsByEmail(email)) {
             return ResponseEntity.badRequest().body(Map.of("message", "Cet email est déjà utilisé."));
         }
 
         Role role = Role.valueOf(roleStr);
-        if (role == Role.DIRECTEUR || role == Role.FORMATEUR) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Rôle non autorisé pour ce formulaire."));
+        if (role == Role.DIRECTEUR || role == Role.FORMATEUR || role == Role.PARENT) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message",
+                    role == Role.PARENT
+                            ? "Les parents se connectent avec le matricule de l'enfant (Espace parent). Aucun compte à créer ici."
+                            : "Rôle non autorisé pour ce formulaire."
+            ));
         }
+
+        String motDePasseInitial = motDePassePropose.isEmpty() ? "password123" : motDePassePropose;
 
         User user = User.builder()
                 .nom(nom)
                 .prenom(prenom)
                 .email(email)
-                .motDePasse(passwordEncoder.encode("password123")) // Par défaut, réinitialisable
+                .motDePasse(passwordEncoder.encode(motDePasseInitial))
                 .role(role)
+                .telephone(telephone)
+                .lieuNaissance(lieuNaissance)
+                .adresse(adresse)
+                .dateNaissance(dateNaissance)
                 .actif(true)
                 .build();
 
         userRepository.save(user);
-        return ResponseEntity.ok(Map.of("message", "Compte créé avec succès. Mot de passe par défaut : password123"));
+
+        if (role == Role.COORDINATEUR) {
+            if (!body.containsKey("centreId") || body.get("centreId") == null || body.get("centreId").toString().isBlank()) {
+                userRepository.delete(user);
+                return ResponseEntity.badRequest().body(Map.of("message", "Le centre est obligatoire pour un coordinateur."));
+            }
+            Long centreId = Long.valueOf(body.get("centreId").toString());
+            Optional<Centre> centreOpt = centreRepository.findById(centreId);
+            if (centreOpt.isEmpty()) {
+                userRepository.delete(user);
+                return ResponseEntity.badRequest().body(Map.of("message", "Centre introuvable."));
+            }
+            Centre centre = centreOpt.get();
+            if (centre.getCoordinateur() != null) {
+                userRepository.delete(user);
+                return ResponseEntity.badRequest().body(Map.of("message", "Ce centre a déjà un coordinateur."));
+            }
+            List<Centre> existing = centreRepository.findByCoordinateur(user);
+            if (!existing.isEmpty()) {
+                userRepository.delete(user);
+                return ResponseEntity.badRequest().body(Map.of("message", "Un coordinateur ne peut gérer qu'un seul centre."));
+            }
+            centre.setCoordinateur(user);
+            centreRepository.save(centre);
+        }
+
+        if (role == Role.RESPONSABLE_CLUSTER) {
+            String cluster = body.get("cluster") != null ? body.get("cluster").toString().trim() : "";
+            if (cluster.isBlank()) {
+                userRepository.delete(user);
+                return ResponseEntity.badRequest().body(Map.of("message", "Le cluster est obligatoire pour un responsable de cluster."));
+            }
+            if (centreRepository.findByCluster(cluster).isEmpty()) {
+                userRepository.delete(user);
+                return ResponseEntity.badRequest().body(Map.of("message", "Cluster inconnu. Créez d'abord des centres dans ce cluster."));
+            }
+            user.setAssignedCluster(cluster);
+            userRepository.save(user);
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Compte créé avec succès.",
+                "motDePasseInitial", motDePasseInitial,
+                "motDePasseTemporaire", motDePassePropose.isEmpty()
+        ));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateProfile(@PathVariable Long id, @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> updateProfile(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            Authentication auth
+    ) {
         Optional<User> userOpt = userRepository.findById(id);
         if (userOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
+        User current = (User) auth.getPrincipal();
+        if (!current.getId().equals(id) && current.getRole() != Role.DIRECTEUR) {
+            return ResponseEntity.status(403).body(Map.of("message", "Vous ne pouvez modifier que votre propre profil."));
+        }
+
         User user = userOpt.get();
-        if (body.containsKey("nom")) user.setNom(body.get("nom"));
-        if (body.containsKey("prenom")) user.setPrenom(body.get("prenom"));
-        if (body.containsKey("telephone")) user.setTelephone(body.get("telephone"));
+        if (body.containsKey("nom")) user.setNom(InputSanitizer.clean(body.get("nom")));
+        if (body.containsKey("prenom")) user.setPrenom(InputSanitizer.clean(body.get("prenom")));
+        if (body.containsKey("telephone")) user.setTelephone(InputSanitizer.digitsOnly(body.get("telephone"), 15));
+        if (body.containsKey("telephoneSecondaire")) user.setTelephoneSecondaire(InputSanitizer.digitsOnly(body.get("telephoneSecondaire"), 15));
+        if (body.containsKey("numeroCompteBancaire")) user.setNumeroCompteBancaire(InputSanitizer.digitsOnly(body.get("numeroCompteBancaire"), 34));
+        if (body.containsKey("numeroMobileMoney")) user.setNumeroMobileMoney(InputSanitizer.digitsOnly(body.get("numeroMobileMoney"), 15));
+        if (body.containsKey("lieuNaissance")) user.setLieuNaissance(InputSanitizer.clean(body.get("lieuNaissance")));
+        if (body.containsKey("adresse")) user.setAdresse(InputSanitizer.clean(body.get("adresse")));
+        if (body.containsKey("dateNaissance") && body.get("dateNaissance") != null && !body.get("dateNaissance").isEmpty()) {
+            try {
+                LocalDate dob = LocalDate.parse(body.get("dateNaissance"));
+                if (dob.isAfter(LocalDate.now())) {
+                    return ResponseEntity.badRequest().body(Map.of("message", "La date de naissance ne peut pas être dans le futur."));
+                }
+                user.setDateNaissance(dob);
+            } catch (Exception ignored) {
+            }
+        }
         if (body.containsKey("motDePasse") && body.get("motDePasse") != null && !body.get("motDePasse").isEmpty()) {
+            String ancien = body.get("ancienMotDePasse");
+            if (ancien == null || ancien.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "L'ancien mot de passe est requis pour en définir un nouveau."));
+            }
+            if (!passwordEncoder.matches(ancien, user.getMotDePasse())) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Ancien mot de passe incorrect."));
+            }
+            if (body.get("motDePasse").length() < 6 || body.get("motDePasse").length() > 128) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Le nouveau mot de passe doit contenir entre 6 et 128 caractères."));
+            }
             user.setMotDePasse(passwordEncoder.encode(body.get("motDePasse")));
         }
 
+        userRepository.save(user);
+        return ResponseEntity.ok(user);
+    }
+
+    @PostMapping("/me/avatar")
+    public ResponseEntity<?> uploadMyAvatar(Authentication auth, @RequestParam("file") MultipartFile file) {
+        User user = (User) auth.getPrincipal();
+        try {
+            String url = secureFileStorage.store(file, "avatars", "image", 5L * 1024 * 1024, "avatar-" + user.getId());
+            User managed = userRepository.findById(user.getId()).orElse(user);
+            managed.setAvatar(url);
+            userRepository.save(managed);
+            return ResponseEntity.ok(managed);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("message", "Erreur lors de l'upload de la photo."));
+        }
+    }
+
+    @DeleteMapping("/me/avatar")
+    public ResponseEntity<?> deleteMyAvatar(Authentication auth) {
+        User current = (User) auth.getPrincipal();
+        Optional<User> userOpt = userRepository.findById(current.getId());
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User user = userOpt.get();
+        user.setAvatar(null);
+        userRepository.save(user);
+        return ResponseEntity.ok(user);
+    }
+
+    @PostMapping("/me/carte-identite/{face}")
+    public ResponseEntity<?> uploadCarteIdentite(
+            Authentication auth,
+            @PathVariable String face,
+            @RequestParam("file") MultipartFile file
+    ) {
+        String side = face == null ? "" : face.trim().toLowerCase(Locale.ROOT);
+        if (!side.equals("recto") && !side.equals("verso")) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Indiquez recto ou verso."));
+        }
+
+        User current = (User) auth.getPrincipal();
+        try {
+            String url = secureFileStorage.store(
+                    file, "identite", "image", 8L * 1024 * 1024, "cni-" + side + "-" + current.getId()
+            );
+            User managed = userRepository.findById(current.getId()).orElse(current);
+            if (side.equals("recto")) {
+                managed.setCarteIdentiteRecto(url);
+            } else {
+                managed.setCarteIdentiteVerso(url);
+            }
+            userRepository.save(managed);
+            return ResponseEntity.ok(managed);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "message", "Erreur lors de l'upload de la carte d'identité."
+            ));
+        }
+    }
+
+    @DeleteMapping("/me/carte-identite/{face}")
+    public ResponseEntity<?> deleteCarteIdentite(Authentication auth, @PathVariable String face) {
+        String side = face == null ? "" : face.trim().toLowerCase(Locale.ROOT);
+        if (!side.equals("recto") && !side.equals("verso")) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Indiquez recto ou verso."));
+        }
+        User current = (User) auth.getPrincipal();
+        Optional<User> userOpt = userRepository.findById(current.getId());
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User user = userOpt.get();
+        if (side.equals("recto")) {
+            user.setCarteIdentiteRecto(null);
+        } else {
+            user.setCarteIdentiteVerso(null);
+        }
         userRepository.save(user);
         return ResponseEntity.ok(user);
     }

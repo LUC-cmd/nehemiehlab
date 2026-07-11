@@ -2,6 +2,7 @@ package com.nehemiahlab.platform.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -45,4 +46,11 @@ public class ModuleFormation {
 
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    /** Enrichi à la lecture (non persisté) */
+    @Transient
+    private String formateurNom;
+
+    @Transient
+    private String formateurPrenom;
 }

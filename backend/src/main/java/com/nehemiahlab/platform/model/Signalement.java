@@ -16,8 +16,15 @@ public class Signalement {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column
     private Long eleveId;
+
+    @Column
+    private Long centreId;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private String cibleType = "ENFANT"; // "ENFANT", "CENTRE"
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "auteur_id", nullable = false)
@@ -30,6 +37,29 @@ public class Signalement {
     @Builder.Default
     private String statut = "EN_ATTENTE"; // "EN_ATTENTE", "TRAITE"
 
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean inclureDansRapport = false;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private String priorite = "NORMALE"; // "NORMALE", "URGENTE"
+
+    @Column(columnDefinition = "TEXT")
+    private String etatEquipements;
+
+    @Column(columnDefinition = "TEXT")
+    private String defis;
+
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Transient
+    private String eleveNom;
+
+    @Transient
+    private String elevePrenom;
+
+    @Transient
+    private String centreNom;
 }

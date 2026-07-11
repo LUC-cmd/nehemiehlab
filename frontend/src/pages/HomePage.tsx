@@ -1,210 +1,245 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { 
-  Code, 
-  Box, 
-  Cpu, 
-  LineChart, 
-  ArrowRight, 
-  Sparkles,
-  GraduationCap,
-  Users
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { motion, useScroll, useTransform } from 'framer-motion';
+import { Code, Box, Cpu, LineChart, ArrowRight, ArrowUp } from 'lucide-react';
+import SiteHeader from '../components/site/SiteHeader';
+import SiteFooter from '../components/site/SiteFooter';
+import PublicationsBanner from '../components/site/PublicationsBanner';
+import NouveautesSection from '../components/site/NouveautesSection';
+import GalerieSection from '../components/site/GalerieSection';
+import MissionSection from '../components/site/MissionSection';
+import NehemiahLabSection from '../components/site/NehemiahLabSection';
+import FloatingOrbs from '../components/site/FloatingOrbs';
+import StatsBar from '../components/site/StatsBar';
+import SectionHeading from '../components/site/SectionHeading';
+import {
+  HERO_IMAGE,
+  SITE_INFO,
+  PROGRAMS,
+} from '../constants/branding';
+import { useInscriptionFormateursOuverte } from '../hooks/useInscriptionFormateursOuverte';
 
-const programs = [
-  {
-    id: 1,
-    title: 'Programmation',
-    description: 'Apprendre à coder avec Scratch, Python et créer des jeux et applications interactives.',
-    icon: Code,
-    color: 'from-blue-400 to-blue-600',
-    shadow: 'shadow-blue-500/20'
-  },
-  {
-    id: 2,
-    title: 'Modélisation 3D',
-    description: 'Donner vie à son imagination en concevant des objets en trois dimensions.',
-    icon: Box,
-    color: 'from-purple-400 to-purple-600',
-    shadow: 'shadow-purple-500/20'
-  },
-  {
-    id: 3,
-    title: 'Électronique',
-    description: 'Comprendre les circuits, utiliser des composants et construire des robots.',
-    icon: Cpu,
-    color: 'from-green-400 to-green-600',
-    shadow: 'shadow-green-500/20'
-  },
-  {
-    id: 4,
-    title: 'Business',
-    description: 'Développer l\'esprit d\'entreprise, le leadership et la gestion de projet dès le plus jeune âge.',
-    icon: LineChart,
-    color: 'from-orange-400 to-orange-600',
-    shadow: 'shadow-orange-500/20'
-  }
-];
+const programIcons = { programmation: Code, modelisation: Box, electronique: Cpu, business: LineChart };
+const programColors: Record<string, { color: string; shadow: string }> = {
+  programmation: { color: 'from-blue-400 to-blue-600', shadow: 'shadow-blue-500/20' },
+  modelisation: { color: 'from-purple-400 to-purple-600', shadow: 'shadow-purple-500/20' },
+  electronique: { color: 'from-emerald-400 to-emerald-600', shadow: 'shadow-emerald-500/20' },
+  business: { color: 'from-orange-400 to-orange-600', shadow: 'shadow-orange-500/20' },
+};
+
+const heroWords = ['Faites', 'entrer', 'votre', 'enfant', 'dans', 'le', 'monde', 'des'];
 
 export default function HomePage() {
-  const navigate = useNavigate();
+  const { scrollY } = useScroll();
+  const [showBackTop, setShowBackTop] = useState(false);
+  const { ouverte: inscriptionsOuvertes } = useInscriptionFormateursOuverte();
+  const heroImageY = useTransform(scrollY, [0, 600], [0, 80]);
+  const heroImageScale = useTransform(scrollY, [0, 600], [1, 1.08]);
+  const heroOpacity = useTransform(scrollY, [0, 400], [1, 0.6]);
+
+  useEffect(() => {
+    const onScroll = () => setShowBackTop(window.scrollY > 720);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    document.title = 'Smart Kids Academy | Nehemiah Lab Togo';
+    const description = document.querySelector('meta[name="description"]');
+    if (description) {
+      description.setAttribute(
+        'content',
+        "Smart Kids Academy accompagne les enfants et adolescents avec des formations pratiques en code, électronique, 3D et compétences d'avenir.",
+      );
+    }
+  }, []);
 
   return (
-    <div className="min-h-screen bg-[#0f0c22] text-white overflow-hidden font-sans">
-      {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0f0c22]/80 backdrop-blur-md border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#F43B1D] to-orange-400 flex items-center justify-center shadow-lg shadow-orange-500/20">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-black tracking-tight leading-none">
-                SMART <span className="text-[#F43B1D]">KIDS</span>
-              </h1>
-              <span className="text-xs text-gray-400 font-medium tracking-widest uppercase">Academy</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => navigate('/connexion')}
-              className="text-gray-300 hover:text-white font-medium transition-colors hidden sm:block"
-            >
-              Connexion
-            </button>
-            <button 
-              onClick={() => navigate('/inscription-formateur')}
-              className="px-6 py-2.5 rounded-full bg-gradient-to-r from-[#F43B1D] to-orange-500 text-white font-bold hover:shadow-lg hover:shadow-orange-500/30 hover:-translate-y-0.5 transition-all"
-            >
-              Inscription
-            </button>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen text-slate-900 font-sans antialiased bg-transparent">
+      <SiteHeader />
+      <main id="main-content" className="relative">
+      {/* Hero */}
+      <section className="relative pt-10 sm:pt-14 lg:pt-16 pb-20 sm:pb-24 lg:pb-32 px-4 sm:px-6 overflow-hidden">
+        <FloatingOrbs />
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#004b57]/12 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 animate-float-slow" />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#004b57]/08 rounded-full blur-[100px] translate-y-1/3 -translate-x-1/4 animate-float-slow-reverse" />
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 px-6">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-[#F43B1D]/20 to-purple-500/20 rounded-full blur-[120px] opacity-50 pointer-events-none" />
-        
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 mb-8 backdrop-blur-sm">
-              <span className="flex h-2 w-2 rounded-full bg-[#F43B1D] animate-pulse"></span>
-              <span className="text-sm font-medium text-gray-300">Un programme de Nehemiah Lab</span>
-            </div>
-            
-            <h2 className="text-5xl lg:text-7xl font-black leading-[1.1] mb-6">
-              Éveiller le <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F43B1D] to-orange-400">génie</span><br />
-              en chaque enfant
-            </h2>
-            
-            <p className="text-lg lg:text-xl text-gray-400 mb-10 leading-relaxed max-w-xl">
-              Découvrez la Smart Kids Academy, un environnement d'apprentissage innovant où les enfants développent les compétences de demain à travers des projets pratiques et ludiques.
-            </p>
-            
-            <div className="flex flex-wrap items-center gap-4">
-              <button 
-                onClick={() => navigate('/inscription-formateur')}
-                className="px-8 py-4 rounded-full bg-white text-[#0f0c22] font-bold text-lg hover:bg-gray-100 hover:scale-105 transition-all flex items-center gap-2"
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-10 sm:gap-14 items-center relative z-10">
+          <motion.div style={{ opacity: heroOpacity }}>
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#004b57]/10 border border-[#004b57]/25 mb-8"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#004b57] opacity-60" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#004b57]" />
+              </span>
+              <span className="text-sm font-medium text-[#004b57]">Programme {SITE_INFO.parentOrg}</span>
+            </motion.div>
+
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl xl:text-[3.25rem] font-extrabold leading-[1.08] tracking-tight mb-5 sm:mb-6 text-slate-900">
+              {heroWords.map((word, i) => (
+                <motion.span
+                  key={word}
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.08 * i, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                  className="inline-block mr-[0.28em]"
+                >
+                  {word}
+                </motion.span>
+              ))}
+              <motion.span
+                initial={{ opacity: 0, y: 24, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: 0.72, duration: 0.55 }}
+                className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-[#004b57] via-[#006878] to-[#004b57] animate-gradient-x bg-[length:200%_auto]"
               >
-                Rejoindre l'académie
-                <ArrowRight className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => navigate('/connexion')}
-                className="px-8 py-4 rounded-full border border-white/20 text-white font-bold text-lg hover:bg-white/5 transition-all"
+                technologies
+              </motion.span>
+            </h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.85, duration: 0.6 }}
+              className="text-base sm:text-lg text-slate-500 mb-8 sm:mb-10 leading-relaxed max-w-xl"
+            >
+              {SITE_INFO.heroSubtitle}
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1, duration: 0.5 }}
+              className="flex flex-wrap gap-3 sm:gap-4"
+            >
+              {inscriptionsOuvertes ? (
+                <Link
+                  to="/inscription-formateur"
+                  className="w-full sm:w-auto justify-center px-6 sm:px-8 py-3.5 sm:py-4 rounded-full font-bold text-white bg-[#004b57] hover:bg-[#003840] transition-colors inline-flex items-center gap-2 shadow-lg shadow-[#004b57]/25"
+                >
+                  Rejoindre l'académie
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
+              ) : (
+                <Link
+                  to="/connexion"
+                  className="w-full sm:w-auto justify-center px-6 sm:px-8 py-3.5 sm:py-4 rounded-full font-bold text-white bg-[#004b57] hover:bg-[#003840] transition-colors inline-flex items-center gap-2 shadow-lg shadow-[#004b57]/25"
+                >
+                  Se connecter
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={() => document.getElementById('programmes')?.scrollIntoView({ behavior: 'smooth' })}
+                className="w-full sm:w-auto justify-center px-6 sm:px-8 py-3.5 sm:py-4 rounded-full font-semibold border-2 border-[#004b57]/35 text-[#004b57] hover:bg-[#004b57]/08 transition-all inline-flex items-center"
               >
-                Portail Administration
+                Découvrir les programmes
               </button>
-            </div>
+            </motion.div>
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="relative"
+            initial={{ opacity: 0, scale: 0.92, rotateY: -8 }}
+            animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+            transition={{ duration: 0.85, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            style={{ y: heroImageY, scale: heroImageScale }}
+            className="relative perspective-1000"
           >
-            <div className="aspect-square lg:aspect-[4/5] rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl relative">
-              <img 
-                src="https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=2022&auto=format&fit=crop" 
-                alt="Enfants apprenant à coder" 
-                className="w-full h-full object-cover"
+            <div className="relative">
+              <motion.div
+                animate={{ rotate: [0, 360] }}
+                transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
+                className="absolute -inset-3 rounded-[2.2rem] bg-gradient-to-br from-[#004b57]/35 via-transparent to-[#004b57]/15 opacity-70 blur-sm"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0f0c22] via-[#0f0c22]/20 to-transparent" />
-              
-              {/* Floating badges */}
-              <div className="absolute bottom-10 left-10 right-10 flex gap-4">
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex-1">
-                  <div className="text-3xl font-black text-white mb-1">500+</div>
-                  <div className="text-sm text-gray-400 font-medium">Jeunes formés</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex-1">
-                  <div className="text-3xl font-black text-[#F43B1D] mb-1">100%</div>
-                  <div className="text-sm text-gray-400 font-medium">Pratique</div>
-                </div>
+              <div className="relative aspect-[4/5] max-h-[460px] sm:max-h-[560px] rounded-[2rem] overflow-hidden border border-slate-200 shadow-2xl shadow-slate-900/10">
+                <img src={HERO_IMAGE} alt="Atelier Smart Kids Academy" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#004b57]/80 via-[#004b57]/15 to-transparent" />
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.1, duration: 0.6 }}
+                  className="absolute bottom-0 left-0 right-0 p-6"
+                >
+                  <div className="backdrop-blur-md bg-white/90 rounded-xl p-4 border border-white/60 shadow-lg">
+                    <p className="text-sm text-[#004b57] font-medium">Smart Kids Academy</p>
+                    <p className="text-slate-900 font-bold">{SITE_INFO.tagline}</p>
+                  </div>
+                </motion.div>
               </div>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* Programs Section */}
-      <section className="py-24 bg-[#14102c] relative border-y border-white/5">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center max-w-3xl mx-auto mb-20">
-            <h3 className="text-4xl font-bold mb-6">Nos Domaines d'Apprentissage</h3>
-            <p className="text-gray-400 text-lg">
-              Des parcours adaptés pour stimuler la créativité, la logique et l'esprit critique de vos enfants.
-            </p>
-          </div>
+      <StatsBar />
+      <PublicationsBanner />
+      <MissionSection />
+      <NehemiahLabSection />
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {programs.map((program, index) => (
-              <motion.div
-                key={program.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className={`bg-white/5 border border-white/10 rounded-3xl p-8 hover:bg-white/10 transition-colors group cursor-default`}
-              >
-                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${program.color} flex items-center justify-center mb-6 shadow-lg ${program.shadow} group-hover:scale-110 transition-transform`}>
-                  <program.icon className="w-7 h-7 text-white" />
-                </div>
-                <h4 className="text-xl font-bold mb-3">{program.title}</h4>
-                <p className="text-gray-400 leading-relaxed text-sm">
-                  {program.description}
-                </p>
-              </motion.div>
-            ))}
+      {/* Programmes */}
+      <section id="programmes" className="py-24 sm:py-28 lg:py-32 px-4 sm:px-6 lg:px-8 section-sep bg-slate-50">
+        <div className="max-w-7xl mx-auto">
+          <SectionHeading
+            badge="Formations"
+            title="Nos domaines d'apprentissage"
+            description="Quatre pôles complémentaires pour une formation STEAM complète."
+          />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-7">
+            {PROGRAMS.map((program, index) => {
+              const Icon = programIcons[program.id as keyof typeof programIcons];
+              const style = programColors[program.id];
+              return (
+                <motion.article
+                  key={program.id}
+                  initial={{ opacity: 0, y: 32 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-40px' }}
+                  transition={{ delay: index * 0.1, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+                  whileHover={{ y: -8, transition: { duration: 0.25 } }}
+                  className="group p-8 sm:p-9 rounded-3xl border border-slate-200 bg-white hover:border-[#004b57]/30 hover:shadow-lg hover:shadow-[#004b57]/8 transition-all duration-300 min-h-[260px]"
+                >
+                  <motion.div
+                    whileHover={{ rotate: [0, -8, 8, 0], scale: 1.08 }}
+                    transition={{ duration: 0.5 }}
+                    className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${style.color} flex items-center justify-center mb-7 shadow-lg ${style.shadow}`}
+                  >
+                    <Icon className="w-8 h-8 text-white" />
+                  </motion.div>
+                  <h3 className="text-xl font-bold mb-3 text-slate-900">{program.title}</h3>
+                  <p className="text-slate-500 text-base leading-relaxed">{program.description}</p>
+                </motion.article>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 bg-[#0a0816]">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-[#F43B1D]" />
-            <span className="font-bold">Smart Kids Academy</span>
-          </div>
-          <div className="flex items-center gap-6 text-gray-400 text-sm">
-            <a href="https://ska.nehemiahlab.com" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">
-              ska.nehemiahlab.com
-            </a>
-            <span>+228 97 25 53 53</span>
-          </div>
-          <p className="text-gray-500 text-sm">
-            © {new Date().getFullYear()} Nehemiah Lab. Tous droits réservés.
-          </p>
-        </div>
-      </footer>
+      <NouveautesSection />
+
+      <GalerieSection />
+
+      {showBackTop && (
+        <motion.button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.97 }}
+          className="fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-40 inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 rounded-full bg-[#004b57] text-white text-sm sm:text-base font-semibold shadow-xl shadow-[#004b57]/30"
+        >
+          <ArrowUp className="w-4 h-4" />
+          <span className="hidden sm:inline">Retour en haut</span>
+        </motion.button>
+      )}
+      </main>
+
+      <SiteFooter />
     </div>
   );
 }

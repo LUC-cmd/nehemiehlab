@@ -25,6 +25,22 @@ public class Projet {
     @Builder.Default
     private Integer evolution = 0; // 0-100%
 
+    /** Pourquoi le projet n'avance pas / n'est pas terminé */
+    @Column(columnDefinition = "TEXT")
+    private String causeNonAvancement;
+
+    /** Justification pédagogique détaillée pour le rapport */
+    @Column(columnDefinition = "TEXT")
+    private String justificationPedagogique;
+
+    /** Points forts observés chez l'enfant */
+    @Column(columnDefinition = "TEXT")
+    private String pointsForts;
+
+    /** Recommandations / pistes d'amélioration */
+    @Column(columnDefinition = "TEXT")
+    private String recommandations;
+
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 }

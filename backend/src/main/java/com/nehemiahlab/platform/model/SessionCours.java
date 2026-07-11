@@ -29,16 +29,40 @@ public class SessionCours {
 
     @Column(nullable = false)
     private LocalDateTime heureDebut;
+
+    /** Heure de fin réelle (renseignée à la clôture) */
+    private LocalDateTime heureFin;
     
     @Column(nullable = false)
     private Integer dureePrevueMinutes;
 
     @Column(nullable = false)
     private String statut; // "EN_COURS", "CLOTUREE"
+
+    /** Module / activité réalisée pendant la séance */
+    private String moduleFait;
+
+    private Double latitudeDebut;
+
+    private Double longitudeDebut;
+
+    private Double precisionDebutMetres;
+
+    private Double latitudeFin;
+
+    private Double longitudeFin;
+
+    private Double precisionFinMetres;
     
     private Long dureeReelleMinutes;
     
     private String rapportUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String etatEquipements;
+
+    @Column(columnDefinition = "TEXT")
+    private String defisSession;
 
     @Transient
     private Long nbPresents;

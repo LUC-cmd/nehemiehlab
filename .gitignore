@@ -16,8 +16,15 @@ Thumbs.db
 
 # Environment and secrets
 .env
+**/.env
+backend/.env
+**/application-local.properties
 *.log
 *.sql
+!backend/src/main/resources/db/migration/*.sql
+
+# Backend build output (including copied local configuration)
+backend/target/
 
 # Build artifacts
 *.class

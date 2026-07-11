@@ -14,4 +14,7 @@ public interface ModuleFormationRepository extends JpaRepository<ModuleFormation
     long countByFormateurId(Long formateurId);
     List<ModuleFormation> findByCentreIdAndDateBetween(Long centreId, LocalDate debut, LocalDate fin);
     List<ModuleFormation> findByFormateurIdAndDateBetween(Long formateurId, LocalDate debut, LocalDate fin);
+    List<ModuleFormation> findByDateBetween(LocalDate debut, LocalDate fin);
+    List<ModuleFormation> findByCentreIdInAndDateBetween(List<Long> centreIds, LocalDate debut, LocalDate fin);
+    List<ModuleFormation> findByFormateurIdAndCentreIdInAndDateBetween(Long formateurId, List<Long> centreIds, LocalDate debut, LocalDate fin);
 }

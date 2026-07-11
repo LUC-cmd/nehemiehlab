@@ -29,6 +29,14 @@ public class Transaction {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
 
+    /** Preuve de la transaction (photo, PDF ou document) — obligatoire côté comptabilité */
+    private String justificatifUrl;
+
+    private String justificatifNom;
+
+    /** MIME type du justificatif (image/jpeg, application/pdf, ...) */
+    private String justificatifType;
+
     @Column(nullable = false)
     @Builder.Default
     private String statut = "EN_ATTENTE"; // "EN_ATTENTE", "VALIDEE", "REFUSEE"

@@ -23,6 +23,10 @@ public class Eleve {
     @Column(nullable = false)
     private String prenom;
 
+    /** Matricule unique : AA + SKA + 4 chiffres (ex: 26SKA0487) */
+    @Column(unique = true, length = 16)
+    private String matricule;
+
     @Column(nullable = false)
     private Integer age;
 
