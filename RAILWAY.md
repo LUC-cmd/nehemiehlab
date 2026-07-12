@@ -28,6 +28,7 @@ Le code convertit `DATABASE_URL` en `DB_HOST`, `DB_PORT`, etc. automatiquement.
 
 1. **New Service** → dépôt GitHub `nehemiahlab`
 2. Railway utilise le `Dockerfile` à la racine
+3. **Settings → Root Directory** : laissez **vide** (racine du repo, pas `backend` ni `frontend`)
 3. Variables **obligatoires** :
 
 ```env
