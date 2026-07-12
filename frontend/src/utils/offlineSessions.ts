@@ -6,11 +6,18 @@ export type OfflineSessionDraft = {
   centreNom?: string;
   dureePrevueMinutes: number;
   moduleFait?: string;
+  moduleCoursId?: number;
   etatEquipements?: string;
   defisSession?: string;
   heureDebut: string;
   heureFin?: string;
   statut: 'EN_COURS' | 'CLOTUREE';
+  latitudeDebut?: number;
+  longitudeDebut?: number;
+  precisionDebutMetres?: number;
+  latitudeFin?: number;
+  longitudeFin?: number;
+  precisionFinMetres?: number;
   evaluations: Array<{
     localEleveId: number;
     eleveNom: string;
@@ -22,6 +29,9 @@ export type OfflineSessionDraft = {
     note?: number | null;
     commentaire?: string | null;
     projetTravaille?: string | null;
+    projetFinal?: boolean;
+    projetProbleme?: string | null;
+    projetSolution?: string | null;
   }>;
   createdAt: number;
   closedAt?: number;
@@ -69,8 +79,9 @@ export function getOfflineSessionDraft(localId: string): OfflineSessionDraft | n
 export type OfflineFormationDraft = {
   localId: string;
   centreId: number;
-  titre: string;
-  description: string;
+  moduleCoursId: number;
+  moduleTitre: string;
+  remarques?: string;
   dureeHeures: number;
   date: string;
   elevesPresents: number[];

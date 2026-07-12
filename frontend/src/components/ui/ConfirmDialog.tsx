@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, X } from 'lucide-react';
+import ValidationActionButton from './ValidationActionButton';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -94,17 +95,13 @@ export default function ConfirmDialog({
               <button type="button" onClick={onCancel} className="btn-ghost w-full sm:w-auto justify-center">
                 {cancelLabel}
               </button>
-              <button
-                type="button"
+              <ValidationActionButton
+                size="md"
+                variant={danger ? 'danger' : 'success'}
                 onClick={onConfirm}
-                className={`w-full sm:w-auto justify-center px-4 py-2.5 text-sm font-semibold rounded-xl transition-colors ${
-                  danger
-                    ? 'bg-red-600 text-white hover:bg-red-700'
-                    : 'bg-[#004b57] text-white hover:bg-[#003a44]'
-                }`}
               >
                 {confirmLabel}
-              </button>
+              </ValidationActionButton>
             </div>
           </motion.div>
         </div>

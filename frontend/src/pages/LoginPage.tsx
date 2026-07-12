@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/api';
 import { useInscriptionFormateursOuverte } from '../hooks/useInscriptionFormateursOuverte';
 import AuthShell from '../components/auth/AuthShell';
+import EmailDeliveryHint from '../components/ui/EmailDeliveryHint';
 import toast from 'react-hot-toast';
 import { isValidEmail, normalizeEmail } from '../utils/email';
 
@@ -238,7 +239,10 @@ export default function LoginPage() {
     setResetLoading(true);
     try {
       const res = await authService.requestPasswordResetOtp(resetEmail.trim().toLowerCase());
-      toast.success(res.data?.message || 'Code OTP envoyé par email.');
+      toast.success(
+        res.data?.message
+          || 'Code envoyé. Vérifiez votre boîte mail et le dossier Spam dans Gmail.',
+      );
       setResetStep('otp');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
@@ -636,11 +640,14 @@ export default function LoginPage() {
               <div className="flex items-start gap-2">
                 <ShieldCheck className="w-5 h-5 text-[#004b57] shrink-0 mt-0.5" />
                 <p className="text-sm text-slate-600">
-                  Un code OTP sera envoyé uniquement si cet email correspond à un compte actif
-                  de la plateforme. Vérifiez aussi vos spams. Sans ce code, le mot de passe ne
-                  peut pas être changé.
+                  Un code de vérification sera envoyé uniquement si cet email correspond à un compte actif.
+                  Sans ce code, le mot de passe ne peut pas être changé.
                 </p>
               </div>
+
+              {resetStep === 'email' && (
+                <EmailDeliveryHint className="text-xs" />
+              )}
 
               {resetStep === 'email' ? (
                 <form onSubmit={handleRequestOtp} className="space-y-3" noValidate>
@@ -674,8 +681,10 @@ export default function LoginPage() {
                 </form>
               ) : (
                 <form onSubmit={handleConfirmReset} className="space-y-3" noValidate>
+                  <EmailDeliveryHint email={resetEmail.trim().toLowerCase()} />
                   <p className="text-xs text-slate-500">
                     Code envoyé à <span className="font-semibold text-slate-700">{resetEmail}</span>
+                    {' '}— valide 10 minutes
                   </p>
                   <div>
                     <input

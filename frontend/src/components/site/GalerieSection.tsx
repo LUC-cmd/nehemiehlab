@@ -20,12 +20,15 @@ export default function GalerieSection() {
   }, []);
 
   const items = photos.length
-    ? photos.map((p) => ({
-        key: String(p.id),
-        src: p.imageUrl ? mediaUrl(p.imageUrl) : '',
-        alt: p.legende,
-      }))
-    : GALLERY_IMAGES.map((img) => ({ key: img.src, src: img.src, alt: img.alt }));
+    ? photos
+        .filter((p) => p.ordre !== 0)
+        .map((p) => ({
+          key: String(p.id),
+          src: p.imageUrl ? mediaUrl(p.imageUrl) : '',
+          alt: p.legende,
+        }))
+        .filter((item) => item.src)
+    : GALLERY_IMAGES.slice(1).map((img) => ({ key: img.src, src: img.src, alt: img.alt }));
 
   return (
     <section id="galerie" className="py-24 sm:py-28 lg:py-32 px-4 sm:px-6 lg:px-8 section-sep">

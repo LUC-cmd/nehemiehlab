@@ -50,7 +50,7 @@ public class ContentManagementController {
     @Autowired
     private SecureFileStorage secureFileStorage;
 
-    // ---------------------- Ressources (interne CEDJ) ----------------------
+    // ---------------------- Ressources (interne CDEJ) ----------------------
     /** Lecture : Directeur, staff Nehemiah, formateurs SKA, animateurs, coordinateurs */
     @GetMapping("/ressources")
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'STAFF_NEHEMIAH', 'FORMATEUR', 'ANIMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER')")
@@ -228,8 +228,8 @@ public class ContentManagementController {
         return new SavedFile("/uploads/ressources/" + filename, original);
     }
 
-    // ---------------------- Communaute (interne CEDJ) ----------------------
-    /** Lecture : cercle CEDJ (pas les parents — ils ont uniquement le suivi enfant) */
+    // ---------------------- Communaute (interne CDEJ) ----------------------
+    /** Lecture : cercle CDEJ (pas les parents — ils ont uniquement le suivi enfant) */
     @GetMapping("/communaute")
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER', 'COMPTABLE', 'STAFF_NEHEMIAH', 'ANIMATEUR', 'BENEVOLE', 'PARTICIPANT')")
     public ResponseEntity<List<CommunityProfile>> getCommunauteAdmin(Authentication auth) {
@@ -579,10 +579,10 @@ public class ContentManagementController {
             case RESPONSABLE_CLUSTER -> "Responsable cluster";
             case COMPTABLE -> "Comptable";
             case STAFF_NEHEMIAH -> "Staff Nehemiah";
-            case ANIMATEUR -> "Animateur CEDJ";
+            case ANIMATEUR -> "Animateur CDEJ";
             case PARENT -> "Parent";
-            case BENEVOLE -> "Bénévole CEDJ";
-            case PARTICIPANT -> "Participant CEDJ";
+            case BENEVOLE -> "Bénévole CDEJ";
+            case PARTICIPANT -> "Participant CDEJ";
         };
     }
 
@@ -619,7 +619,7 @@ public class ContentManagementController {
         } else if (directorEdit && (target.getRoleAffiche() == null || target.getRoleAffiche().isBlank())) {
             target.setRoleAffiche(target.getType() == CommunityProfileType.SKA_TEACHER
                     ? "Formateur SKA"
-                    : "Membre CEDJ");
+                    : "Membre CDEJ");
         }
 
         target.setBio(truncateText(InputSanitizer.cleanNullable(body.getBio()), 2000));

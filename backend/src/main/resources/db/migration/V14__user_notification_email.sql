@@ -1,0 +1,2 @@
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS notifications_email_actives BOOLEAN NOT NULL DEFAULT TRUE;

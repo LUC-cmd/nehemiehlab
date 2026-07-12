@@ -4,6 +4,9 @@ import { useAuth } from '../../context/AuthContext';
 import { parentService } from '../../services/api';
 import toast from 'react-hot-toast';
 import { PageLoadingSkeleton } from '../../components/ui/DashboardSkeletons';
+import ChildSessionHistory from '../../components/dashboard/ChildSessionHistory';
+import type { ChildSessionRow } from '../../types';
+import { formatFullName } from '../../utils/displayName';
 
 interface ParentEnfantView {
   id: number;
@@ -23,15 +26,22 @@ interface ParentEnfantView {
 export default function ParentDashboard() {
   const { user } = useAuth();
   const [enfant, setEnfant] = useState<ParentEnfantView | null>(null);
+  const [seances, setSeances] = useState<ChildSessionRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    parentService
-      .getMonEnfant()
-      .then((r) => setEnfant(r.data))
+    Promise.all([
+      parentService.getMonEnfant(),
+      parentService.getSeances(),
+    ])
+      .then(([enfantRes, seancesRes]) => {
+        setEnfant(enfantRes.data);
+        setSeances(seancesRes.data || []);
+      })
       .catch(() => {
         toast.error('Impossible de charger les informations de l’enfant.');
         setEnfant(null);
+        setSeances([]);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -54,7 +64,7 @@ export default function ParentDashboard() {
           Bonjour{user?.prenom ? `, ${user.prenom}` : ''}
         </h1>
         <p className="text-slate-500 mt-1">
-          Suivi de <strong className="text-slate-800">{enfant.prenom} {enfant.nom}</strong>
+          Suivi de <strong className="text-slate-800">{formatFullName(enfant.prenom, enfant.nom)}</strong>
         </p>
       </div>
 
@@ -167,6 +177,11 @@ export default function ParentDashboard() {
           )}
         </div>
       </div>
+
+      <ChildSessionHistory
+        sessions={seances}
+        childName={formatFullName(enfant.prenom, enfant.nom)}
+      />
     </div>
   );
 }

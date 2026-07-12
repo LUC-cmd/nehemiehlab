@@ -39,6 +39,16 @@ public class EvaluationSession {
     /** Projet travaillé par l'enfant pendant cette séance (optionnel si pas de projet) */
     private String projetTravaille;
 
+    /** true = projet de fin de formation (sort sur le rapport annuel), false = pratique */
+    @Builder.Default
+    private boolean projetFinal = false;
+
+    @Column(columnDefinition = "TEXT")
+    private String projetProbleme;
+
+    @Column(columnDefinition = "TEXT")
+    private String projetSolution;
+
     /** Heure d'arrivée réelle (quand le formateur passe sur ON — gère les retards) */
     private java.time.LocalDateTime heureArrivee;
 

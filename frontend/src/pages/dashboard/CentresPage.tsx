@@ -582,7 +582,7 @@ export default function CentresPage() {
               <button
                 type="button"
                 onClick={() => setShowAddModal(true)}
-                className="py-2 px-4 rounded-xl text-sm font-semibold border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 shadow-sm inline-flex items-center gap-2"
+                className="py-2 px-4 rounded-xl text-sm font-semibold bg-white text-slate-900 border-2 border-white hover:bg-slate-50 shadow-md inline-flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 Nouveau centre
@@ -637,7 +637,18 @@ export default function CentresPage() {
             <label className="label">Formateur</label>
             <select
               value={formateurFilter}
-              onChange={(e) => setFormateurFilter(e.target.value)}
+              onChange={(e) => {
+                const fid = e.target.value;
+                setFormateurFilter(fid);
+                if (!fid) {
+                  setCentreFilter('');
+                  return;
+                }
+                const matching = centres.filter((c) =>
+                  c.formateurs?.some((f) => f.id === Number(fid)),
+                );
+                setCentreFilter(matching.length === 1 ? String(matching[0].id) : '');
+              }}
               className="input-field py-2"
             >
               <option value="">Tous</option>

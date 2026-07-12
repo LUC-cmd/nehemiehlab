@@ -1,8 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { centreService, eleveService, signalementService } from '../../services/api';
+import { motion } from 'framer-motion';
+import { centreService, eleveService, signalementService, notificationService } from '../../services/api';
 import type { Signalement } from '../../types';
 import type { Centre, Eleve } from '../../types';
-import { AlertTriangle, Check, Clock, User, Calendar, PlusCircle, ShieldAlert, Wrench, FlagTriangleRight } from 'lucide-react';
+import { ALERT_PRESETS, type AlertPresetId } from '../../constants/alertPresets';
+import ValidationActionButton from '../../components/ui/ValidationActionButton';
+import {
+  AlertTriangle, Check, Clock, User, Calendar, PlusCircle, ShieldAlert, Wrench,
+  FlagTriangleRight, Send, Megaphone,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageLoadingSkeleton } from '../../components/ui/DashboardSkeletons';
 import { useMinDelayLoading } from '../../hooks/useMinDelayLoading';
@@ -32,6 +38,15 @@ export default function SignalementsPage() {
   const [newPriorite, setNewPriorite] = useState<'NORMALE' | 'URGENTE'>('NORMALE');
   const [newEtatEquipements, setNewEtatEquipements] = useState('');
   const [newDefis, setNewDefis] = useState('');
+
+  const [broadcastTitre, setBroadcastTitre] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcastRoles, setBroadcastRoles] = useState<string[]>(['FORMATEUR']);
+  const [broadcastPreset, setBroadcastPreset] = useState<AlertPresetId>('FORMATEUR');
+  const [broadcastCentreId, setBroadcastCentreId] = useState('');
+  const [broadcastSending, setBroadcastSending] = useState(false);
+
+  const isDirecteur = hasRole('DIRECTEUR');
 
   useEffect(() => {
     fetchCentres();
@@ -145,6 +160,44 @@ export default function SignalementsPage() {
     }
   };
 
+  const handleRelayer = async (id: number, roles: string[]) => {
+    try {
+      const res = await signalementService.relayer(id, { roles });
+      toast.success(res.data?.message || 'Alerte relayée (app + email).');
+    } catch {
+      toast.error('Erreur lors du relais de l\'alerte.');
+    }
+  };
+
+  const handleBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!broadcastTitre.trim() || !broadcastMessage.trim() || broadcastRoles.length === 0) {
+      toast.error('Titre, message et au moins un destinataire requis.');
+      return;
+    }
+    setBroadcastSending(true);
+    try {
+      const res = await notificationService.diffuser({
+        titre: broadcastTitre.trim(),
+        message: broadcastMessage.trim(),
+        roles: broadcastRoles,
+        centreId: broadcastCentreId ? Number(broadcastCentreId) : undefined,
+      });
+      toast.success(res.data?.message || 'Alerte envoyée.');
+      setBroadcastTitre('');
+      setBroadcastMessage('');
+    } catch {
+      toast.error('Erreur lors de l\'envoi.');
+    } finally {
+      setBroadcastSending(false);
+    }
+  };
+
+  const applyBroadcastPreset = (presetId: AlertPresetId) => {
+    setBroadcastPreset(presetId);
+    setBroadcastRoles(ALERT_PRESETS[presetId].roles);
+  };
+
   const canTreat = hasRole('DIRECTEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER') && hasFeature('manage_signalements');
 
   const filtered = signalements.filter(s => {
@@ -215,6 +268,79 @@ export default function SignalementsPage() {
           ))}
         </div>
       </div>
+
+      {isDirecteur && (
+        <form onSubmit={handleBroadcast} className="card border border-violet-500/35 bg-gradient-to-br from-violet-600/15 via-dark-900 to-fuchsia-900/10 overflow-hidden relative">
+          <motion.div
+            aria-hidden
+            className="absolute -top-20 -right-20 w-56 h-56 rounded-full bg-violet-500/10 blur-3xl"
+            animate={{ scale: [1, 1.08, 1], opacity: [0.4, 0.65, 0.4] }}
+            transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <div className="relative z-[1]">
+            <div className="flex items-center gap-2 text-white font-bold mb-1">
+              <Megaphone className="w-5 h-5 text-violet-300" />
+              Diffuser une alerte
+            </div>
+            <p className="text-xs text-dark-300 mb-4">
+              Chaque destinataire reçoit notification in-app, email et rappel bureau PC jusqu&apos;à lecture.
+            </p>
+
+            <p className="label mb-2">Qui doit recevoir l&apos;alerte ?</p>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+              {(Object.keys(ALERT_PRESETS) as AlertPresetId[]).map((id) => {
+                const p = ALERT_PRESETS[id];
+                const active = broadcastPreset === id;
+                return (
+                  <motion.button
+                    key={id}
+                    type="button"
+                    onClick={() => applyBroadcastPreset(id)}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`text-left rounded-xl border p-3 transition-all ${
+                      active
+                        ? 'border-violet-400/60 bg-violet-500/20 shadow-lg shadow-violet-900/20 ring-2 ring-violet-400/30'
+                        : 'border-dark-700 bg-dark-900/50 hover:border-violet-500/30'
+                    }`}
+                  >
+                    <p className={`text-sm font-bold ${active ? 'text-violet-100' : 'text-white'}`}>{p.label}</p>
+                    <p className="text-[10px] text-dark-400 mt-1 leading-snug">{p.subtitle}</p>
+                  </motion.button>
+                );
+              })}
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Titre</label>
+                <input className="input-field" value={broadcastTitre} onChange={(e) => setBroadcastTitre(e.target.value)} placeholder="Ex: Rappel séance terrain" />
+              </div>
+              <div>
+                <label className="label">Centre (pour cibler les formateurs)</label>
+                <select className="input-field" value={broadcastCentreId} onChange={(e) => setBroadcastCentreId(e.target.value)}>
+                  <option value="">Tous les centres</option>
+                  {centres.map((c) => <option key={c.id} value={String(c.id)}>{c.nom}</option>)}
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="label">Message</label>
+                <textarea rows={3} className="input-field" value={broadcastMessage} onChange={(e) => setBroadcastMessage(e.target.value)} placeholder="Votre message…" />
+              </div>
+            </div>
+            <ValidationActionButton
+              type="submit"
+              variant="violet"
+              icon={Send}
+              loading={broadcastSending}
+              size="lg"
+              className="mt-5"
+            >
+              {broadcastSending ? 'Envoi en cours…' : 'Envoyer l\'alerte maintenant'}
+            </ValidationActionButton>
+          </div>
+        </form>
+      )}
 
       <div className="card border border-dark-700 bg-gradient-to-r from-dark-900 to-dark-800">
         <div className="flex items-center gap-2 text-white font-bold mb-4">
@@ -476,15 +602,39 @@ export default function SignalementsPage() {
                 <>
                   <span className="badge badge-warning flex items-center gap-1"><Clock className="w-3 h-3" /> En attente</span>
                   {canTreat ? (
-                    <button
-                      type="button"
+                    <ValidationActionButton
+                      size="sm"
+                      variant="success"
+                      icon={Check}
                       onClick={() => handleTraiter(s.id)}
-                      className="btn-success py-2 px-4 text-xs"
                     >
-                      <Check className="w-3.5 h-3.5" />
                       Marquer traité
-                    </button>
+                    </ValidationActionButton>
                   ) : null}
+                  {isDirecteur && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {(Object.keys(ALERT_PRESETS) as AlertPresetId[]).map((presetId) => {
+                        const p = ALERT_PRESETS[presetId];
+                        const variant =
+                          presetId === 'TOUS' ? 'violet'
+                            : presetId === 'COMPTABLE' ? 'warning'
+                              : presetId === 'FORMATEUR_COMPTABLE' ? 'primary'
+                                : 'sky';
+                        return (
+                          <ValidationActionButton
+                            key={presetId}
+                            size="sm"
+                            variant={variant}
+                            icon={Send}
+                            title={p.subtitle}
+                            onClick={() => void handleRelayer(s.id, p.roles)}
+                          >
+                            → {p.label}
+                          </ValidationActionButton>
+                        );
+                      })}
+                    </div>
+                  )}
                 </>
               ) : (
                 <span className="badge badge-success flex items-center gap-1"><Check className="w-3 h-3" /> Traité</span>

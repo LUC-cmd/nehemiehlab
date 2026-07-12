@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useAccess } from '../../context/AccessContext';
-import { centreService, eleveService, sessionService, syncOfflineQueue } from '../../services/api';
-import type { Centre, Eleve, SessionCours, EvaluationSession, User } from '../../types';
+import { centreService, eleveService, sessionService, syncOfflineQueue, moduleCoursService, rapportService } from '../../services/api';
+import type { Centre, Eleve, SessionCours, EvaluationSession, User, ModuleCours } from '../../types';
 import { fetchWithOfflineCache, readCache, writeCache } from '../../utils/offlineCache';
 import {
   getOfflineSessionDraft,
@@ -24,7 +24,14 @@ import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import MediaDropZone from '../../components/ui/MediaDropZone';
 import GeoMapPanel from '../../components/ui/GeoMapPanel';
+import SessionAttendanceBoard from '../../components/dashboard/SessionAttendanceBoard';
+import SessionDetailHero from '../../components/dashboard/SessionDetailHero';
+import ModuleSupportsPanel from '../../components/dashboard/ModuleSupportsPanel';
+import SessionHorairesCard from '../../components/dashboard/SessionHorairesCard';
+import { datetimeLocalToIso, nowForDatetimeLocal } from '../../utils/datetime';
 import { formatCoords } from '../../utils/geo';
+import { requireSessionGeolocation } from '../../utils/sessionGeo';
+import GeolocationRequiredModal from '../../components/ui/GeolocationRequiredModal';
 
 function formatElapsed(totalMinutes: number) {
   const m = Math.max(0, Math.floor(totalMinutes));
@@ -41,13 +48,15 @@ export default function SessionsPage() {
   
   const [sessions, setSessions] = useState<SessionCours[]>([]);
   const [centres, setCentres] = useState<Centre[]>([]);
+  const [modulesCatalog, setModulesCatalog] = useState<ModuleCours[]>([]);
   const [offlineDrafts, setOfflineDrafts] = useState<OfflineSessionDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const skeletonLoading = useMinDelayLoading(loading, 220);
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSession, setNewSession] = useState({
-    titre: '', centreId: '', duree: '120', moduleFait: '', etatEquipements: '', defisSession: '',
+    titre: '', centreId: '', duree: '120', moduleCoursId: '', etatEquipements: '', defisSession: '',
+    heureDebut: nowForDatetimeLocal(),
   });
   
   const [selectedSession, setSelectedSession] = useState<SessionCours | null>(null);
@@ -55,28 +64,74 @@ export default function SessionsPage() {
   const [evaluations, setEvaluations] = useState<EvaluationSession[]>([]);
   const [showSessionDetail, setShowSessionDetail] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [contextForm, setContextForm] = useState({ moduleFait: '', etatEquipements: '', defisSession: '' });
+  const [contextForm, setContextForm] = useState({ moduleCoursId: '', etatEquipements: '', defisSession: '' });
+
+  const moduleSelectLabel = (id: string | number | undefined) => {
+    if (!id) return '';
+    const mod = modulesCatalog.find((m) => m.id === Number(id));
+    return mod ? `#${mod.numeroOrdre} — ${mod.titre}` : '';
+  };
+
+  const isFormateur = hasRole('FORMATEUR');
+  const isDirecteur = hasRole('DIRECTEUR');
+  const canManageSessions = hasFeature('manage_sessions');
+
+  const resolveModuleLabel = (session?: SessionCours | null, contextModuleId?: string) => {
+    const catalogLabel = moduleSelectLabel(contextModuleId || session?.moduleCoursId);
+    if (catalogLabel) return catalogLabel;
+    return session?.moduleFait || 'non renseigné';
+  };
+
+  const selectedModuleIdForSupports = useMemo(() => {
+    const rawId = contextForm.moduleCoursId || selectedSession?.moduleCoursId;
+    return rawId ? Number(rawId) : null;
+  }, [contextForm.moduleCoursId, selectedSession?.moduleCoursId]);
   
   // Filters for Directeur
   const [selectedRegion, setSelectedRegion] = useState<string>('');
   const [selectedFormateurId, setSelectedFormateurId] = useState<string>('');
   const [selectedCentreId, setSelectedCentreId] = useState<string>('');
   const [confirmClotureId, setConfirmClotureId] = useState<number | string | null>(null);
+  const [geoModal, setGeoModal] = useState<{
+    open: boolean;
+    phase: 'debut' | 'fin';
+    message?: string;
+    retrying?: boolean;
+    onSuccess?: (geo: { latitude: number; longitude: number; precisionMetres?: number }) => void;
+  }>({ open: false, phase: 'debut' });
 
-  const getCurrentPosition = async (): Promise<{ latitude: number; longitude: number; precisionMetres?: number } | null> => {
-    if (!navigator.geolocation) return null;
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          precisionMetres: pos.coords.accuracy,
-        }),
-        () => resolve(null),
-        { enableHighAccuracy: true, timeout: 12000 },
-      );
-    });
+  const captureSessionGeo = async (
+    phase: 'debut' | 'fin',
+    allowCached = false,
+  ): Promise<{ latitude: number; longitude: number; precisionMetres?: number }> => {
+    return requireSessionGeolocation(phase, { allowCached });
   };
+
+  const promptGeoRequired = (
+    phase: 'debut' | 'fin',
+    message: string,
+    onSuccess: (geo: { latitude: number; longitude: number; precisionMetres?: number }) => void,
+  ) => {
+    setGeoModal({ open: true, phase, message, onSuccess });
+  };
+
+  const handleGeoRetry = async () => {
+    if (!geoModal.onSuccess) return;
+    setGeoModal((prev) => ({ ...prev, retrying: true, message: undefined }));
+    try {
+      const geo = await captureSessionGeo(geoModal.phase, geoModal.phase === 'debut');
+      geoModal.onSuccess(geo);
+      setGeoModal({ open: false, phase: 'debut' });
+    } catch (err) {
+      setGeoModal((prev) => ({
+        ...prev,
+        retrying: false,
+        message: err instanceof Error ? err.message : 'Localisation refusée.',
+      }));
+    }
+  };
+
+  const canEditTerrain = isFormateur && canManageSessions;
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -97,6 +152,12 @@ export default function SessionsPage() {
       ]);
       setSessions(sessResult.data);
       setCentres(centResult.data);
+      try {
+        const modRes = await moduleCoursService.list();
+        setModulesCatalog((modRes.data || []).filter((m) => m.actif));
+      } catch {
+        setModulesCatalog([]);
+      }
     } catch {
       setSessions(readCache<SessionCours[]>('sessions') || []);
       setCentres(
@@ -131,7 +192,7 @@ export default function SessionsPage() {
           titre: draft.titre,
           centre: { id: draft.centreId },
           dureePrevueMinutes: draft.dureePrevueMinutes,
-          moduleFait: draft.moduleFait,
+          moduleCoursId: draft.moduleCoursId,
           etatEquipements: draft.etatEquipements,
           defisSession: draft.defisSession,
         });
@@ -152,20 +213,37 @@ export default function SessionsPage() {
             note: saved?.note ?? undefined,
             commentaire: saved?.commentaire ?? undefined,
             projetTravaille: saved?.projetTravaille ?? undefined,
+            projetFinal: saved?.projetFinal ?? false,
+            projetProbleme: saved?.projetProbleme ?? undefined,
+            projetSolution: saved?.projetSolution ?? undefined,
           };
         });
 
         if (updates.length > 0) {
           await sessionService.updateEvaluations(realSession.id, updates);
         }
-        if (draft.moduleFait || draft.etatEquipements || draft.defisSession) {
+        if (draft.latitudeDebut != null && draft.longitudeDebut != null) {
+          await sessionService.localiserDebut(realSession.id, {
+            latitude: draft.latitudeDebut,
+            longitude: draft.longitudeDebut,
+            precisionMetres: draft.precisionDebutMetres,
+          });
+        }
+        if (draft.moduleCoursId || draft.etatEquipements || draft.defisSession) {
           await sessionService.updateContexte(realSession.id, {
-            moduleFait: draft.moduleFait,
+            moduleCoursId: draft.moduleCoursId,
             etatEquipements: draft.etatEquipements,
             defisSession: draft.defisSession,
           });
         }
         if (draft.statut === 'CLOTUREE') {
+          if (draft.latitudeFin != null && draft.longitudeFin != null) {
+            await sessionService.localiserFin(realSession.id, {
+              latitude: draft.latitudeFin,
+              longitude: draft.longitudeFin,
+              precisionMetres: draft.precisionFinMetres,
+            });
+          }
           await sessionService.cloturer(realSession.id);
         }
         removeOfflineSessionDraft(draft.localId);
@@ -205,8 +283,16 @@ export default function SessionsPage() {
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
+    if (!newSession.moduleCoursId && isFormateur) {
+      toast.error('Sélectionnez un module du catalogue Directeur.');
+      return;
+    }
+
+    const runCreate = async (geo: { latitude: number; longitude: number; precisionMetres?: number }) => {
       const centreId = Number(newSession.centreId);
+      const moduleCoursId = newSession.moduleCoursId ? Number(newSession.moduleCoursId) : undefined;
+      const moduleFaitLabel = moduleSelectLabel(newSession.moduleCoursId);
+
       if (!navigator.onLine) {
         const eleves = await loadCentreEleves(centreId);
         const centre = centres.find((item) => item.id === centreId);
@@ -216,11 +302,15 @@ export default function SessionsPage() {
           centreId,
           centreNom: centre?.nom,
           dureePrevueMinutes: Number(newSession.duree),
-          moduleFait: newSession.moduleFait || undefined,
+          moduleCoursId,
+          moduleFait: moduleFaitLabel || undefined,
           etatEquipements: newSession.etatEquipements || undefined,
           defisSession: newSession.defisSession || undefined,
-          heureDebut: new Date().toISOString(),
+          heureDebut: datetimeLocalToIso(newSession.heureDebut),
           statut: 'EN_COURS',
+          latitudeDebut: geo.latitude,
+          longitudeDebut: geo.longitude,
+          precisionDebutMetres: geo.precisionMetres,
           evaluations: eleves.map((eleve) => ({
             localEleveId: eleve.id,
             eleveNom: eleve.nom,
@@ -235,35 +325,44 @@ export default function SessionsPage() {
         };
         saveOfflineSessionDraft(draft);
         setOfflineDrafts(listOfflineSessionDrafts());
-        toast.success('Session enregistrée hors ligne. Elle sera synchronisée au retour de la connexion.');
+        toast.success('Session enregistrée hors ligne (GPS capturé). Synchronisation à la reconnexion.');
         setShowAddModal(false);
-        setNewSession({ titre: '', centreId: '', duree: '120', moduleFait: '', etatEquipements: '', defisSession: '' });
+        setNewSession({ titre: '', centreId: '', duree: '120', moduleCoursId: '', etatEquipements: '', defisSession: '', heureDebut: nowForDatetimeLocal() });
         await fetchInitialData();
         return;
       }
 
-      const geo = await getCurrentPosition();
       const response = await sessionService.create({
         titre: newSession.titre,
         centre: { id: centreId },
         dureePrevueMinutes: Number(newSession.duree),
-        latitudeDebut: geo?.latitude,
-        longitudeDebut: geo?.longitude,
-        precisionDebutMetres: geo?.precisionMetres,
-        moduleFait: newSession.moduleFait || undefined,
+        heureDebut: datetimeLocalToIso(newSession.heureDebut),
+        latitudeDebut: geo.latitude,
+        longitudeDebut: geo.longitude,
+        precisionDebutMetres: geo.precisionMetres,
+        moduleCoursId,
         etatEquipements: newSession.etatEquipements || undefined,
         defisSession: newSession.defisSession || undefined,
       });
       toast.success(
         response.data?.queuedOffline
           ? 'Session mise en attente hors ligne. Elle sera synchronisée automatiquement.'
-          : 'Session démarrée !',
+          : 'Session démarrée avec localisation !',
       );
       setShowAddModal(false);
-      setNewSession({ titre: '', centreId: '', duree: '120', moduleFait: '', etatEquipements: '', defisSession: '' });
+      setNewSession({ titre: '', centreId: '', duree: '120', moduleCoursId: '', etatEquipements: '', defisSession: '', heureDebut: nowForDatetimeLocal() });
       fetchInitialData();
-    } catch {
-      toast.error('Erreur lors de la création de la session.');
+    };
+
+    try {
+      const geo = await captureSessionGeo('debut', true);
+      await runCreate(geo);
+    } catch (err) {
+      promptGeoRequired(
+        'debut',
+        err instanceof Error ? err.message : 'Localisation obligatoire pour démarrer.',
+        (geo) => { void runCreate(geo); },
+      );
     }
   };
 
@@ -278,7 +377,9 @@ export default function SessionsPage() {
       setSelectedSession(res.data.session);
       setEvaluations(res.data.evaluations);
       setContextForm({
-        moduleFait: res.data.session?.moduleFait || '',
+        moduleCoursId: res.data.session?.moduleCoursId
+          ? String(res.data.session.moduleCoursId)
+          : '',
         etatEquipements: res.data.session?.etatEquipements || '',
         defisSession: res.data.session?.defisSession || '',
       });
@@ -306,9 +407,16 @@ export default function SessionsPage() {
       heureFin: draft.heureFin,
       dureePrevueMinutes: draft.dureePrevueMinutes,
       statut: draft.statut,
+      moduleCoursId: draft.moduleCoursId,
       moduleFait: draft.moduleFait,
       etatEquipements: draft.etatEquipements,
       defisSession: draft.defisSession,
+      latitudeDebut: draft.latitudeDebut,
+      longitudeDebut: draft.longitudeDebut,
+      precisionDebutMetres: draft.precisionDebutMetres,
+      latitudeFin: draft.latitudeFin,
+      longitudeFin: draft.longitudeFin,
+      precisionFinMetres: draft.precisionFinMetres,
       createdAt: new Date(draft.createdAt).toISOString(),
     } as SessionCours;
     const pseudoEvaluations = draft.evaluations.map((evaluation) => ({
@@ -326,12 +434,15 @@ export default function SessionsPage() {
       note: evaluation.note ?? undefined,
       commentaire: evaluation.commentaire ?? undefined,
       projetTravaille: evaluation.projetTravaille ?? undefined,
+      projetFinal: evaluation.projetFinal ?? false,
+      projetProbleme: evaluation.projetProbleme ?? undefined,
+      projetSolution: evaluation.projetSolution ?? undefined,
     }));
     setSelectedOfflineDraftId(localId);
     setSelectedSession(pseudoSession);
     setEvaluations(pseudoEvaluations);
     setContextForm({
-      moduleFait: draft.moduleFait || '',
+      moduleCoursId: draft.moduleCoursId ? String(draft.moduleCoursId) : '',
       etatEquipements: draft.etatEquipements || '',
       defisSession: draft.defisSession || '',
     });
@@ -356,6 +467,9 @@ export default function SessionsPage() {
                   note: evaluation.note ?? null,
                   commentaire: evaluation.commentaire ?? null,
                   projetTravaille: evaluation.projetTravaille ?? null,
+                  projetFinal: evaluation.projetFinal ?? false,
+                  projetProbleme: evaluation.projetProbleme ?? null,
+                  projetSolution: evaluation.projetSolution ?? null,
                 }
               : item;
           }),
@@ -370,6 +484,9 @@ export default function SessionsPage() {
         note: ev.note,
         commentaire: ev.commentaire,
         projetTravaille: ev.projetTravaille,
+        projetFinal: ev.projetFinal ?? false,
+        projetProbleme: ev.projetFinal ? ev.projetProbleme : undefined,
+        projetSolution: ev.projetFinal ? ev.projetSolution : undefined,
       }));
       await sessionService.updateEvaluations(selectedSession.id, data);
       toast.success('Évaluations sauvegardées');
@@ -381,13 +498,20 @@ export default function SessionsPage() {
 
   const handleSaveContexte = async () => {
     if (!selectedSession) return;
+    if (isFormateur && !contextForm.moduleCoursId) {
+      toast.error('Sélectionnez un module du catalogue Directeur.');
+      return;
+    }
+    const moduleCoursId = contextForm.moduleCoursId ? Number(contextForm.moduleCoursId) : undefined;
+    const moduleFaitLabel = moduleSelectLabel(contextForm.moduleCoursId);
     try {
       if (selectedOfflineDraftId) {
         const draft = getOfflineSessionDraft(selectedOfflineDraftId);
         if (!draft) throw new Error('OFFLINE_DRAFT_NOT_FOUND');
         saveOfflineSessionDraft({
           ...draft,
-          moduleFait: contextForm.moduleFait || undefined,
+          moduleCoursId,
+          moduleFait: moduleFaitLabel || undefined,
           etatEquipements: contextForm.etatEquipements || undefined,
           defisSession: contextForm.defisSession || undefined,
         });
@@ -396,7 +520,7 @@ export default function SessionsPage() {
         return;
       }
       await sessionService.updateContexte(selectedSession.id, {
-        moduleFait: contextForm.moduleFait,
+        moduleCoursId,
         etatEquipements: contextForm.etatEquipements,
         defisSession: contextForm.defisSession,
       });
@@ -428,36 +552,51 @@ export default function SessionsPage() {
     setConfirmClotureId(null);
     try {
       await handleUpdateEvaluations();
-      if (selectedOfflineDraftId) {
-        const draft = getOfflineSessionDraft(selectedOfflineDraftId);
-        if (!draft) throw new Error('OFFLINE_DRAFT_NOT_FOUND');
-        saveOfflineSessionDraft({
-          ...draft,
-          statut: 'CLOTUREE',
-          closedAt: Date.now(),
-          heureFin: new Date().toISOString(),
-          moduleFait: contextForm.moduleFait || undefined,
-          etatEquipements: contextForm.etatEquipements || undefined,
-          defisSession: contextForm.defisSession || undefined,
+
+      const finishClose = async (geoFin: { latitude: number; longitude: number; precisionMetres?: number }) => {
+        if (selectedOfflineDraftId) {
+          const draft = getOfflineSessionDraft(selectedOfflineDraftId);
+          if (!draft) throw new Error('OFFLINE_DRAFT_NOT_FOUND');
+          saveOfflineSessionDraft({
+            ...draft,
+            statut: 'CLOTUREE',
+            closedAt: Date.now(),
+            heureFin: new Date().toISOString(),
+            latitudeFin: geoFin.latitude,
+            longitudeFin: geoFin.longitude,
+            precisionFinMetres: geoFin.precisionMetres,
+            moduleCoursId: contextForm.moduleCoursId ? Number(contextForm.moduleCoursId) : draft.moduleCoursId,
+            moduleFait: moduleSelectLabel(contextForm.moduleCoursId) || draft.moduleFait,
+            etatEquipements: contextForm.etatEquipements || undefined,
+            defisSession: contextForm.defisSession || undefined,
+          });
+          setOfflineDrafts(listOfflineSessionDrafts());
+          toast.success('Session clôturée hors ligne (GPS fin enregistré).');
+          setShowSessionDetail(false);
+          return;
+        }
+        await sessionService.updateContexte(selectedSession.id, {
+          moduleCoursId: contextForm.moduleCoursId ? Number(contextForm.moduleCoursId) : undefined,
+          etatEquipements: contextForm.etatEquipements,
+          defisSession: contextForm.defisSession,
         });
-        setOfflineDrafts(listOfflineSessionDrafts());
-        toast.success('Session clôturée hors ligne. Elle sera synchronisée dès que possible.');
+        await sessionService.localiserFin(selectedSession.id, geoFin);
+        await sessionService.cloturer(selectedSession.id);
+        toast.success('Session clôturée avec localisation de fin.');
         setShowSessionDetail(false);
-        return;
+        fetchInitialData();
+      };
+
+      try {
+        const geoFin = await captureSessionGeo('fin');
+        await finishClose(geoFin);
+      } catch (err) {
+        promptGeoRequired(
+          'fin',
+          err instanceof Error ? err.message : 'Localisation obligatoire pour clôturer.',
+          (geo) => { void finishClose(geo); },
+        );
       }
-      await sessionService.updateContexte(selectedSession.id, {
-        moduleFait: contextForm.moduleFait,
-        etatEquipements: contextForm.etatEquipements,
-        defisSession: contextForm.defisSession,
-      });
-      const geo = await getCurrentPosition();
-      if (geo) {
-        await sessionService.localiserFin(selectedSession.id, geo);
-      }
-      await sessionService.cloturer(selectedSession.id);
-      toast.success('Session clôturée définitivement.');
-      setShowSessionDetail(false);
-      fetchInitialData();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
         || 'Erreur lors de la clôture.';
@@ -467,18 +606,23 @@ export default function SessionsPage() {
 
   const markStartLocation = async () => {
     if (!selectedSession || selectedOfflineDraftId) return;
-    const geo = await getCurrentPosition();
-    if (!geo) {
-      toast.error('Impossible de recuperer votre localisation.');
-      return;
-    }
     try {
+      const geo = await captureSessionGeo('debut');
       await sessionService.localiserDebut(selectedSession.id, geo);
-      toast.success('Debut geolocalise avec succes.');
+      toast.success('Début géolocalisé avec succès.');
       openSessionDetail(selectedSession);
       fetchInitialData();
-    } catch {
-      toast.error('Erreur pendant la geolocalisation de debut.');
+    } catch (err) {
+      promptGeoRequired(
+        'debut',
+        err instanceof Error ? err.message : 'Localisation obligatoire.',
+        async (geo) => {
+          await sessionService.localiserDebut(selectedSession.id, geo);
+          toast.success('Début géolocalisé avec succès.');
+          openSessionDetail(selectedSession);
+          fetchInitialData();
+        },
+      );
     }
   };
 
@@ -513,11 +657,32 @@ export default function SessionsPage() {
     }
   };
 
-  const isFormateur = hasRole('FORMATEUR');
-  const isDirecteur = hasRole('DIRECTEUR');
-  const canManageSessions = hasFeature('manage_sessions');
+  const downloadExecutionReport = async () => {
+    if (!selectedSession) return;
+    try {
+      toast.loading('Génération du rapport SKA…', { id: 'exec-pdf' });
+      const res = await rapportService.exporterSessionExecutionPdf(selectedSession.id);
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const centre = selectedSession.centre?.nom?.replace(/[^a-zA-Z0-9_-]/g, '_') || 'centre';
+      link.href = url;
+      link.download = `rapport_execution_${centre}_seance_${selectedSession.id}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success('Rapport d\'exécution téléchargé', { id: 'exec-pdf' });
+    } catch {
+      toast.error('Impossible de générer le rapport', { id: 'exec-pdf' });
+    }
+  };
 
   // Computed for filters
+  const sessionPresentStats = useMemo(() => {
+    const total = evaluations.length;
+    const present = evaluations.filter((e) => e.present).length;
+    return { present, total };
+  }, [evaluations]);
+
   const regions = useMemo(
     () => Array.from(new Set(centres.map((c) => c.region).filter(Boolean))) as string[],
     [centres],
@@ -593,6 +758,28 @@ export default function SessionsPage() {
     const id = window.setInterval(() => setNowTick(Date.now()), 30_000);
     return () => window.clearInterval(id);
   }, [liveSession?.id]);
+
+  useEffect(() => {
+    if (!isDirecteur || !selectedFormateurId || !selectedCentreId) return;
+    const refresh = () => {
+      sessionService.getAll().then((res) => setSessions(res.data)).catch(() => undefined);
+    };
+    const id = window.setInterval(refresh, 20_000);
+    return () => window.clearInterval(id);
+  }, [isDirecteur, selectedFormateurId, selectedCentreId]);
+
+  useEffect(() => {
+    if (!showSessionDetail || !selectedSession || selectedOfflineDraftId) return;
+    if (!isDirecteur || selectedSession.statut !== 'EN_COURS') return;
+    const refresh = () => {
+      sessionService.getById(selectedSession.id).then((res) => {
+        setSelectedSession(res.data.session);
+        setEvaluations(res.data.evaluations);
+      }).catch(() => undefined);
+    };
+    const id = window.setInterval(refresh, 15_000);
+    return () => window.clearInterval(id);
+  }, [showSessionDetail, selectedSession?.id, selectedSession?.statut, isDirecteur, selectedOfflineDraftId]);
 
   const liveElapsedMinutes = useMemo(() => {
     if (!liveSession?.heureDebut) return 0;
@@ -712,9 +899,20 @@ export default function SessionsPage() {
       {/* Statut terrain — formateur au centre, en train de travailler */}
       {isDirecteur && selectedFormateur && (
         <div
-          className={`rounded-xl border px-4 py-3.5 ${
+          role={onTerrain && liveSession ? 'button' : undefined}
+          tabIndex={onTerrain && liveSession ? 0 : undefined}
+          onClick={() => {
+            if (onTerrain && liveSession) void openSessionDetail(liveSession);
+          }}
+          onKeyDown={(e) => {
+            if (onTerrain && liveSession && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault();
+              void openSessionDetail(liveSession);
+            }
+          }}
+          className={`rounded-xl border px-4 py-3.5 transition-all ${
             onTerrain
-              ? 'border-emerald-200 bg-emerald-50'
+              ? 'border-emerald-200 bg-emerald-50 cursor-pointer hover:border-emerald-300 hover:shadow-md'
               : 'border-slate-200 bg-slate-50'
           }`}
         >
@@ -784,10 +982,24 @@ export default function SessionsPage() {
               </div>
             </div>
             {onTerrain && (
-              <span className="inline-flex items-center gap-1.5 self-start px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-600 text-white shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                SUR LE TERRAIN
-              </span>
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <span className="inline-flex items-center gap-1.5 self-start px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-600 text-white shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  SUR LE TERRAIN
+                </span>
+                {liveSession && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void openSessionDetail(liveSession);
+                    }}
+                    className="text-xs font-semibold text-emerald-800 underline-offset-2 hover:underline"
+                  >
+                    Voir la séance en direct →
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -1008,15 +1220,55 @@ export default function SessionsPage() {
             <input type="text" required placeholder="Ex: TP React - Matin" className="input-field" value={newSession.titre} onChange={e => setNewSession({...newSession, titre: e.target.value})} />
           </div>
           <div>
-            <label className="label">Module fait <span className="text-red-500">*</span></label>
-            <input
-              type="text"
+            <label className="label">Module enseigné <span className="text-red-500">*</span></label>
+            <select
               required
-              placeholder="Ex: Scratch — boucles et conditions"
               className="input-field"
-              value={newSession.moduleFait}
-              onChange={e => setNewSession({ ...newSession, moduleFait: e.target.value })}
+              value={newSession.moduleCoursId}
+              onChange={(e) => {
+                const id = e.target.value;
+                const mod = modulesCatalog.find((m) => m.id === Number(id));
+                const dureeMinutes = mod?.dureeRecommandeeHeures
+                  ? String(Math.round(mod.dureeRecommandeeHeures * 60))
+                  : newSession.duree;
+                setNewSession({
+                  ...newSession,
+                  moduleCoursId: id,
+                  titre: mod?.titre || newSession.titre,
+                  duree: dureeMinutes,
+                });
+              }}
+            >
+              <option value="">Sélectionner un module…</option>
+              {modulesCatalog.map((m) => (
+                <option key={m.id} value={m.id}>
+                  #{m.numeroOrdre} — {m.titre}
+                </option>
+              ))}
+            </select>
+            {modulesCatalog.length === 0 && (
+              <p className="text-xs text-amber-400 mt-1">
+                Aucun module disponible. Le Directeur doit en publier dans « Supports de cours ».
+              </p>
+            )}
+            {newSession.moduleCoursId && (
+              <div className="mt-2">
+                <ModuleSupportsPanel moduleId={Number(newSession.moduleCoursId)} variant="dark" />
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="label">Heure de début *</label>
+            <input
+              type="datetime-local"
+              required
+              className="input-field"
+              value={newSession.heureDebut}
+              onChange={(e) => setNewSession({ ...newSession, heureDebut: e.target.value })}
             />
+            <p className="text-xs text-dark-500 mt-1">
+              Ajustez si la séance a commencé plus tôt. La position GPS sera capturée au lancement.
+            </p>
           </div>
           <div>
             <label className="label">Durée prévue</label>
@@ -1069,37 +1321,23 @@ export default function SessionsPage() {
                   )}
                 </h2>
                 {selectedSession && (
-                  <div>
-                    <p className="text-sm text-dark-400">
-                      {selectedSession.centre.nom}
-                      {' • '}
-                      Date: {new Date(selectedSession.heureDebut).toLocaleDateString('fr-FR')}
-                      {' • '}
-                      Début: {new Date(selectedSession.heureDebut).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                      {selectedSession.heureFin
-                        ? ` • Fin: ${new Date(selectedSession.heureFin).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
-                        : selectedSession.statut === 'EN_COURS'
-                          ? ' • Fin: en cours'
-                          : ''}
-                    </p>
-                    <p className="text-xs text-dark-400 mt-1">
-                      Module: {selectedSession.moduleFait || contextForm.moduleFait || 'non renseigné'}
-                      {' • '}
-                      Équipements: {selectedSession.etatEquipements || contextForm.etatEquipements || 'non renseigné'}
-                      {' • '}
-                      Défis: {selectedSession.defisSession || contextForm.defisSession || 'non renseignés'}
-                    </p>
-                    {selectedSession.statut === 'CLOTUREE' && selectedSession.dureeReelleMinutes != null && (
-                      <p className="text-xs text-emerald-400 mt-1 font-medium">
-                        Heures formateur (cette séance) : {formatElapsed(selectedSession.dureeReelleMinutes)}
-                      </p>
-                    )}
-                  </div>
+                  <p className="text-sm text-dark-400">
+                    {selectedSession.centre.nom}
+                    {' · '}
+                    {evaluations.filter((e) => e.present).length}/{evaluations.length} présents
+                  </p>
                 )}
               </div>
             </div>
             
-            {selectedSession?.statut === 'EN_COURS' && isFormateur && canManageSessions && !detailLoading && (
+            {selectedSession?.statut === 'EN_COURS' && isDirecteur && !detailLoading && (
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-sm">
+                <Radio className="w-4 h-4 animate-pulse" />
+                Consultation en direct — actualisation auto
+              </span>
+            )}
+
+            {selectedSession?.statut === 'EN_COURS' && canEditTerrain && !detailLoading && (
               <div className="flex items-center gap-3">
                 {!selectedOfflineDraftId && (!selectedSession.latitudeDebut || !selectedSession.longitudeDebut) ? (
                   <button onClick={markStartLocation} className="btn-ghost flex items-center gap-2 text-amber-400 hover:bg-amber-500/10">
@@ -1119,10 +1357,18 @@ export default function SessionsPage() {
             )}
             
             {selectedSession?.statut === 'CLOTUREE' && !detailLoading && (
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => void downloadExecutionReport()}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  Rapport d&apos;exécution SKA (PDF)
+                </button>
                 {selectedSession.rapportUrl ? (
                   <a href={`/api${selectedSession.rapportUrl}`} target="_blank" rel="noreferrer" className="btn-success flex items-center gap-2">
-                    <DownloadCloud className="w-4 h-4" /> Télécharger le rapport
+                    <DownloadCloud className="w-4 h-4" /> Pièce jointe formateur
                   </a>
                 ) : isFormateur ? (
                   <div className="w-full max-w-md">
@@ -1134,12 +1380,14 @@ export default function SessionsPage() {
                       }}
                       accept=".pdf,.doc,.docx,application/pdf"
                       maxSizeMb={25}
-                      label="Ajouter un rapport (Word/PDF)"
-                      hint="Glisser-déposer ou Ctrl+V"
+                      label="Pièce jointe optionnelle (Word/PDF)"
+                      hint="Le rapport officiel est généré automatiquement depuis vos saisies"
                     />
                   </div>
                 ) : (
-                  <span className="text-dark-500 italic text-sm">Aucun rapport</span>
+                  <span className="text-dark-500 italic text-sm">
+                    Rapport auto-généré depuis les données saisies par le formateur
+                  </span>
                 )}
               </div>
             )}
@@ -1181,17 +1429,46 @@ export default function SessionsPage() {
                 </div>
               </div>
             )}
+            <SessionDetailHero
+              session={selectedSession}
+              moduleLabel={resolveModuleLabel(selectedSession, contextForm.moduleCoursId)}
+              equipment={selectedSession.etatEquipements || contextForm.etatEquipements}
+              challenges={selectedSession.defisSession || contextForm.defisSession}
+              presentCount={sessionPresentStats.present}
+              totalCount={sessionPresentStats.total}
+              formatElapsed={formatElapsed}
+            />
+
+            <SessionHorairesCard
+              session={selectedSession}
+              readOnly={!canEditTerrain || isDirecteur}
+              onUpdated={() => selectedSession.id > 0 && openSessionDetail(selectedSession)}
+            />
+
+            {selectedModuleIdForSupports && (
+              <div className="mb-5">
+                <ModuleSupportsPanel moduleId={selectedModuleIdForSupports} variant="dark" />
+              </div>
+            )}
+
             <div className="card overflow-hidden p-0 border border-dark-700 mb-5">
               {selectedSession.statut !== 'CLOTUREE' && isFormateur && (
                 <div className="p-4 border-b border-dark-700 bg-dark-900/40 grid md:grid-cols-3 gap-4">
                   <div>
-                    <label className="label">Module fait <span className="text-red-400">*</span></label>
-                    <input
+                    <label className="label">Module enseigné <span className="text-red-400">*</span></label>
+                    <select
+                      required
                       className="input-field"
-                      placeholder="Ex: Scratch — boucles"
-                      value={contextForm.moduleFait}
-                      onChange={e => setContextForm(prev => ({ ...prev, moduleFait: e.target.value }))}
-                    />
+                      value={contextForm.moduleCoursId}
+                      onChange={(e) => setContextForm((prev) => ({ ...prev, moduleCoursId: e.target.value }))}
+                    >
+                      <option value="">Sélectionner un module…</option>
+                      {modulesCatalog.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          #{m.numeroOrdre} — {m.titre}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="label">État des équipements</label>
@@ -1213,132 +1490,28 @@ export default function SessionsPage() {
                   </div>
                 </div>
               )}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-dark-800/50 border-b border-dark-700">
-                      <th className="p-4 font-semibold text-dark-200">Élève</th>
-                      <th className="p-4 font-semibold text-dark-200">Sexe</th>
-                      <th className="p-4 font-semibold text-dark-200">Âge</th>
-                      <th className="p-4 font-semibold text-dark-200">Classe</th>
-                      <th className="p-4 font-semibold text-dark-200 text-center w-28">Présence *</th>
-                      <th className="p-4 font-semibold text-dark-200 w-36">Note /10 *</th>
-                      <th className="p-4 font-semibold text-dark-200 w-28">Arrivée</th>
-                      <th className="p-4 font-semibold text-dark-200 w-28">Heures</th>
-                      <th className="p-4 font-semibold text-dark-200 min-w-[160px]">Projet</th>
-                      <th className="p-4 font-semibold text-dark-200 min-w-[180px]">Commentaire</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-dark-800">
-                    {evaluations.map(ev => (
-                      <tr key={ev.id} className="hover:bg-dark-800/20 transition-colors">
-                        <td className="p-4">
-                          <div className="font-medium text-white">{ev.eleve.prenom} {ev.eleve.nom}</div>
-                        </td>
-                        <td className="p-4 text-dark-300 text-sm">{ev.eleve.sexe}</td>
-                        <td className="p-4 text-dark-300 text-sm">{ev.eleve.age}</td>
-                        <td className="p-4 text-dark-300 text-sm">{ev.eleve.classe}</td>
-                        <td className="p-4 text-center">
-                          <label className="inline-flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" className="sr-only peer" 
-                               checked={ev.present} 
-                               disabled={selectedSession.statut === 'CLOTUREE'}
-                               onChange={e => setEvaluations(prev => prev.map(p => p.id === ev.id ? {
-                                 ...p,
-                                 present: e.target.checked,
-                                 note: e.target.checked ? p.note : undefined,
-                                 heureArrivee: e.target.checked
-                                   ? (p.heureArrivee || new Date().toISOString())
-                                   : undefined,
-                                 dureeMinutes: e.target.checked ? p.dureeMinutes : undefined,
-                               } : p))} />
-                            <span
-                              className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
-                                ev.present ? 'bg-emerald-500' : 'bg-red-500'
-                              } ${selectedSession.statut === 'CLOTUREE' ? 'opacity-60 cursor-not-allowed' : ''}`}
-                            >
-                              <span
-                                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                                  ev.present ? 'translate-x-[22px]' : 'translate-x-0.5'
-                                }`}
-                              />
-                            </span>
-                            <span className={`text-xs font-bold ${ev.present ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {ev.present ? 'ON' : 'OFF'}
-                            </span>
-                          </label>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <input 
-                              type="number" 
-                              min="0" max="10" step="0.5"
-                              disabled={selectedSession.statut === 'CLOTUREE' || !ev.present}
-                              className="input-field py-1.5 w-24 text-center font-bold text-primary-400 disabled:opacity-50" 
-                              placeholder={ev.present ? 'Oblig.' : '-'}
-                              value={displayNote10(ev.note)}
-                              onChange={e => handleNoteChange(ev.id, e.target.value)} 
-                            />
-                            <span className="text-dark-400 font-medium">/ 10</span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-sm text-dark-300 whitespace-nowrap">
-                          {ev.present && ev.heureArrivee
-                            ? new Date(ev.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-                            : ev.present
-                              ? 'À l’appel'
-                              : '—'}
-                        </td>
-                        <td className="p-4 text-sm font-semibold text-emerald-300 whitespace-nowrap">
-                          {(() => {
-                            if (!ev.present) return '0 h';
-                            if (ev.dureeMinutes != null) {
-                              const h = Math.floor(ev.dureeMinutes / 60);
-                              const m = ev.dureeMinutes % 60;
-                              return h > 0 ? `${h} h ${m.toString().padStart(2, '0')}` : `${m} min`;
-                            }
-                            if (ev.heureArrivee && selectedSession.statut === 'EN_COURS') {
-                              const mins = Math.max(0, Math.floor((Date.now() - new Date(ev.heureArrivee).getTime()) / 60000));
-                              const h = Math.floor(mins / 60);
-                              const m = mins % 60;
-                              return h > 0 ? `${h} h ${m.toString().padStart(2, '0')}` : `${m} min`;
-                            }
-                            return '—';
-                          })()}
-                        </td>
-                        <td className="p-4">
-                          <input
-                            type="text"
-                            className="input-field text-sm min-w-[140px]"
-                            disabled={selectedSession.statut === 'CLOTUREE'}
-                            placeholder={ev.eleve.projet?.nom || 'Projet (si applicable)'}
-                            value={ev.projetTravaille || ''}
-                            onChange={e => setEvaluations(prev => prev.map(p =>
-                              p.id === ev.id ? { ...p, projetTravaille: e.target.value } : p
-                            ))}
-                          />
-                        </td>
-                        <td className="p-4">
-                          <input
-                            type="text"
-                            className="input-field text-sm min-w-[160px]"
-                            disabled={selectedSession.statut === 'CLOTUREE'}
-                            placeholder="Optionnel"
-                            value={ev.commentaire || ''}
-                            onChange={e => setEvaluations(prev => prev.map(p =>
-                              p.id === ev.id ? { ...p, commentaire: e.target.value } : p
-                            ))}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                    {evaluations.length === 0 && (
-                      <tr>
-                        <td colSpan={10} className="p-8 text-center text-dark-500 italic">Aucun élève trouvé.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+              <div className="px-4 sm:px-5 pt-4 border-b border-dark-700/60">
+                <h3 className="text-lg font-bold text-white">
+                  {isDirecteur ? 'Suivi en direct des enfants' : 'Présences & suivi par élève'}
+                </h3>
+                <p className="text-xs text-dark-500 mt-0.5 mb-3">
+                  {isDirecteur
+                    ? 'Le directeur consulte uniquement — seul le formateur sur le terrain saisit les données.'
+                    : 'Marquez la présence, la note /10, le projet et une alerte si besoin.'}
+                </p>
+              </div>
+              <div className="p-4 sm:p-5">
+                <SessionAttendanceBoard
+                  evaluations={evaluations}
+                  session={selectedSession}
+                  readOnly={selectedSession.statut === 'CLOTUREE' || !canEditTerrain}
+                  supervisionMode={isDirecteur && selectedSession.statut === 'EN_COURS'}
+                  canSignal={canEditTerrain && selectedSession.statut === 'EN_COURS' && !selectedOfflineDraftId}
+                  sessionId={selectedSession.id > 0 ? selectedSession.id : undefined}
+                  onEvaluationsChange={setEvaluations}
+                  onNoteChange={handleNoteChange}
+                  displayNote10={displayNote10}
+                />
               </div>
             </div>
             </>
@@ -1350,11 +1523,20 @@ export default function SessionsPage() {
       <ConfirmDialog
         open={confirmClotureId != null}
         title="Clôturer la session ?"
-        message="Cette session sera définitivement clôturée et ne pourra plus être modifiée."
+        message="La localisation de fin sera capturée (obligatoire). La session sera définitivement clôturée."
         confirmLabel="Clôturer"
         danger
         onConfirm={confirmCloturer}
         onCancel={() => setConfirmClotureId(null)}
+      />
+
+      <GeolocationRequiredModal
+        open={geoModal.open}
+        phase={geoModal.phase}
+        message={geoModal.message}
+        retrying={geoModal.retrying}
+        onRetry={() => void handleGeoRetry()}
+        onClose={() => setGeoModal({ open: false, phase: 'debut' })}
       />
     </div>
   );

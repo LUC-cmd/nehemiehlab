@@ -68,6 +68,11 @@ export default function UtilisateursPage() {
 
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
+    const today = new Date().toISOString().split('T')[0];
+    if (newAccount.dateNaissance && newAccount.dateNaissance > today) {
+      toast.error('La date de naissance ne peut pas dépasser aujourd\'hui.');
+      return;
+    }
     if (newAccount.role === 'COORDINATEUR' && !newAccount.centreId) {
       toast.error('Sélectionnez le centre pour le coordinateur.');
       return;
@@ -153,7 +158,7 @@ export default function UtilisateursPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Gestion des Utilisateurs</h1>
           <p className="text-dark-400 mt-1">
-            Créez les comptes staff / CEDJ. Les parents se connectent avec le matricule (Espace parent).
+            Créez les comptes staff / CDEJ. Les parents se connectent avec le matricule (Espace parent).
           </p>
         </div>
         {isDir && (
@@ -332,6 +337,11 @@ export default function UtilisateursPage() {
             <p className="mt-1.5 text-xs text-dark-400">
               {ROLE_ACCESS_SUMMARY[newAccount.role]}
             </p>
+            {newAccount.role === 'DIRECTEUR' && (
+              <p className="mt-2 text-xs text-violet-300 bg-violet-500/10 border border-violet-500/25 rounded-lg px-3 py-2">
+                Vous pouvez créer un autre directeur avec les mêmes droits de supervision et de diffusion d&apos;alertes.
+              </p>
+            )}
             <p className="mt-1 text-xs text-dark-500">
               Parent : pas de création ici — connexion via matricule (Espace parent).
             </p>

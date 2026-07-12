@@ -2,13 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAccess } from '../../context/AccessContext';
 import { eleveService, centreService } from '../../services/api';
-import type { Eleve, Centre } from '../../types';
-import { Plus, Search, Clock, MessageSquare, AlertTriangle, Play, Square, Award, Edit2, KeyRound, Copy } from 'lucide-react';
+import type { Eleve, Centre, ChildSessionRow } from '../../types';
+import { NIVEAUX_MAITRISE } from '../../types';
+import { Plus, Search, MessageSquare, AlertTriangle, Edit2, KeyRound, Copy, CalendarDays, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { cleanNameInput, FIRSTNAME_EXAMPLE, NAME_EXAMPLE } from '../../utils/formInputs';
+import EleveFicheForm from '../../components/dashboard/EleveFicheForm';
+import { emptyEleveFiche, eleveToFicheValues } from '../../utils/eleveForm';
 import { PageLoadingSkeleton, TableSkeleton } from '../../components/ui/DashboardSkeletons';
 import { useMinDelayLoading } from '../../hooks/useMinDelayLoading';
 import Modal from '../../components/ui/Modal';
+import ChildSessionHistory from '../../components/dashboard/ChildSessionHistory';
+import { formatFullName } from '../../utils/displayName';
 
 export default function ElevesPage() {
   const { hasRole, user } = useAuth();
@@ -24,6 +28,7 @@ export default function ElevesPage() {
   
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [showSignalModal, setShowSignalModal] = useState(false);
@@ -37,7 +42,7 @@ export default function ElevesPage() {
   const [activeEleve, setActiveEleve] = useState<Eleve | null>(null);
   
   // Form states
-  const [newEleve, setNewEleve] = useState({ nom: '', prenom: '', age: '', sexe: 'M' as 'M' | 'F', classe: '', centreId: '', dateDebutFormation: new Date().toISOString().split('T')[0] });
+  const [ficheValues, setFicheValues] = useState(emptyEleveFiche());
   const [projectForm, setProjectForm] = useState({
     nom: '',
     description: '',
@@ -46,6 +51,10 @@ export default function ElevesPage() {
     justificationPedagogique: '',
     pointsForts: '',
     recommandations: '',
+    probleme: '',
+    solution: '',
+    niveauMaitrise: '',
+    observationsRapport: '',
   });
   const [commentText, setCommentText] = useState('');
   const [signalText, setSignalText] = useState('');
@@ -53,6 +62,10 @@ export default function ElevesPage() {
   const [signalPriorite, setSignalPriorite] = useState<'NORMALE' | 'URGENTE'>('NORMALE');
   const [signalEquipements, setSignalEquipements] = useState('');
   const [signalDefis, setSignalDefis] = useState('');
+
+  const [showSeancesModal, setShowSeancesModal] = useState(false);
+  const [seancesEleve, setSeancesEleve] = useState<ChildSessionRow[]>([]);
+  const [seancesLoading, setSeancesLoading] = useState(false);
 
   useEffect(() => {
     fetchInitialData();
@@ -106,9 +119,13 @@ export default function ElevesPage() {
     e.preventDefault();
     try {
       const { data } = await eleveService.create({
-        ...newEleve,
-        age: Number(newEleve.age),
-        centreId: Number(newEleve.centreId || selectedCentreId)
+        nom: ficheValues.nom,
+        prenom: ficheValues.prenom,
+        age: Number(ficheValues.age),
+        sexe: ficheValues.sexe,
+        classe: ficheValues.classe,
+        centreId: Number(ficheValues.centreId || selectedCentreId),
+        dateDebutFormation: ficheValues.dateDebutFormation,
       });
       const matricule = data?.matricule || data?.eleve?.matricule || data?.codeAccesParent;
       toast.success(
@@ -118,11 +135,43 @@ export default function ElevesPage() {
         { duration: 8000 },
       );
       setShowAddModal(false);
-      setNewEleve({ nom: '', prenom: '', age: '', sexe: 'M', classe: '', centreId: '', dateDebutFormation: new Date().toISOString().split('T')[0] });
+      setFicheValues(emptyEleveFiche(selectedCentreId));
       fetchEleves(Number(selectedCentreId));
     } catch {
       toast.error('Erreur lors de l\'inscription de l\'élève.');
     }
+  };
+
+  const handleUpdateEleve = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeEleve) return;
+    try {
+      await eleveService.update(activeEleve.id, {
+        nom: ficheValues.nom,
+        prenom: ficheValues.prenom,
+        age: Number(ficheValues.age),
+        sexe: ficheValues.sexe,
+        classe: ficheValues.classe,
+        dateDebutFormation: ficheValues.dateDebutFormation,
+      });
+      toast.success('Fiche élève mise à jour.');
+      setShowEditModal(false);
+      setActiveEleve(null);
+      fetchEleves(Number(selectedCentreId));
+    } catch {
+      toast.error('Erreur lors de la mise à jour.');
+    }
+  };
+
+  const openAddModal = () => {
+    setFicheValues(emptyEleveFiche(selectedCentreId));
+    setShowAddModal(true);
+  };
+
+  const openEditModal = (eleve: Eleve) => {
+    setActiveEleve(eleve);
+    setFicheValues(eleveToFicheValues(eleve));
+    setShowEditModal(true);
   };
 
   const handleIssueParentCode = async (eleve: Eleve) => {
@@ -185,6 +234,21 @@ export default function ElevesPage() {
     }
   };
 
+  const handleOpenSeances = async (eleve: Eleve) => {
+    setActiveEleve(eleve);
+    setShowSeancesModal(true);
+    setSeancesLoading(true);
+    setSeancesEleve([]);
+    try {
+      const { data } = await eleveService.getSeances(eleve.id);
+      setSeancesEleve(data || []);
+    } catch {
+      toast.error('Impossible de charger l\'historique des séances.');
+    } finally {
+      setSeancesLoading(false);
+    }
+  };
+
   const handleAddSignalement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeEleve) return;
@@ -237,7 +301,7 @@ export default function ElevesPage() {
           <p className="text-dark-400 mt-1">Infos fixes enfant (identité/scolarité) + suivi évolutif par séance et projet.</p>
         </div>
         {canEdit && (
-          <button onClick={() => setShowAddModal(true)} className="btn-primary">
+          <button onClick={openAddModal} className="btn-primary">
             <Plus className="w-4 h-4" />
             Inscrire un élève
           </button>
@@ -287,8 +351,20 @@ export default function ElevesPage() {
                 {filtered.map((eleve) => (
                   <tr key={eleve.id} className="hover:bg-dark-800/20 transition-colors">
                     <td className="p-4">
-                      <div className="font-medium text-white">{eleve.prenom} {eleve.nom}</div>
-                      <div className="text-xs text-dark-400 mt-0.5">{eleve.totalHeures ? `${eleve.totalHeures.toFixed(1)} hrs` : '0 hr'}</div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenSeances(eleve)}
+                        className="text-left group"
+                      >
+                        <div className="font-medium text-white group-hover:text-primary-300 transition-colors">
+                          {formatFullName(eleve.prenom, eleve.nom)}
+                        </div>
+                        <div className="text-xs text-dark-400 mt-0.5 group-hover:text-dark-300">
+                          {eleve.totalHeures ? `${eleve.totalHeures.toFixed(1)} hrs` : '0 hr'}
+                          <span className="mx-1">·</span>
+                          <span className="text-primary-400/80">Voir les séances</span>
+                        </div>
+                      </button>
                     </td>
                     <td className="p-4">
                       {eleve.matricule ? (
@@ -337,10 +413,26 @@ export default function ElevesPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleOpenSeances(eleve)}
+                          className="p-2 text-primary-400 hover:text-primary-300 hover:bg-primary-500/10 rounded-lg transition-colors"
+                          title="Historique des séances"
+                        >
+                          <CalendarDays className="w-4 h-4" />
+                        </button>
                         <button onClick={() => { setActiveEleve(eleve); setCommentText(''); setShowCommentModal(true); }}
                           className="p-2 text-dark-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors" title="Commenter">
                           <MessageSquare className="w-4 h-4" />
                         </button>
+                        {canEdit && (
+                          <button
+                            onClick={() => openEditModal(eleve)}
+                            className="p-2 text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 rounded-lg transition-colors"
+                            title="Modifier la fiche"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
                         {canEdit && (
                           <button onClick={() => {
                             setActiveEleve(eleve);
@@ -352,6 +444,10 @@ export default function ElevesPage() {
                               justificationPedagogique: eleve.projet?.justificationPedagogique ?? '',
                               pointsForts: eleve.projet?.pointsForts ?? '',
                               recommandations: eleve.projet?.recommandations ?? '',
+                              probleme: eleve.projet?.probleme ?? '',
+                              solution: eleve.projet?.solution ?? '',
+                              niveauMaitrise: eleve.projet?.niveauMaitrise ?? '',
+                              observationsRapport: eleve.projet?.observationsRapport ?? '',
                             });
                             setShowProjectModal(true);
                           }}
@@ -378,7 +474,7 @@ export default function ElevesPage() {
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-dark-500">
+                    <td colSpan={7} className="p-8 text-center text-dark-500">
                       Aucun élève trouvé.
                     </td>
                   </tr>
@@ -406,51 +502,50 @@ export default function ElevesPage() {
           </>
         }
       >
-        <form id="add-eleve-form" onSubmit={handleAddEleve} className="space-y-3 sm:space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div>
-              <label className="label">Nom</label>
-              <input type="text" required placeholder={`Ex: ${NAME_EXAMPLE}`} className="input-field"
-                value={newEleve.nom} onChange={e => setNewEleve({ ...newEleve, nom: cleanNameInput(e.target.value) })} />
-            </div>
-            <div>
-              <label className="label">Prénom</label>
-              <input type="text" required placeholder={`Ex: ${FIRSTNAME_EXAMPLE}`} className="input-field"
-                value={newEleve.prenom} onChange={e => setNewEleve({ ...newEleve, prenom: cleanNameInput(e.target.value) })} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div>
-              <label className="label">Âge</label>
-              <input type="number" required placeholder="Âge" className="input-field"
-                value={newEleve.age} onChange={e => setNewEleve({ ...newEleve, age: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">Sexe</label>
-              <select className="input-field" value={newEleve.sexe} onChange={e => setNewEleve({ ...newEleve, sexe: e.target.value as 'M' | 'F' })}>
-                <option value="M">Masculin</option>
-                <option value="F">Féminin</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="label">Classe d&apos;étude</label>
-            <input type="text" required placeholder="Ex: Terminale D, 3ème, etc." className="input-field"
-              value={newEleve.classe} onChange={e => setNewEleve({ ...newEleve, classe: e.target.value })} />
-          </div>
-          <div>
-            <label className="label">Date de début de formation</label>
-            <input type="date" required className="input-field"
-              value={newEleve.dateDebutFormation} onChange={e => setNewEleve({ ...newEleve, dateDebutFormation: e.target.value })} />
-          </div>
-        </form>
+        <EleveFicheForm
+          formId="add-eleve-form"
+          values={ficheValues}
+          onChange={setFicheValues}
+          onSubmit={handleAddEleve}
+          centres={centres}
+          showCentreSelect={centres.length > 1}
+          mode="create"
+        />
+      </Modal>
+
+      <Modal
+        open={showEditModal && !!activeEleve}
+        title={activeEleve ? `Fiche — ${activeEleve.prenom} ${activeEleve.nom}` : 'Modifier'}
+        size="md"
+        onClose={() => { setShowEditModal(false); setActiveEleve(null); }}
+        footer={
+          <>
+            <button type="button" onClick={() => { setShowEditModal(false); setActiveEleve(null); }} className="btn-ghost w-full sm:w-auto justify-center">
+              Annuler
+            </button>
+            <button type="submit" form="edit-eleve-form" className="btn-primary w-full sm:w-auto justify-center">
+              Enregistrer
+            </button>
+          </>
+        }
+      >
+        <EleveFicheForm
+          formId="edit-eleve-form"
+          values={ficheValues}
+          onChange={setFicheValues}
+          onSubmit={handleUpdateEleve}
+          centres={centres}
+          showCentreSelect={false}
+          mode="edit"
+        />
       </Modal>
 
       {/* Modal Projet */}
       <Modal
         open={showProjectModal && !!activeEleve}
-        title={activeEleve ? `Projet de ${activeEleve.prenom}` : 'Projet'}
-        size="md"
+        title={activeEleve ? `Projet final — ${activeEleve.prenom}` : 'Projet'}
+        subtitle="Ces informations alimentent le rapport annuel formateur (problème, solution, niveau, observations)."
+        size="lg"
         onClose={() => setShowProjectModal(false)}
         footer={
           <>
@@ -478,6 +573,31 @@ export default function ElevesPage() {
             <label className="label">Évolution (%) : {projectForm.evolution}%</label>
             <input type="range" min="0" max="100" step="5" className="w-full accent-primary-500"
               value={projectForm.evolution} onChange={e => setProjectForm({ ...projectForm, evolution: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label className="label">Problème illustré par le projet (rapport annuel)</label>
+            <textarea rows={2} placeholder="Quel problème local ou personnel le projet adresse-t-il ?" className="input-field"
+              value={projectForm.probleme} onChange={e => setProjectForm({ ...projectForm, probleme: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">Solution illustrée par le projet</label>
+            <textarea rows={2} placeholder="Comment le projet Scratch propose une solution ?" className="input-field"
+              value={projectForm.solution} onChange={e => setProjectForm({ ...projectForm, solution: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">Niveau de maîtrise (rapport annuel)</label>
+            <select className="input-field" value={projectForm.niveauMaitrise}
+              onChange={e => setProjectForm({ ...projectForm, niveauMaitrise: e.target.value })}>
+              <option value="">Auto (selon notes de séance)</option>
+              {NIVEAUX_MAITRISE.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Observations consolidées (rapport annuel)</label>
+            <textarea rows={3} placeholder="Synthèse comportement, assiduité, progrès…" className="input-field"
+              value={projectForm.observationsRapport} onChange={e => setProjectForm({ ...projectForm, observationsRapport: e.target.value })} />
           </div>
           <div>
             <label className="label">Cause (pourquoi le projet n&apos;avance pas / n&apos;est pas terminé)</label>
@@ -588,6 +708,32 @@ export default function ElevesPage() {
             Inclure cette alerte dans le rapport enfant
           </label>
         </form>
+      </Modal>
+
+      <Modal
+        open={showSeancesModal && !!activeEleve}
+        title={activeEleve ? `Séances — ${formatFullName(activeEleve.prenom, activeEleve.nom)}` : 'Séances'}
+        subtitle={activeEleve?.matricule ? `Matricule ${activeEleve.matricule}` : undefined}
+        size="xl"
+        onClose={() => setShowSeancesModal(false)}
+        footer={
+          <button type="button" onClick={() => setShowSeancesModal(false)} className="btn-ghost w-full sm:w-auto justify-center">
+            Fermer
+          </button>
+        }
+      >
+        {seancesLoading ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <Loader2 className="w-8 h-8 text-primary-400 animate-spin" />
+            <p className="text-dark-400 text-sm">Chargement du parcours…</p>
+          </div>
+        ) : (
+          <ChildSessionHistory
+            sessions={seancesEleve}
+            childName={formatFullName(activeEleve?.prenom, activeEleve?.nom)}
+            theme="dark"
+          />
+        )}
       </Modal>
 
       <Modal

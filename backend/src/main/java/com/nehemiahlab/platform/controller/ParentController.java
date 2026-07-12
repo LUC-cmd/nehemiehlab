@@ -14,10 +14,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/parent")
@@ -69,6 +71,47 @@ public class ParentController {
             body.put("projet", null);
         }
         return ResponseEntity.ok(body);
+    }
+
+    @GetMapping("/seances")
+    @PreAuthorize("hasRole('PARENT')")
+    public ResponseEntity<?> seancesEnfant(Authentication auth) {
+        User parent = (User) auth.getPrincipal();
+        if (parent.getEleveId() == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Aucun enfant lié à ce compte parent."
+            ));
+        }
+
+        List<Map<String, Object>> seances = evaluationSessionRepository.findByEleveId(parent.getEleveId())
+                .stream()
+                .filter(ev -> ev.getSessionCours() != null)
+                .sorted(Comparator.comparing(
+                        (EvaluationSession ev) -> ev.getSessionCours().getHeureDebut(),
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(ev -> {
+                    var s = ev.getSessionCours();
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("sessionId", s.getId());
+                    row.put("titre", s.getTitre());
+                    row.put("module", s.getModuleFait());
+                    row.put("centre", s.getCentre() != null ? s.getCentre().getNom() : null);
+                    row.put("date", s.getHeureDebut());
+                    row.put("statut", s.getStatut());
+                    row.put("present", ev.isPresent());
+                    row.put("note", ev.getNote());
+                    row.put("commentaire", ev.getCommentaire());
+                    row.put("projetTravaille", ev.getProjetTravaille());
+                    row.put("projetFinal", ev.isProjetFinal());
+                    row.put("projetProbleme", ev.getProjetProbleme());
+                    row.put("projetSolution", ev.getProjetSolution());
+                    row.put("heureArrivee", ev.getHeureArrivee());
+                    row.put("dureeMinutes", ev.getDureeMinutes());
+                    return row;
+                })
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(seances);
     }
 
     private Double computePerformance(Long eleveId) {

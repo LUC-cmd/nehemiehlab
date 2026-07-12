@@ -39,8 +39,11 @@ public class SessionCours {
     @Column(nullable = false)
     private String statut; // "EN_COURS", "CLOTUREE"
 
-    /** Module / activité réalisée pendant la séance */
+    /** Module / activité réalisée pendant la séance (libellé affiché) */
     private String moduleFait;
+
+    /** Référence au module du catalogue Directeur */
+    private Long moduleCoursId;
 
     private Double latitudeDebut;
 

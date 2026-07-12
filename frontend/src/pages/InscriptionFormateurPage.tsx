@@ -17,6 +17,7 @@ import {
 import { authService } from '../services/api';
 import { useInscriptionFormateursOuverte } from '../hooks/useInscriptionFormateursOuverte';
 import AuthShell from '../components/auth/AuthShell';
+import EmailDeliveryHint from '../components/ui/EmailDeliveryHint';
 import MediaDropZone from '../components/ui/MediaDropZone';
 import {
   cleanNameInput,
@@ -58,6 +59,8 @@ export default function InscriptionFormateurPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [successEmail, setSuccessEmail] = useState('');
+  const [emailEnvoye, setEmailEnvoye] = useState<boolean | null>(null);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [cniRecto, setCniRecto] = useState<File | null>(null);
@@ -180,6 +183,8 @@ export default function InscriptionFormateurPage() {
         carteIdentiteVerso: cniVerso,
       });
       setSuccess(true);
+      setEmailEnvoye(Boolean(data?.emailEnvoye));
+      setSuccessEmail(form.email.trim().toLowerCase());
       setSuccessMessage(
         data?.message
           || 'Votre compte est en attente de validation par le Directeur.'
@@ -222,7 +227,7 @@ export default function InscriptionFormateurPage() {
             <CheckCircle className="w-10 h-10 text-emerald-600" />
           </div>
           <h2 className="text-2xl font-bold text-slate-900 mb-3">Inscription enregistrée</h2>
-          <p className="text-slate-500 mb-8 leading-relaxed">
+          <p className="text-slate-500 mb-4 leading-relaxed">
             {successMessage || (
               <>
                 Votre compte est en attente de validation par le Directeur. Vous pourrez compléter
@@ -230,6 +235,28 @@ export default function InscriptionFormateurPage() {
               </>
             )}
           </p>
+          {emailEnvoye === true && successEmail && (
+            <div className="mb-6 space-y-3 text-left">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                <p className="font-semibold flex items-center gap-2">
+                  <Mail className="w-4 h-4 shrink-0" />
+                  Email de confirmation envoyé
+                </p>
+                <p className="mt-1.5 leading-relaxed">
+                  Un message a été envoyé à <strong>{successEmail}</strong>.
+                </p>
+              </div>
+              <EmailDeliveryHint email={successEmail} />
+            </div>
+          )}
+          {emailEnvoye === false && (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm text-amber-900">
+              <p className="font-semibold">Email non envoyé pour le moment</p>
+              <p className="mt-1.5 leading-relaxed">
+                Votre inscription est bien enregistrée. Le Directeur validera votre compte — vous pourrez vous connecter une fois validé.
+              </p>
+            </div>
+          )}
           <div className="space-y-3">
             <button onClick={() => navigate('/connexion')} className="btn-primary w-full justify-center">
               Aller à la connexion

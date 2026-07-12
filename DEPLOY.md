@@ -28,6 +28,10 @@ Guide pour déployer **Smart Kids Academy** gratuitement avant de passer à un h
 
 ## Étape 2 — Déployer sur Render
 
+> **Git ≠ mots de passe.** Le dépôt GitHub contient uniquement le **code** et un fichier modèle `backend/.env.example` (sans secrets).  
+> Le fichier `backend/.env` est **ignoré par Git** : il reste sur votre PC pour le développement local.  
+> Pour l’**hébergement** (Render), vous saisissez les mots de passe **une fois** dans le tableau de bord Render → **Environment** (pas sur GitHub).
+
 Vous voyez *« You haven't created any services yet »* ? Suivez ces étapes :
 
 1. Menu gauche → **Blueprints** (ou bouton **New** en haut à droite → **Blueprint**).
@@ -68,19 +72,57 @@ Vous voyez *« You haven't created any services yet »* ? Suivez ces étapes :
 
 ### E-mails (inscription, validation, mot de passe oublié)
 
-Pour que les utilisateurs reçoivent des e-mails, configurez le **SMTP Gmail** sur `nehemiahlab-api` :
+#### Option recommandée : Gmail perso (~500 e-mails/jour)
 
-| Variable | Valeur |
-|----------|--------|
+Gratuit, sans changement de code. Suffisant pour les OTP et les alertes au démarrage.
+
+**1. Côté Google (une seule fois)**
+
+1. Ouvrez [myaccount.google.com/security](https://myaccount.google.com/security)
+2. Activez la **validation en 2 étapes**
+3. Cherchez **Mots de passe des applications** (parfois sous « Connexion à Google »)
+4. Créez un mot de passe pour **Autre** → nommez-le `Smart Kids Academy`
+5. Copiez le code **16 caractères** (ex. `abcd efgh ijkl mnop`)
+
+**2. Fichier local `backend/.env`**
+
+Copiez `backend/.env.example` vers `backend/.env`, puis :
+
+```env
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=votre.adresse@gmail.com
+MAIL_PASSWORD=abcdefghijklmnop
+MAIL_FROM=votre.adresse@gmail.com
+MAIL_OTP_FROM=votre.adresse@gmail.com
+```
+
+Remplacez `votre.adresse@gmail.com` par **votre vrai Gmail**.  
+`MAIL_FROM` et `MAIL_OTP_FROM` doivent être **identiques** à `MAIL_USERNAME` sur Gmail perso.
+
+**3. Sur Render (production)**
+
+Dans le service **nehemiahlab-api** → **Environment**, ajoutez les mêmes variables `MAIL_*`, puis redéployez.
+
+**4. Tester**
+
+1. Redémarrez le backend
+2. Page **Connexion** → **Mot de passe oublié**
+3. Saisissez l’email d’un compte existant (ex. `director@nehemiahlab.com`)
+4. Vérifiez la boîte mail (et les **spams**)
+
+| Variable | Valeur Gmail perso |
+|----------|-------------------|
 | `MAIL_HOST` | `smtp.gmail.com` |
 | `MAIL_PORT` | `587` |
-| `MAIL_USERNAME` | Votre Gmail |
-| `MAIL_PASSWORD` | Mot de passe d'application Gmail (16 caractères) |
-| `MAIL_FROM` | `no-reply@nehemiahlab.com` ou votre Gmail |
+| `MAIL_USERNAME` | Votre `@gmail.com` |
+| `MAIL_PASSWORD` | Mot de passe d'application (16 car.) |
+| `MAIL_FROM` | **Même** que `MAIL_USERNAME` |
+| `MAIL_OTP_FROM` | **Même** que `MAIL_USERNAME` |
 
-Gmail → **Sécurité** → **Validation en 2 étapes** → **Mots de passe des applications**.
+**Quota :** ~500 e-mails/jour (plus que Brevo gratuit à 300/jour).
 
-Sans SMTP :
+Sans SMTP configuré :
 - Inscription / validation : message à l'écran uniquement
 - Mot de passe oublié (OTP) : **ne fonctionne pas**
 

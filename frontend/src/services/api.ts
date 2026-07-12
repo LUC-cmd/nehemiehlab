@@ -1,6 +1,6 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import type { User, Transaction } from '../types';
+import type { User, Transaction, ModuleCours, FormateurEvaluation, ChildSessionRow, RapportSyntheseCentre, ApercuRapportFormateur } from '../types';
 import {
   clearAuthSession,
   getAuthToken,
@@ -309,13 +309,17 @@ export const centreService = {
 export const eleveService = {
   getByCentre: (centreId: number) => api.get(`/eleves/centre/${centreId}`),
   getById: (id: number) => api.get(`/eleves/${id}`),
+  getSeances: (id: number) => api.get<ChildSessionRow[]>(`/eleves/${id}/seances`),
   create: (data: {
     nom: string; prenom: string; age: number; sexe: string;
     classe: string; centreId: number; dateDebutFormation: string;
   }) => api.post('/eleves', data),
+  update: (id: number, data: {
+    nom?: string; prenom?: string; age?: number; sexe?: string;
+    classe?: string; dateDebutFormation?: string;
+  }) => api.put(`/eleves/${id}`, data),
   issueParentActivationCode: (eleveId: number) =>
     api.post(`/eleves/${eleveId}/parent-activation-code`),
-  update: (id: number, data: unknown) => api.put(`/eleves/${id}`, data),
   delete: (id: number) => api.delete(`/eleves/${id}`),
 
   // Présences
@@ -364,13 +368,67 @@ export const eleveService = {
 // ============================================================
 export const formationService = {
   create: (data: {
-    centreId: number; titre: string; description: string;
-    dureeHeures: number; elevesPresents: number[]; date: string;
+    centreId: number;
+    moduleCoursId: number;
+    dureeHeures?: number;
+    date: string;
+    elevesPresents: number[];
+    remarques?: string;
   }) => api.post('/formations', data),
-  getByCentre: (centreId: number, params?: { debut?: string; fin?: string; formateurId?: number }) =>
+  getByCentre: (centreId: number, params?: { debut?: string; fin?: string; formateurId?: number; moduleCoursId?: number }) =>
     api.get(`/formations/centre/${centreId}`, { params }),
   getMesFormations: (params?: { debut?: string; fin?: string }) =>
     api.get('/formations/mes-formations', { params }),
+};
+
+// ============================================================
+//  Modules pédagogiques & supports de cours (Directeur → Formateurs)
+// ============================================================
+export const moduleCoursService = {
+  list: () => api.get<ModuleCours[]>('/modules-cours'),
+  get: (id: number) => api.get<ModuleCours>(`/modules-cours/${id}`),
+  create: (data: Partial<ModuleCours>) => api.post<ModuleCours>('/modules-cours', data),
+  update: (id: number, data: Partial<ModuleCours>) => api.put<ModuleCours>(`/modules-cours/${id}`, data),
+  delete: (id: number) => api.delete(`/modules-cours/${id}`),
+};
+
+export const serieSupportService = {
+  list: (params?: { moduleId?: number }) =>
+    api.get<import('../types').SerieSupportCours[]>('/series-supports-cours', { params }),
+  get: (id: number) => api.get<import('../types').SerieSupportCours>(`/series-supports-cours/${id}`),
+  create: (data: {
+    titre: string;
+    description?: string;
+    ordre?: number;
+    actif?: boolean;
+    moduleIds: number[];
+  }) => api.post<import('../types').SerieSupportCours>('/series-supports-cours', data),
+  update: (id: number, data: Partial<{
+    titre: string;
+    description: string;
+    ordre: number;
+    actif: boolean;
+    moduleIds: number[];
+  }>) => api.put<import('../types').SerieSupportCours>(`/series-supports-cours/${id}`, data),
+  delete: (id: number) => api.delete(`/series-supports-cours/${id}`),
+  uploadFichiers: (id: number, files: File[]) => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+    return api.post<import('../types').SerieSupportCours>(`/series-supports-cours/${id}/fichiers`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  deleteFichier: (serieId: number, fichierId: number) =>
+    api.delete(`/series-supports-cours/${serieId}/fichiers/${fichierId}`),
+};
+
+export const formateurEvaluationService = {
+  list: (params?: { formateurId?: number }) =>
+    api.get<FormateurEvaluation[]>('/formateur-evaluations', { params }),
+  submit: (data: FormData) =>
+    api.post<FormateurEvaluation>('/formateur-evaluations', data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 // ============================================================
@@ -383,14 +441,19 @@ export const sessionService = {
     titre: string;
     centre: { id: number };
     dureePrevueMinutes: number;
+    heureDebut?: string;
     latitudeDebut?: number;
     longitudeDebut?: number;
     precisionDebutMetres?: number;
     moduleFait?: string;
+    moduleCoursId?: number;
     etatEquipements?: string;
     defisSession?: string;
   }) => api.post('/sessions', data),
-  cloturer: (id: number) => api.put(`/sessions/${id}/cloturer`),
+  cloturer: (id: number, data?: { heureFin?: string }) =>
+    api.put(`/sessions/${id}/cloturer`, data ?? {}),
+  updateHoraires: (id: number, data: { heureDebut?: string; heureFin?: string }) =>
+    api.put(`/sessions/${id}/horaires`, data),
   localiserDebut: (id: number, data: { latitude: number; longitude: number; precisionMetres?: number }) =>
     api.post(`/sessions/${id}/localisation/debut`, data),
   localiserFin: (id: number, data: { latitude: number; longitude: number; precisionMetres?: number }) =>
@@ -401,9 +464,13 @@ export const sessionService = {
     note?: number;
     commentaire?: string;
     projetTravaille?: string;
+    projetFinal?: boolean;
+    projetProbleme?: string;
+    projetSolution?: string;
   }[]) => api.put(`/sessions/${id}/evaluations`, data),
   updateContexte: (id: number, data: {
     moduleFait?: string;
+    moduleCoursId?: number;
     etatEquipements?: string;
     defisSession?: string;
   }) =>
@@ -455,6 +522,8 @@ export const transactionService = {
   },
   valider: (id: number) => api.put(`/transactions/${id}/valider`),
   refuser: (id: number) => api.put(`/transactions/${id}/refuser`),
+  relayer: (id: number, data: { roles: string[]; message?: string }) =>
+    api.post(`/transactions/${id}/relayer`, data),
 };
 
 // ============================================================
@@ -464,6 +533,13 @@ export const notificationService = {
   getMes: () => api.get('/notifications'),
   marquerLu: (id: number) => api.put(`/notifications/${id}/lu`),
   marquerTousLus: () => api.put('/notifications/tous-lus'),
+  diffuser: (data: {
+    titre: string;
+    message: string;
+    roles: string[];
+    centreId?: number;
+    cluster?: string;
+  }) => api.post('/notifications/diffuser', data),
 };
 
 // ============================================================
@@ -487,6 +563,7 @@ export const signalementService = {
     priorite?: 'NORMALE' | 'URGENTE';
     etatEquipements?: string;
     defis?: string;
+    sessionId?: number;
   }) =>
     api.post(`/eleves/${data.eleveId}/signalements`, {
       description: data.description,
@@ -494,9 +571,12 @@ export const signalementService = {
       priorite: data.priorite ?? 'NORMALE',
       etatEquipements: data.etatEquipements ?? '',
       defis: data.defis ?? '',
+      sessionId: data.sessionId != null ? String(data.sessionId) : undefined,
     }),
   setInclusionRapport: (id: number, inclureDansRapport: boolean) =>
     api.put(`/signalements/${id}/inclusion-rapport`, { inclureDansRapport }),
+  relayer: (id: number, data: { roles: string[]; message?: string }) =>
+    api.post(`/signalements/${id}/relayer`, data),
 };
 
 export const rapportService = {
@@ -523,12 +603,31 @@ export const rapportService = {
     api.get('/rapports/seances', { params, responseType: 'blob' }),
   exporterSeancesPdf: (params?: { centreId?: string; region?: string; cluster?: string; debut?: string; fin?: string }) =>
     api.get('/rapports/seances/pdf', { params, responseType: 'blob' }),
+  exporterExecutionPdf: (params?: {
+    centreId?: string; region?: string; cluster?: string;
+    formateurId?: string; debut?: string; fin?: string;
+  }) => api.get('/rapports/execution/pdf', { params, responseType: 'blob' }),
+  listExecutionSeances: (params?: {
+    centreId?: string; region?: string; cluster?: string;
+    formateurId?: string; debut?: string; fin?: string;
+  }) => api.get<import('../types').RapportExecutionSeancesResponse>('/rapports/execution/seances', { params }),
+  exporterSessionExecutionPdf: (sessionId: number) =>
+    api.get(`/rapports/seances/${sessionId}/execution-pdf`, { responseType: 'blob' }),
   exporterActivitesPdf: (params?: { centreId?: string; region?: string; cluster?: string; debut?: string; fin?: string }) =>
     api.get('/rapports/activites/pdf', { params, responseType: 'blob' }),
   exporterTransactions: (params?: { formateurId?: number; debut?: string; fin?: string }) =>
     api.get('/rapports/transactions', { params, responseType: 'blob' }),
   exporterTransactionsPdf: (params?: { debut?: string; fin?: string }) =>
     api.get('/rapports/transactions/pdf', { params, responseType: 'blob' }),
+  exporterRapportFormateurPdf: (centreId: number, params: {
+    debut: string; fin: string; moduleLabel?: string;
+  }) => api.get(`/rapports/centre/${centreId}/rapport-formateur-pdf`, { params, responseType: 'blob' }),
+  apercuRapportFormateur: (centreId: number, params: { debut: string; fin: string }) =>
+    api.get<ApercuRapportFormateur>(`/rapports/centre/${centreId}/rapport-formateur-apercu`, { params }),
+  getSyntheseCentre: (centreId: number, params: { moduleLabel?: string; debut: string; fin: string }) =>
+    api.get<RapportSyntheseCentre>(`/rapports/synthese/centre/${centreId}`, { params }),
+  saveSyntheseCentre: (centreId: number, data: Partial<RapportSyntheseCentre>) =>
+    api.put(`/rapports/synthese/centre/${centreId}`, data),
 };
 
 // ============================================================
@@ -646,6 +745,7 @@ export const contentManagementService = {
 // ============================================================
 export const parentService = {
   getMonEnfant: () => api.get('/parent/mon-enfant'),
+  getSeances: () => api.get<ChildSessionRow[]>('/parent/seances'),
 };
 
 // ============================================================

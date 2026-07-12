@@ -48,9 +48,9 @@ API JSON (local/démo) : `GET /api/site/demo-comptes`
 |------|-------|-----------|
 | **Comptable** | `compta@ska.tg` | Finances, transactions |
 | **Staff Nehemiah** | `staff@ska.tg` | Ressources, communauté |
-| **Animateur CEDJ** | `animateur@ska.tg` | Communauté CEDJ |
-| **Bénévole** | `benevole@ska.tg` | Communauté CEDJ |
-| **Participant** | `participant@ska.tg` | Communauté CEDJ |
+| **Animateur CDEJ** | `animateur@ska.tg` | Communauté CDEJ |
+| **Bénévole** | `benevole@ska.tg` | Communauté CDEJ |
+| **Participant** | `participant@ska.tg` | Communauté CDEJ |
 
 ---
 

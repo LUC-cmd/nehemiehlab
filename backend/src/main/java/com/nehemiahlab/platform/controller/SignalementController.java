@@ -3,6 +3,7 @@ package com.nehemiahlab.platform.controller;
 import com.nehemiahlab.platform.model.*;
 import com.nehemiahlab.platform.repository.*;
 import com.nehemiahlab.platform.service.CentreAccessService;
+import com.nehemiahlab.platform.service.NotificationDispatchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,10 +29,10 @@ public class SignalementController {
     private UserRepository userRepository;
 
     @Autowired
-    private NotificationRepository notificationRepository;
+    private CentreAccessService centreAccessService;
 
     @Autowired
-    private CentreAccessService centreAccessService;
+    private NotificationDispatchService notificationDispatchService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER', 'FORMATEUR')")
@@ -137,18 +138,76 @@ public class SignalementController {
         signalementRepository.save(signalement);
 
         List<User> directeurs = userRepository.findByRole(Role.DIRECTEUR);
-        for (User dir : directeurs) {
-            notificationRepository.save(Notification.builder()
-                    .userId(dir.getId())
-                    .titre("Alerte centre")
-                    .message("Alerte sur le centre " + centre.getNom() + " signalée par " + auteur.getPrenom() + " " + auteur.getNom() + ".")
-                    .type("SIGNALEMENT")
-                    .lienId(signalement.getId())
-                    .build());
-        }
+        String centreLabel = centre.getNom();
+        String msg = "Alerte sur le centre " + centreLabel + " signalée par " + auteur.getPrenom() + " " + auteur.getNom() + ".";
+        notificationDispatchService.notifyMany(directeurs, "Alerte centre", msg, "SIGNALEMENT", signalement.getId());
 
         enrichWithEleveInfo(signalement);
         return ResponseEntity.ok(signalement);
+    }
+
+    /**
+     * Le directeur relaye une alerte vers les formateurs et/ou le comptable (in-app + email).
+     */
+    @PostMapping("/{id}/relayer")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<?> relayer(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
+        User directeur = (User) auth.getPrincipal();
+        Optional<Signalement> signalementOpt = signalementRepository.findById(id);
+        if (signalementOpt.isEmpty()) return ResponseEntity.notFound().build();
+
+        Signalement signalement = signalementOpt.get();
+        enrichWithEleveInfo(signalement);
+
+        @SuppressWarnings("unchecked")
+        List<String> roleNames = body.get("roles") instanceof List<?> list
+                ? list.stream().map(String::valueOf).toList()
+                : List.of("FORMATEUR");
+
+        List<User> recipients;
+        if (notificationDispatchService.isBroadcastAllRoles(roleNames)) {
+            recipients = notificationDispatchService.resolveAllActiveUsers();
+        } else {
+            List<Role> roles = roleNames.stream()
+                    .map(r -> {
+                        try {
+                            return Role.valueOf(r.trim().toUpperCase());
+                        } catch (IllegalArgumentException e) {
+                            return null;
+                        }
+                    })
+                    .filter(r -> r != null)
+                    .toList();
+
+            if (roles.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Sélectionnez au moins un destinataire."));
+            }
+
+            Long centreId = signalement.getCentreId();
+            if (centreId == null && signalement.getEleveId() != null) {
+                centreId = eleveRepository.findById(signalement.getEleveId())
+                        .map(e -> e.getCentre() != null ? e.getCentre().getId() : null)
+                        .orElse(null);
+            }
+
+            recipients = notificationDispatchService.resolveRecipients(roles, centreId, null);
+        }
+
+        String cible = "ENFANT".equalsIgnoreCase(signalement.getCibleType())
+                ? "élève " + signalement.getElevePrenom() + " " + signalement.getEleveNom()
+                : "centre " + (signalement.getCentreNom() != null ? signalement.getCentreNom() : "");
+        String priorite = "URGENTE".equalsIgnoreCase(signalement.getPriorite()) ? " [URGENT]" : "";
+        String extra = body.get("message") != null ? "\n" + String.valueOf(body.get("message")).trim() : "";
+        String msg = "Alerte terrain" + priorite + " concernant " + cible + " :\n"
+                + signalement.getDescription() + extra
+                + "\n\n— Relais du Directeur " + directeur.getPrenom() + " " + directeur.getNom();
+
+        notificationDispatchService.notifyMany(recipients, "Alerte relayée par le Directeur", msg, "SIGNALEMENT", signalement.getId());
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Alerte relayée à " + recipients.size() + " personne(s).",
+                "destinataires", recipients.size()
+        ));
     }
 
     @PutMapping("/{id}/inclusion-rapport")

@@ -112,8 +112,8 @@ public class UserController {
                 user.getEmail(), user.getPrenom(), user.getNom());
         return ResponseEntity.ok(Map.of(
                 "message", emailEnvoye
-                        ? "Formateur validé. Un email de confirmation lui a été envoyé. Affectez-lui un centre ensuite."
-                        : "Formateur validé. Il peut maintenant se connecter. Affectez-lui un centre ensuite.",
+                        ? "Formateur validé. Un email a été envoyé à " + user.getEmail() + " (vérifiez aussi les spams)."
+                        : "Formateur validé mais l'email n'a pas pu être envoyé. Informez le formateur qu'il peut se connecter.",
                 "emailEnvoye", emailEnvoye,
                 "user", user
         ));
@@ -134,7 +134,13 @@ public class UserController {
         if (body.get("dateNaissance") != null && !body.get("dateNaissance").toString().isBlank()) {
             try {
                 dateNaissance = LocalDate.parse(body.get("dateNaissance").toString());
+                if (dateNaissance.isAfter(LocalDate.now())) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                            "message", "La date de naissance ne peut pas dépasser aujourd'hui."));
+                }
             } catch (Exception ignored) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", "Date de naissance invalide."));
             }
         }
 
@@ -143,12 +149,12 @@ public class UserController {
         }
 
         Role role = Role.valueOf(roleStr);
-        if (role == Role.DIRECTEUR || role == Role.FORMATEUR || role == Role.PARENT) {
+        if (role == Role.FORMATEUR || role == Role.PARENT) {
             return ResponseEntity.badRequest().body(Map.of(
                     "message",
                     role == Role.PARENT
                             ? "Les parents se connectent avec le matricule de l'enfant (Espace parent). Aucun compte à créer ici."
-                            : "Rôle non autorisé pour ce formulaire."
+                            : "Les formateurs s'inscrivent eux-mêmes ; validez-les depuis la page Formateurs."
             ));
         }
 

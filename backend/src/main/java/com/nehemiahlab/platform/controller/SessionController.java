@@ -5,6 +5,7 @@ import com.nehemiahlab.platform.repository.*;
 import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.security.SecureFileStorage;
 import com.nehemiahlab.platform.service.CentreAccessService;
+import com.nehemiahlab.platform.service.ModuleCoursService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,6 +16,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +47,9 @@ public class SessionController {
 
     @Autowired
     private CentreAccessService centreAccessService;
+
+    @Autowired
+    private ModuleCoursService moduleCoursService;
 
     @GetMapping
     public ResponseEntity<?> getSessions(Authentication auth) {
@@ -108,21 +114,36 @@ public class SessionController {
         if (request.getTitre() == null || request.getTitre().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Le titre de la séance est obligatoire."));
         }
-        if (request.getModuleFait() == null || request.getModuleFait().isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Le module fait est obligatoire."));
+
+        Long moduleCoursId = request.getModuleCoursId();
+        String moduleLabel;
+        if (moduleCoursId != null) {
+            ModuleCours catalogModule = moduleCoursService.requireActive(moduleCoursId);
+            moduleLabel = catalogModule.getTitre();
+        } else if (request.getModuleFait() != null && !request.getModuleFait().isBlank()) {
+            if (user.getRole() == Role.FORMATEUR) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", "Sélectionnez un module dans le catalogue défini par le Directeur."));
+            }
+            moduleLabel = InputSanitizer.clean(request.getModuleFait());
+            moduleCoursId = null;
+        } else {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Veuillez sélectionner le module enseigné."));
         }
 
         SessionCours session = SessionCours.builder()
                 .titre(InputSanitizer.clean(request.getTitre()))
                 .dureePrevueMinutes(request.getDureePrevueMinutes())
-                .heureDebut(LocalDateTime.now())
+                .heureDebut(request.getHeureDebut() != null ? request.getHeureDebut() : LocalDateTime.now())
                 .statut("EN_COURS")
                 .centre(centre)
                 .formateur(user)
                 .latitudeDebut(request.getLatitudeDebut())
                 .longitudeDebut(request.getLongitudeDebut())
                 .precisionDebutMetres(request.getPrecisionDebutMetres())
-                .moduleFait(InputSanitizer.clean(request.getModuleFait()))
+                .moduleFait(moduleLabel)
+                .moduleCoursId(moduleCoursId)
                 .etatEquipements(InputSanitizer.cleanNullable(request.getEtatEquipements()))
                 .defisSession(InputSanitizer.cleanNullable(request.getDefisSession()))
                 .build();
@@ -149,7 +170,11 @@ public class SessionController {
 
     @PutMapping("/{id}/cloturer")
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR')")
-    public ResponseEntity<?> cloturerSession(@PathVariable Long id, Authentication auth) {
+    public ResponseEntity<?> cloturerSession(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body,
+            Authentication auth
+    ) {
         User user = (User) auth.getPrincipal();
         SessionCours session = sessionCoursRepository.findById(id).orElse(null);
         if (session == null) return ResponseEntity.notFound().build();
@@ -166,7 +191,13 @@ public class SessionController {
                     ));
                 }
             }
-            LocalDateTime fin = LocalDateTime.now();
+            LocalDateTime fin = parseDateTime(body != null ? body.get("heureFin") : null);
+            if (fin == null) fin = LocalDateTime.now();
+            if (session.getHeureDebut() != null && fin.isBefore(session.getHeureDebut())) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", "L'heure de fin doit être postérieure à l'heure de début."
+                ));
+            }
             session.setHeureFin(fin);
             session.setStatut("CLOTUREE");
             long dureeSeance = Math.max(0, Duration.between(session.getHeureDebut(), fin).toMinutes());
@@ -305,6 +336,9 @@ public class SessionController {
                     eval.setHeureArrivee(null);
                     eval.setHeureDepart(null);
                     eval.setDureeMinutes(null);
+                    eval.setProjetFinal(false);
+                    eval.setProjetProbleme(null);
+                    eval.setProjetSolution(null);
                 } else {
                     // Passage OFF → ON : enregistre l'arrivée (retard possible)
                     if (!wasPresent || eval.getHeureArrivee() == null) {
@@ -326,6 +360,19 @@ public class SessionController {
                 }
                 eval.setCommentaire(InputSanitizer.cleanNullable(req.getCommentaire()));
                 eval.setProjetTravaille(InputSanitizer.cleanNullable(req.getProjetTravaille()));
+
+                boolean markFinal = nowPresent && req.isProjetFinal();
+                eval.setProjetFinal(markFinal);
+                if (markFinal) {
+                    eval.setProjetProbleme(InputSanitizer.cleanNullable(req.getProjetProbleme()));
+                    eval.setProjetSolution(InputSanitizer.cleanNullable(req.getProjetSolution()));
+                    clearOtherFinalProjects(eval.getEleve().getId(), eval.getId());
+                    syncFinalProjectToEleve(eval);
+                } else {
+                    eval.setProjetProbleme(null);
+                    eval.setProjetSolution(null);
+                }
+
                 evaluationSessionRepository.save(eval);
             }
         }
@@ -346,13 +393,77 @@ public class SessionController {
         if ("CLOTUREE".equals(session.getStatut())) {
             return ResponseEntity.badRequest().body(Map.of("message", "Session déjà clôturée."));
         }
-        if (request.getModuleFait() != null) {
+        if (request.getModuleCoursId() != null) {
+            ModuleCours catalogModule = moduleCoursService.requireActive(request.getModuleCoursId());
+            session.setModuleCoursId(catalogModule.getId());
+            session.setModuleFait(catalogModule.getTitre());
+        } else if (request.getModuleFait() != null) {
+            if (user.getRole() == Role.FORMATEUR) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", "Sélectionnez un module dans le catalogue défini par le Directeur."));
+            }
             session.setModuleFait(InputSanitizer.cleanNullable(request.getModuleFait()));
         }
         session.setEtatEquipements(InputSanitizer.cleanNullable(request.getEtatEquipements()));
         session.setDefisSession(InputSanitizer.cleanNullable(request.getDefisSession()));
         sessionCoursRepository.save(session);
         return ResponseEntity.ok(session);
+    }
+
+    @PutMapping("/{id}/horaires")
+    @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR')")
+    public ResponseEntity<?> updateHoraires(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            Authentication auth
+    ) {
+        User user = (User) auth.getPrincipal();
+        SessionCours session = sessionCoursRepository.findById(id).orElse(null);
+        if (session == null) return ResponseEntity.notFound().build();
+        if (!canModifySession(user, session)) {
+            return ResponseEntity.status(403).body(Map.of("message", "Action non autorisée."));
+        }
+
+        if (body.containsKey("heureDebut")) {
+            LocalDateTime debut = parseDateTime(body.get("heureDebut"));
+            if (debut == null) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Heure de début invalide."));
+            }
+            session.setHeureDebut(debut);
+        }
+        if (body.containsKey("heureFin")) {
+            LocalDateTime fin = parseDateTime(body.get("heureFin"));
+            if (fin == null) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Heure de fin invalide."));
+            }
+            session.setHeureFin(fin);
+        }
+        if (session.getHeureDebut() != null && session.getHeureFin() != null
+                && session.getHeureFin().isBefore(session.getHeureDebut())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "L'heure de fin doit être postérieure à l'heure de début."
+            ));
+        }
+        if (session.getHeureDebut() != null && session.getHeureFin() != null) {
+            long minutes = Math.max(0, Duration.between(session.getHeureDebut(), session.getHeureFin()).toMinutes());
+            session.setDureeReelleMinutes(minutes);
+        }
+        sessionCoursRepository.save(session);
+        return ResponseEntity.ok(session);
+    }
+
+    private static LocalDateTime parseDateTime(Object raw) {
+        if (raw == null) return null;
+        String s = raw.toString().trim();
+        if (s.isBlank()) return null;
+        try {
+            if (s.endsWith("Z") || s.contains("+")) {
+                return LocalDateTime.ofInstant(Instant.parse(s), ZoneId.systemDefault());
+            }
+            return LocalDateTime.parse(s.length() > 19 ? s.substring(0, 19) : s);
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private boolean canAccessSession(User user, SessionCours session) {
@@ -368,10 +479,41 @@ public class SessionController {
     }
 
     private boolean canModifySession(User user, SessionCours session) {
-        if (user.getRole() == Role.DIRECTEUR) return true;
+        if (user.getRole() == Role.DIRECTEUR) return false;
         return user.getRole() == Role.FORMATEUR
                 && session.getFormateur() != null
                 && session.getFormateur().getId().equals(user.getId());
+    }
+
+    private void clearOtherFinalProjects(Long eleveId, Long currentEvalId) {
+        if (eleveId == null) return;
+        for (EvaluationSession other : evaluationSessionRepository.findByEleveId(eleveId)) {
+            if (!other.getId().equals(currentEvalId) && other.isProjetFinal()) {
+                other.setProjetFinal(false);
+                evaluationSessionRepository.save(other);
+            }
+        }
+    }
+
+    private void syncFinalProjectToEleve(EvaluationSession eval) {
+        if (eval.getEleve() == null) return;
+        Eleve eleve = eleveRepository.findById(eval.getEleve().getId()).orElse(null);
+        if (eleve == null) return;
+
+        Projet projet = eleve.getProjet();
+        if (projet == null) {
+            projet = new Projet();
+        }
+        if (eval.getProjetTravaille() != null && !eval.getProjetTravaille().isBlank()) {
+            projet.setNom(eval.getProjetTravaille());
+        }
+        projet.setProbleme(eval.getProjetProbleme());
+        projet.setSolution(eval.getProjetSolution());
+        if (projet.getEvolution() == null) {
+            projet.setEvolution(100);
+        }
+        eleve.setProjet(projet);
+        eleveRepository.save(eleve);
     }
 
     @Data
@@ -381,6 +523,9 @@ public class SessionController {
         private Double note;
         private String commentaire;
         private String projetTravaille;
+        private boolean projetFinal;
+        private String projetProbleme;
+        private String projetSolution;
     }
 
     @Data
@@ -392,6 +537,7 @@ public class SessionController {
 
     @Data
     public static class SessionContextRequest {
+        private Long moduleCoursId;
         private String moduleFait;
         private String etatEquipements;
         private String defisSession;

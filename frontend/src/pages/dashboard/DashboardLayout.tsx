@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { NavLink, useNavigate, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Building2, Users, BookOpen, CreditCard,
   BarChart3, Bell, LogOut, Menu, X, ChevronDown, User,
-  AlertTriangle, Settings, GraduationCap, Timer, Megaphone, Sparkles, Image as ImageIcon, Library, UsersRound, ClipboardCheck, Shield, History
+  AlertTriangle, Settings, GraduationCap, Timer, Megaphone, Sparkles, Image as ImageIcon, Library, UsersRound, ClipboardCheck, Shield, History, BookOpenCheck
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAccess } from '../../context/AccessContext';
@@ -14,6 +14,16 @@ import { buildNavForRole, ROLE_LABELS } from '../../constants/roleAccess';
 import InscriptionsToggle from '../../components/dashboard/InscriptionsToggle';
 import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
 import UserAvatar from '../../components/ui/UserAvatar';
+import { formatFullName } from '../../utils/displayName';
+import {
+  acknowledgeAllNotificationsRead,
+  acknowledgeNotificationRead,
+  ensureBrowserNotificationPermission,
+  getBrowserNotificationPermission,
+  processUnreadReminders,
+  shouldAskBrowserNotificationPermission,
+  syncDocumentTitleAlert,
+} from '../../utils/browserNotifications';
 import type { Notification, Role } from '../../types';
 import type { DashboardPage } from '../../constants/roleAccess';
 
@@ -25,7 +35,9 @@ const pageIcons: Record<DashboardPage, React.ReactNode> = {
   eleves: <Users className="w-5 h-5" />,
   sessions: <Timer className="w-5 h-5" />,
   formations: <BookOpen className="w-5 h-5" />,
+  'supports-cours': <GraduationCap className="w-5 h-5" />,
   'journal-activite': <History className="w-5 h-5" />,
+  'evaluation-formateur': <BookOpenCheck className="w-5 h-5" />,
   transactions: <CreditCard className="w-5 h-5" />,
   rapports: <BarChart3 className="w-5 h-5" />,
   publications: <Megaphone className="w-5 h-5" />,
@@ -56,6 +68,7 @@ const roleColors: Record<Role, string> = {
 
 // ─── Panneau de notifications ───────────────────────────────────
 function NotificationsPanel({ onClose }: { onClose: () => void }) {
+  const navigate = useNavigate();
   const [notifs, setNotifs] = useState<Notification[]>([]);
 
   useEffect(() => {
@@ -66,7 +79,22 @@ function NotificationsPanel({ onClose }: { onClose: () => void }) {
 
   const marquerLu = async (id: number) => {
     await notificationService.marquerLu(id);
+    acknowledgeNotificationRead(id);
     setNotifs((prev) => prev.map((n) => n.id === id ? { ...n, lu: true } : n));
+  };
+
+  const marquerTousLus = async () => {
+    await notificationService.marquerTousLus();
+    acknowledgeAllNotificationsRead(notifs.map((n) => n.id));
+    setNotifs((prev) => prev.map((n) => ({ ...n, lu: true })));
+  };
+
+  const openNotification = async (n: Notification) => {
+    if (!n.lu) await marquerLu(n.id);
+    onClose();
+    if (n.type === 'SIGNALEMENT') navigate('/dashboard/signalements');
+    else if (n.type === 'TRANSACTION') navigate('/dashboard/transactions');
+    else navigate('/dashboard');
   };
 
   const typeIcon: Record<string, React.ReactNode> = {
@@ -81,10 +109,20 @@ function NotificationsPanel({ onClose }: { onClose: () => void }) {
       className="absolute right-0 top-12 w-[min(24rem,calc(100vw-1.5rem))] card z-50 shadow-xl shadow-slate-900/10 border border-slate-200">
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
         <h3 className="text-slate-900 font-semibold">Notifications</h3>
-        <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          {notifs.some((n) => !n.lu) && (
+            <button type="button" onClick={() => void marquerTousLus()} className="text-xs text-primary-600 hover:underline">
+              Tout marquer lu
+            </button>
+          )}
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
+      <p className="text-[11px] text-slate-500 mb-3 -mt-2">
+        Les alertes non lues sont rappelées sur le bureau PC jusqu&apos;à lecture. Email envoyé aussi hors application.
+      </p>
 
       {notifs.length === 0 ? (
         <div className="text-center py-8 text-slate-400">
@@ -95,7 +133,7 @@ function NotificationsPanel({ onClose }: { onClose: () => void }) {
         <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
           {notifs.map((n) => (
             <div key={n.id}
-              onClick={() => !n.lu && marquerLu(n.id)}
+              onClick={() => void openNotification(n)}
               className={`p-3 rounded-xl cursor-pointer transition-all ${
                 n.lu ? 'bg-slate-50' : 'bg-white border border-slate-200 hover:border-primary-300'
               }`}>
@@ -132,23 +170,61 @@ export default function DashboardLayout() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [desktopNotifPermission, setDesktopNotifPermission] = useState(
+    () => getBrowserNotificationPermission(),
+  );
+  const prevNotifsRef = useRef<Notification[]>([]);
+
+  const handleNotificationInteract = useCallback(async (notif: Notification) => {
+    try {
+      await notificationService.marquerLu(notif.id);
+      acknowledgeNotificationRead(notif.id);
+      prevNotifsRef.current = prevNotifsRef.current.map((n) =>
+        n.id === notif.id ? { ...n, lu: true } : n,
+      );
+      setUnreadCount((c) => Math.max(0, c - 1));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const refreshNotifications = useCallback(() => {
+    notificationService.getMes()
+      .then((r) => {
+        const data = r.data as Notification[];
+        processUnreadReminders(data, { onInteract: (n) => void handleNotificationInteract(n) });
+        prevNotifsRef.current = data;
+        const unread = data.filter((n) => !n.lu).length;
+        setUnreadCount(unread);
+        syncDocumentTitleAlert(unread);
+      })
+      .catch(() => {});
+  }, [handleNotificationInteract]);
 
   const navItems = (role ? buildNavForRole(role, hasFeature) : []).map((item) => ({
     ...item,
     icon: pageIcons[item.page],
   }));
 
-  // Polling notifications toutes les 30s
+  // Notifications : polling + rappels bureau jusqu'à lecture
   useEffect(() => {
-    const fetch = () => {
-      notificationService.getMes()
-        .then((r) => setUnreadCount(r.data.filter((n: Notification) => !n.lu).length))
-        .catch(() => {});
+    if (shouldAskBrowserNotificationPermission()) {
+      void ensureBrowserNotificationPermission().then((p) => {
+        if (p !== 'unsupported') setDesktopNotifPermission(p);
+      });
+    }
+    refreshNotifications();
+    const pollId = window.setInterval(refreshNotifications, 15000);
+    return () => window.clearInterval(pollId);
+  }, [refreshNotifications]);
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (!document.hidden) refreshNotifications();
     };
-    fetch();
-    const interval = setInterval(fetch, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [refreshNotifications]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -211,7 +287,7 @@ export default function DashboardLayout() {
           <UserAvatar user={user} size="sm" className="shrink-0 ring-2 ring-white/30" />
           {(sidebarOpen || mobileSidebar) && (
             <div className="min-w-0 flex-1">
-              <p className="text-white text-sm font-medium truncate">{user?.prenom} {user?.nom}</p>
+              <p className="text-white text-sm font-medium truncate">{formatFullName(user?.prenom, user?.nom)}</p>
               <span className="inline-block mt-1 text-[10px] font-semibold uppercase tracking-wide text-white/90 bg-white/15 px-2 py-0.5 rounded-md">
                 {role ? ROLE_LABELS[role] : ''}
               </span>
@@ -290,7 +366,21 @@ export default function DashboardLayout() {
               {role === 'DIRECTEUR' && <InscriptionsToggle variant="topbar" />}
 
               {/* Notifications */}
-              <div className="relative">
+              <div className="relative flex items-center gap-1">
+                {desktopNotifPermission !== 'granted' && desktopNotifPermission !== 'unsupported' && (
+                  <button
+                    type="button"
+                    title="Activer les alertes bureau (rappel jusqu'à lecture)"
+                    onClick={() => {
+                      void ensureBrowserNotificationPermission().then((p) => {
+                        if (p !== 'unsupported') setDesktopNotifPermission(p);
+                      });
+                    }}
+                    className="hidden sm:inline-flex text-[10px] font-semibold px-2 py-1 rounded-lg bg-amber-400/20 text-amber-100 border border-amber-300/30 hover:bg-amber-400/30"
+                  >
+                    Alertes PC
+                  </button>
+                )}
                 <button
                   onClick={() => { setShowNotifs(!showNotifs); setShowUserMenu(false); }}
                   className="p-2 relative rounded-lg text-white/90 hover:text-white hover:bg-white/10 transition-colors">

@@ -84,6 +84,11 @@ public class User {
     @Builder.Default
     private boolean actif = true;
 
+    /** Recevoir les alertes par email (hors application) */
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean notificationsEmailActives = true;
+
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 

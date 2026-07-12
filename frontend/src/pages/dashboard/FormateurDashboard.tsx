@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { centreService, dashboardService, formationService, sessionService } from '../../services/api';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { Centre, ModuleFormation, SessionCours } from '../../types';
+import { formatFullName } from '../../utils/displayName';
 import { fetchWithOfflineCache } from '../../utils/offlineCache';
 import EnfantsProfilesShowcase from '../../components/dashboard/EnfantsProfilesShowcase';
 import LocalisationDashboardSection from '../../components/dashboard/LocalisationDashboardSection';
@@ -70,6 +71,7 @@ export default function FormateurDashboard() {
 
   const actions = [
     { label: 'Profils & projets enfants', href: '/dashboard/profils-enfants', color: 'text-[#5ED9FF]' },
+    { label: 'Évaluation (quiz & Scratch)', href: '/dashboard/evaluation-formateur', color: 'text-violet-400' },
     { label: 'Démarrer une session', href: '/dashboard/sessions', color: 'text-primary-400' },
     { label: 'Saisir le module du jour', href: '/dashboard/formations', color: 'text-blue-400' },
     { label: 'Gérer mes élèves', href: '/dashboard/eleves', color: 'text-amber-400' },
@@ -88,7 +90,7 @@ export default function FormateurDashboard() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white">Bienvenue, {user?.prenom}</h1>
+        <h1 className="text-2xl font-bold text-white">Bienvenue, {formatFullName(user?.prenom, user?.nom) || user?.prenom}</h1>
         <p className="text-dark-400 mt-1">Voici un résumé de votre activité de formation.</p>
         {usingOfflineCache && (
           <p className="text-xs text-amber-400 mt-2">Mode hors ligne: affichage des dernières données enregistrées.</p>

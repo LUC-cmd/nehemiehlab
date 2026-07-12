@@ -53,9 +53,9 @@ public class DemoAccountsController {
         body.put("comptesDirecteur", List.of(
                 compte("COMPTABLE", "compta@ska.tg", "Finances / transactions"),
                 compte("STAFF_NEHEMIAH", "staff@ska.tg", "Staff Nehemiah Lab"),
-                compte("ANIMATEUR", "animateur@ska.tg", "Animateur CEDJ"),
-                compte("BENEVOLE", "benevole@ska.tg", "Bénévole CEDJ"),
-                compte("PARTICIPANT", "participant@ska.tg", "Participant CEDJ")
+                compte("ANIMATEUR", "animateur@ska.tg", "Animateur CDEJ"),
+                compte("BENEVOLE", "benevole@ska.tg", "Bénévole CDEJ"),
+                compte("PARTICIPANT", "participant@ska.tg", "Participant CDEJ")
         ));
 
         body.put("parents", List.of(

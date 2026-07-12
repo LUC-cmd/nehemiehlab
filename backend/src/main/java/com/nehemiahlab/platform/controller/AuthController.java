@@ -314,8 +314,8 @@ public class AuthController {
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", emailEnvoye
-                        ? "Inscription enregistrée. Un email de confirmation vous a été envoyé. Le Directeur doit encore valider votre compte."
-                        : "Inscription enregistrée. Le Directeur doit valider votre compte avant la connexion.",
+                        ? "Inscription enregistrée. Un email de confirmation a été envoyé à " + email + ". Vérifiez aussi vos spams."
+                        : "Inscription enregistrée. L'email de confirmation n'a pas pu être envoyé (service mail indisponible). Le Directeur validera votre compte.",
                 "emailEnvoye", emailEnvoye
         ));
     }
@@ -360,7 +360,8 @@ public class AuthController {
 
         Optional<User> userOpt = userRepository.findByEmail(email);
         // Réponse générique pour ne pas révéler si l'email existe
-        String genericOk = "Si un compte actif existe pour cet email, un code OTP a été envoyé. Vérifiez aussi vos spams.";
+        String genericOk = "Si un compte actif existe pour cet email, un code a été envoyé. "
+                + "Ouvrez Gmail → Courrier indésirable / Spam et recherchez « Smart Kids Academy ».";
         if (userOpt.isEmpty() || !userOpt.get().isActif()) {
             return ResponseEntity.ok(Map.of("success", true, "message", genericOk));
         }

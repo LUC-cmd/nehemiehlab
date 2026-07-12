@@ -22,6 +22,10 @@ public class Signalement {
     @Column
     private Long centreId;
 
+    /** Séance terrain liée (alerte saisie pendant une session) */
+    @Column(name = "session_id")
+    private Long sessionId;
+
     @Column(nullable = false)
     @Builder.Default
     private String cibleType = "ENFANT"; // "ENFANT", "CENTRE"

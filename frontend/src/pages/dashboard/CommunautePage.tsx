@@ -14,11 +14,11 @@ import { mediaUrl } from '../../utils/media';
 
 const PROFILE_TYPE_OPTIONS: { value: CommunityProfileType; label: string }[] = [
   { value: 'SKA_TEACHER', label: 'Formateur SKA' },
-  { value: 'AUTRE_PARTICIPANT', label: 'Membre CEDJ' },
+  { value: 'AUTRE_PARTICIPANT', label: 'Membre CDEJ' },
 ];
 
 function profileTypeLabel(type?: CommunityProfileType): string {
-  return PROFILE_TYPE_OPTIONS.find((o) => o.value === type)?.label ?? 'Membre CEDJ';
+  return PROFILE_TYPE_OPTIONS.find((o) => o.value === type)?.label ?? 'Membre CDEJ';
 }
 
 function defaultProfileType(role: Role | null): CommunityProfileType {
@@ -352,7 +352,7 @@ export default function CommunautePage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Communauté CEDJ</h1>
+          <h1 className="text-2xl font-bold text-white">Communauté CDEJ</h1>
           <p className="text-dark-400 mt-1">
             Annuaire interne : formateurs SKA et membres de la communauté.
           </p>
@@ -373,7 +373,7 @@ export default function CommunautePage() {
               Mon profil
             </h2>
             <p className="text-sm text-dark-400 mt-1">
-              Complétez vos informations pour apparaître dans l’annuaire CEDJ.
+              Complétez vos informations pour apparaître dans l’annuaire CDEJ.
             </p>
           </div>
 
@@ -500,7 +500,7 @@ export default function CommunautePage() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-white font-semibold">Membres CEDJ</h2>
+        <h2 className="text-white font-semibold">Membres CDEJ</h2>
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
           {stakeholders.map((u) => (
             <ProfileCard
@@ -656,7 +656,7 @@ export default function CommunautePage() {
       <ConfirmDialog
         open={confirmDeleteId != null}
         title="Supprimer ce profil ?"
-        message="Le profil sera définitivement retiré de la communauté CEDJ."
+        message="Le profil sera définitivement retiré de la communauté CDEJ."
         confirmLabel="Supprimer"
         danger
         onConfirm={confirmDeleteProfile}

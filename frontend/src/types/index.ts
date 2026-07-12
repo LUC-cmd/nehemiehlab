@@ -55,6 +55,8 @@ export interface Centre {
   coordinateurPrenom?: string;
   telephoneCoordinateur?: string;
   telephoneFormateur?: string;
+  codeCdej?: string;
+  lieuFormation?: string;
   coordinateur?: User;
   formateurs: User[];
   nombreEleves: number;
@@ -102,6 +104,7 @@ export interface SessionCours {
   precisionFinMetres?: number;
   rapportUrl?: string;
   moduleFait?: string;
+  moduleCoursId?: number;
   etatEquipements?: string;
   defisSession?: string;
   nbPresents?: number;
@@ -119,6 +122,10 @@ export interface EvaluationSession {
   note?: number;
   commentaire?: string;
   projetTravaille?: string;
+  /** true = projet de fin (rapport annuel), false = pratique */
+  projetFinal?: boolean;
+  projetProbleme?: string;
+  projetSolution?: string;
   /** Arrivée réelle (retard possible) */
   heureArrivee?: string;
   heureDepart?: string;
@@ -136,6 +143,10 @@ export interface Projet {
   justificationPedagogique?: string;
   pointsForts?: string;
   recommandations?: string;
+  probleme?: string;
+  solution?: string;
+  niveauMaitrise?: string;
+  observationsRapport?: string;
   updatedAt: string;
 }
 
@@ -186,11 +197,120 @@ export interface ModuleFormation {
   formateurId: number;
   formateurNom?: string;
   formateurPrenom?: string;
+  moduleCoursId?: number;
   titre: string;
   description: string;
   dureeHeures: number;
   elevesPresents: number[];
 }
+
+export interface FormateurEvaluation {
+  id: number;
+  formateurId: number;
+  formateurNom?: string;
+  formateurPrenom?: string;
+  moduleCoursId: number;
+  moduleTitre?: string;
+  quizScore: number;
+  quizTotal: number;
+  quizReponses?: string;
+  scratchUrl?: string;
+  scratchNom?: string;
+  analyse?: string;
+  createdAt?: string;
+}
+
+export interface ChildSessionRow {
+  sessionId: number;
+  titre: string;
+  module?: string;
+  centre?: string;
+  date: string;
+  statut?: string;
+  present: boolean;
+  note?: number | null;
+  commentaire?: string;
+  projetTravaille?: string;
+  projetFinal?: boolean;
+  projetProbleme?: string;
+  projetSolution?: string;
+  heureArrivee?: string;
+  dureeMinutes?: number | null;
+}
+
+export interface RapportSyntheseCentre {
+  id?: number;
+  centreId: number;
+  moduleLabel: string;
+  annee?: number;
+  dateDebut?: string;
+  dateFin?: string;
+  effectifDebutFilles?: number;
+  effectifDebutGarcons?: number;
+  effectifFinalFilles?: number;
+  effectifFinalGarcons?: number;
+  projetsLibresP1?: number;
+  projetsLibresP2?: number;
+  projetsNonAcheves?: number;
+  projetsGroupe?: number;
+  projetsContextuels?: number;
+  projetsPresentes?: number;
+  syntheseTable?: string;
+  aime?: string;
+  pasAime?: string;
+  vision?: string;
+  empty?: boolean;
+}
+
+export const NIVEAUX_MAITRISE = ['Médiocre', 'Passable', 'Assez-bien', 'Bien', 'Très-bien'] as const;
+
+export interface ApercuRapportFormateur {
+  periodeDebut: string;
+  periodeFin: string;
+  periodeLabel: string;
+  seancesTerrain: number;
+  elevesInscrits: number;
+  elevesActifs: number;
+  totalPresences: number;
+}
+
+export interface RapportExecutionSeanceItem {
+  id: number;
+  date: string;
+  heureDebut?: string;
+  creneau: string;
+  centreId?: number;
+  centreNom?: string;
+  codeCdej?: string;
+  lieuFormation?: string;
+  region?: string;
+  cluster?: string;
+  formateurId?: number;
+  formateurNom?: string;
+  moduleFait?: string;
+  presents: number;
+  totalEleves: number;
+  defisSession?: string;
+  etatEquipements?: string;
+  statut: string;
+}
+
+export interface RapportExecutionSeancesResponse {
+  total: number;
+  presentsTotal: number;
+  periodeDebut: string;
+  periodeFin: string;
+  sessions: RapportExecutionSeanceItem[];
+}
+
+export const DEFAULT_SYNTHESE_ROWS = [
+  { categorie: 'Cadre', defis: '', lecons: '', propsTrainer: '', propsEnfants: '', propsCdej: '', propsNehemiah: '' },
+  { categorie: 'Modules', defis: '', lecons: '', propsTrainer: '', propsEnfants: '', propsCdej: '', propsNehemiah: '' },
+  { categorie: 'Enfants', defis: '', lecons: '', propsTrainer: '', propsEnfants: '', propsCdej: '', propsNehemiah: '' },
+  { categorie: 'CDEJ', defis: '', lecons: '', propsTrainer: '', propsEnfants: '', propsCdej: '', propsNehemiah: '' },
+  { categorie: 'Nehemiah Lab', defis: '', lecons: '', propsTrainer: '', propsEnfants: '', propsCdej: '', propsNehemiah: '' },
+  { categorie: 'SKA Trainer', defis: '', lecons: '', propsTrainer: '', propsEnfants: '', propsCdej: '', propsNehemiah: '' },
+];
 
 // --- Transaction ---
 export interface Transaction {
@@ -349,6 +469,46 @@ export interface RessourceItem {
   fichiers?: RessourceFichier[];
   actif: boolean;
   createdAt: string;
+  updatedAt?: string;
+}
+
+/** Module pédagogique SKA — saisi par le Directeur */
+export interface SupportCoursFichier {
+  id?: number;
+  url: string;
+  nom: string;
+  mimeType?: string;
+  ordre?: number;
+}
+
+export interface ModuleCours {
+  id: number;
+  numeroOrdre: number;
+  titre: string;
+  description?: string;
+  objectifs?: string;
+  dureeRecommandeeHeures?: number;
+  niveau?: string;
+  actif: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface SerieSupportCours {
+  id: number;
+  titre: string;
+  description?: string;
+  ordre: number;
+  actif: boolean;
+  fichiers: SupportCoursFichier[];
+  moduleIds: number[];
+  modules?: Array<{
+    id: number;
+    numeroOrdre: number;
+    titre: string;
+    actif: boolean;
+  }>;
+  createdAt?: string;
   updatedAt?: string;
 }
 

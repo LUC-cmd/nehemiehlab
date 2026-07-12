@@ -10,6 +10,8 @@ import {
 import toast from 'react-hot-toast';
 import { PageLoadingSkeleton } from '../../components/ui/DashboardSkeletons';
 import { useMinDelayLoading } from '../../hooks/useMinDelayLoading';
+import RapportAnnuelFormateurCard from '../../components/dashboard/RapportAnnuelFormateurCard';
+import RapportExecutionSeancesPanel from '../../components/dashboard/RapportExecutionSeancesPanel';
 
 type ExportKey =
   | 'eleves'
@@ -344,6 +346,24 @@ export default function RapportsPage() {
         </div>
       </div>
 
+      {canPedago && selectedCentreId && (
+        <RapportAnnuelFormateurCard
+          centreId={Number(selectedCentreId)}
+          centreName={centres.find((c) => String(c.id) === selectedCentreId)?.nom || 'Centre'}
+          initialDebut={dateDebut}
+          initialFin={dateFin}
+        />
+      )}
+
+      {canPedago && (
+        <RapportExecutionSeancesPanel
+          filters={sharedParams}
+          isDirecteur={isDirecteur}
+          validateDates={validateDates}
+          downloadFile={downloadFile}
+        />
+      )}
+
       {/* Cartes d’export */}
       <div className="grid md:grid-cols-2 gap-4 sm:gap-5">
         {canPedago && (
@@ -395,8 +415,8 @@ export default function RapportsPage() {
           <ReportCard
             icon={<ClipboardList className="w-5 h-5" />}
             eyebrow="Opérations terrain"
-            title="Suivi des séances"
-            description="Format terrain : NOM, PRENOMS, SEXE, CLASSE, AGE, MODULE, PARTICIPATION /10, équipements, défis + alertes centre."
+            title="Rapport d'exécution SKA Program"
+            description="Format officiel (type Yoto Sud) : CDEJ, formateur, créneau, effectif présent (P) et défis — généré depuis les séances clôturées saisies par les formateurs. Excel détaillé par enfant en complément."
           >
             <ExportButtons
               exporting={exporting}
@@ -413,9 +433,9 @@ export default function RapportsPage() {
               onPdf={() =>
                 runExport(
                   'seances-pdf',
-                  () => rapportService.exporterSeancesPdf(sharedParams),
-                  `suivi_seances_${stamp()}.pdf`,
-                  'Suivi séances PDF',
+                  () => rapportService.exporterExecutionPdf(sharedParams),
+                  `rapport_execution_ska_${stamp()}.pdf`,
+                  'Rapport exécution SKA PDF',
                 )
               }
             />

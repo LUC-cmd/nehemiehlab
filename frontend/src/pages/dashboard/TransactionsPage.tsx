@@ -15,6 +15,8 @@ import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import SecureProofViewer from '../../components/ui/SecureProofViewer';
 import MediaDropZone from '../../components/ui/MediaDropZone';
+import ValidationActionButton from '../../components/ui/ValidationActionButton';
+import { ALERT_PRESETS, type AlertPresetId } from '../../constants/alertPresets';
 
 const ACCEPTED_PROOF =
   '.jpg,.jpeg,.png,.webp,.gif,.pdf,.doc,.docx,.xls,.xlsx,image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -164,6 +166,15 @@ export default function TransactionsPage() {
       fetchTransactions();
     } catch {
       toast.error('Erreur lors du refus.');
+    }
+  };
+
+  const handleRelayerTx = async (id: number, roles: string[]) => {
+    try {
+      const res = await transactionService.relayer(id, { roles });
+      toast.success(res.data?.message || 'Notification envoyée (app + email).');
+    } catch {
+      toast.error('Erreur lors de la notification.');
     }
   };
 
@@ -419,44 +430,67 @@ export default function TransactionsPage() {
                     {(canValidateTx || isDirecteur) && (
                       <td>
                         {canValidateTx && tx.statut === 'EN_ATTENTE' ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <button
                               type="button"
                               onClick={() => setDetailTx(tx)}
-                              className="p-1 text-slate-500 hover:bg-slate-100 rounded transition-colors"
+                              className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
                               title="Voir le détail"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
-                            <button
-                              type="button"
+                            <ValidationActionButton
+                              size="sm"
+                              variant="success"
+                              icon={Check}
+                              title={missingProof ? 'Valider (justificatif encore manquant)' : 'Valider le paiement'}
                               onClick={() => handleValider(tx.id)}
-                              className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
-                              title={
-                                missingProof
-                                  ? 'Valider (justificatif encore manquant)'
-                                  : 'Valider'
-                              }
                             >
-                              <Check className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
+                              Valider
+                            </ValidationActionButton>
+                            <ValidationActionButton
+                              size="sm"
+                              variant="danger"
+                              icon={X}
+                              title="Refuser la transaction"
                               onClick={() => handleRefuser(tx.id)}
-                              className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
-                              title="Refuser"
                             >
-                              <X className="w-4 h-4" />
-                            </button>
+                              Refuser
+                            </ValidationActionButton>
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => setDetailTx(tx)}
-                            className="text-xs text-slate-500 hover:text-[#004b57] inline-flex items-center gap-1"
-                          >
-                            <Eye className="w-3.5 h-3.5" /> Détail
-                          </button>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setDetailTx(tx)}
+                              className="text-xs text-slate-500 hover:text-[#004b57] inline-flex items-center gap-1"
+                            >
+                              <Eye className="w-3.5 h-3.5" /> Détail
+                            </button>
+                            {isDirecteur && (
+                              <>
+                                {(Object.keys(ALERT_PRESETS) as AlertPresetId[]).map((presetId) => {
+                                  const p = ALERT_PRESETS[presetId];
+                                  const variant =
+                                    presetId === 'TOUS' ? 'violet'
+                                      : presetId === 'COMPTABLE' ? 'warning'
+                                        : presetId === 'FORMATEUR_COMPTABLE' ? 'primary'
+                                          : 'sky';
+                                  return (
+                                    <ValidationActionButton
+                                      key={presetId}
+                                      size="sm"
+                                      variant={variant}
+                                      title={p.subtitle}
+                                      onClick={() => void handleRelayerTx(tx.id, p.roles)}
+                                    >
+                                      → {p.label}
+                                    </ValidationActionButton>
+                                  );
+                                })}
+                              </>
+                            )}
+                          </div>
                         )}
                       </td>
                     )}

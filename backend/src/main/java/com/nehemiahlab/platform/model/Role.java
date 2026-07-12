@@ -9,12 +9,12 @@ public enum Role {
     COMPTABLE,
     /** Staff Nehemiah Lab */
     STAFF_NEHEMIAH,
-    /** Animateur CEDJ */
+    /** Animateur CDEJ */
     ANIMATEUR,
     /** Parent d'enfant accompagné */
     PARENT,
-    /** Bénévole CEDJ */
+    /** Bénévole CDEJ */
     BENEVOLE,
-    /** Participant CEDJ */
+    /** Participant CDEJ */
     PARTICIPANT
 }

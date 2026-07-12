@@ -4,7 +4,9 @@ import com.nehemiahlab.platform.model.*;
 import com.nehemiahlab.platform.repository.*;
 import com.nehemiahlab.platform.service.CentreAccessService;
 import com.nehemiahlab.platform.service.MatriculeService;
+import com.nehemiahlab.platform.service.NotificationDispatchService;
 import com.nehemiahlab.platform.service.ParentActivationService;
+import com.nehemiahlab.platform.security.InputSanitizer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,9 +15,12 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/eleves")
@@ -37,7 +42,7 @@ public class EleveController {
     private SignalementRepository signalementRepository;
 
     @Autowired
-    private NotificationRepository notificationRepository;
+    private NotificationDispatchService notificationDispatchService;
 
     @Autowired
     private UserRepository userRepository;
@@ -92,6 +97,45 @@ public class EleveController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/{id}/seances")
+    @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER')")
+    public ResponseEntity<?> seancesEleve(@PathVariable Long id, Authentication auth) {
+        centreAccessService.requireEleveAccess((User) auth.getPrincipal(), id);
+        if (eleveRepository.findById(id).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        List<Map<String, Object>> seances = evaluationSessionRepository.findByEleveId(id)
+                .stream()
+                .filter(ev -> ev.getSessionCours() != null)
+                .sorted(Comparator.comparing(
+                        (EvaluationSession ev) -> ev.getSessionCours().getHeureDebut(),
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(ev -> {
+                    var s = ev.getSessionCours();
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("sessionId", s.getId());
+                    row.put("titre", s.getTitre());
+                    row.put("module", s.getModuleFait());
+                    row.put("centre", s.getCentre() != null ? s.getCentre().getNom() : null);
+                    row.put("date", s.getHeureDebut());
+                    row.put("statut", s.getStatut());
+                    row.put("present", ev.isPresent());
+                    row.put("note", ev.getNote());
+                    row.put("commentaire", ev.getCommentaire());
+                    row.put("projetTravaille", ev.getProjetTravaille());
+                    row.put("projetFinal", ev.isProjetFinal());
+                    row.put("projetProbleme", ev.getProjetProbleme());
+                    row.put("projetSolution", ev.getProjetSolution());
+                    row.put("heureArrivee", ev.getHeureArrivee());
+                    row.put("dureeMinutes", ev.getDureeMinutes());
+                    return row;
+                })
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(seances);
+    }
+
     @Autowired
     private MatriculeService matriculeService;
 
@@ -137,6 +181,58 @@ public class EleveController {
                 "matricule", saved.getMatricule(),
                 "message", "Élève inscrit. Générez séparément un code d'activation parent à usage unique."
         ));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER')")
+    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
+        User user = (User) auth.getPrincipal();
+        centreAccessService.requireEleveAccess(user, id);
+        Eleve eleve = eleveRepository.findById(id).orElse(null);
+        if (eleve == null) return ResponseEntity.notFound().build();
+
+        if (body.containsKey("nom")) {
+            String nom = InputSanitizer.clean(body.get("nom").toString()).trim();
+            if (nom.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Le nom est obligatoire."));
+            }
+            eleve.setNom(nom);
+        }
+        if (body.containsKey("prenom")) {
+            String prenom = InputSanitizer.clean(body.get("prenom").toString()).trim();
+            if (prenom.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Le prénom est obligatoire."));
+            }
+            eleve.setPrenom(prenom);
+        }
+        if (body.containsKey("age")) {
+            int age = Integer.parseInt(body.get("age").toString());
+            if (age < 6 || age > 22) {
+                return ResponseEntity.badRequest().body(Map.of("message", "L'âge doit être entre 6 et 22 ans."));
+            }
+            eleve.setAge(age);
+        }
+        if (body.containsKey("sexe")) {
+            String sexe = body.get("sexe").toString();
+            if (!"M".equals(sexe) && !"F".equals(sexe)) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Sexe invalide (M ou F)."));
+            }
+            eleve.setSexe(sexe);
+        }
+        if (body.containsKey("classe")) {
+            String classe = InputSanitizer.clean(body.get("classe").toString()).trim();
+            if (classe.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "La classe est obligatoire."));
+            }
+            eleve.setClasse(classe);
+        }
+        if (body.containsKey("dateDebutFormation")) {
+            eleve.setDateDebutFormation(LocalDate.parse(body.get("dateDebutFormation").toString()));
+        }
+
+        Eleve saved = eleveRepository.save(eleve);
+        calculateAndSetPerformance(saved);
+        return ResponseEntity.ok(saved);
     }
 
     @PostMapping("/{id}/parent-activation-code")
@@ -193,6 +289,22 @@ public class EleveController {
         if (body.containsKey("recommandations")) {
             Object v = body.get("recommandations");
             projet.setRecommandations(v == null ? null : v.toString());
+        }
+        if (body.containsKey("probleme")) {
+            Object v = body.get("probleme");
+            projet.setProbleme(v == null ? null : v.toString());
+        }
+        if (body.containsKey("solution")) {
+            Object v = body.get("solution");
+            projet.setSolution(v == null ? null : v.toString());
+        }
+        if (body.containsKey("niveauMaitrise")) {
+            Object v = body.get("niveauMaitrise");
+            projet.setNiveauMaitrise(v == null ? null : v.toString());
+        }
+        if (body.containsKey("observationsRapport")) {
+            Object v = body.get("observationsRapport");
+            projet.setObservationsRapport(v == null ? null : v.toString());
         }
         projet.setUpdatedAt(LocalDateTime.now());
 
@@ -300,41 +412,43 @@ public class EleveController {
 
         Eleve eleve = eleveOpt.get();
 
+        Long sessionId = null;
+        if (body.get("sessionId") != null && !body.get("sessionId").isBlank()) {
+            sessionId = Long.valueOf(body.get("sessionId"));
+        }
+
         Signalement signalement = Signalement.builder()
                 .eleveId(id)
                 .centreId(eleve.getCentre() != null ? eleve.getCentre().getId() : null)
+                .sessionId(sessionId)
                 .cibleType("ENFANT")
                 .auteur(auteur)
-                .description(body.get("description"))
+                .description(InputSanitizer.clean(body.get("description")))
                 .inclureDansRapport(Boolean.parseBoolean(body.getOrDefault("inclureDansRapport", "false")))
                 .priorite(body.getOrDefault("priorite", "NORMALE"))
-                .defis(body.getOrDefault("defis", ""))
-                .etatEquipements(body.getOrDefault("etatEquipements", ""))
+                .defis(InputSanitizer.cleanNullable(body.getOrDefault("defis", "")))
+                .etatEquipements(InputSanitizer.cleanNullable(body.getOrDefault("etatEquipements", "")))
                 .statut("EN_ATTENTE")
                 .build();
 
         signalementRepository.save(signalement);
 
-        // Créer une notification pour le Directeur et le Coordinateur du centre
-        List<User> admins = userRepository.findByRole(Role.DIRECTEUR);
-        for (User admin : admins) {
-            notificationRepository.save(Notification.builder()
-                    .userId(admin.getId())
-                    .titre("Signalement d'incident")
-                    .message("L'élève " + eleve.getPrenom() + " " + eleve.getNom() + " a été signalé par " + auteur.getPrenom() + " " + auteur.getNom() + ".")
-                    .type("SIGNALEMENT")
-                    .lienId(signalement.getId())
-                    .build());
-        }
+        String eleveLabel = eleve.getPrenom() + " " + eleve.getNom();
+        String auteurLabel = auteur.getPrenom() + " " + auteur.getNom();
+        String priorite = "URGENTE".equalsIgnoreCase(signalement.getPriorite()) ? " [URGENT]" : "";
+        String msg = "L'élève " + eleveLabel + " a été signalé" + priorite + " par " + auteurLabel + ".\n"
+                + signalement.getDescription();
 
-        if (eleve.getCentre().getCoordinateur() != null) {
-            notificationRepository.save(Notification.builder()
-                    .userId(eleve.getCentre().getCoordinateur().getId())
-                    .titre("Signalement d'incident (Centre)")
-                    .message("L'élève " + eleve.getPrenom() + " " + eleve.getNom() + " a été signalé par " + auteur.getPrenom() + " " + auteur.getNom() + ".")
-                    .type("SIGNALEMENT")
-                    .lienId(signalement.getId())
-                    .build());
+        notificationDispatchService.notifyRole(Role.DIRECTEUR, "Signalement d'incident", msg, "SIGNALEMENT", signalement.getId());
+
+        if (eleve.getCentre() != null && eleve.getCentre().getCoordinateur() != null) {
+            notificationDispatchService.notify(
+                    eleve.getCentre().getCoordinateur(),
+                    "Signalement d'incident (Centre)",
+                    msg,
+                    "SIGNALEMENT",
+                    signalement.getId()
+            );
         }
 
         return ResponseEntity.ok(signalement);

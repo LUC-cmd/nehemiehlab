@@ -51,6 +51,14 @@ public class Centre {
     /** Numéro du formateur du centre (affiché aux coordinateurs) */
     private String telephoneFormateur;
 
+    /** Code CDEJ (ex. TG0908) pour les rapports formateurs */
+    @Column(name = "code_cdej", length = 32)
+    private String codeCdej;
+
+    /** Lieu précis de la formation SKA (village/quartier) */
+    @Column(name = "lieu_formation")
+    private String lieuFormation;
+
     /** Compte coordinateur optionnel (assigné plus tard par le Directeur) */
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "coordinateur_id")

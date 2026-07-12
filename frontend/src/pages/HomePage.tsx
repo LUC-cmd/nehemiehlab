@@ -7,6 +7,7 @@ import SiteFooter from '../components/site/SiteFooter';
 import PublicationsBanner from '../components/site/PublicationsBanner';
 import NouveautesSection from '../components/site/NouveautesSection';
 import GalerieSection from '../components/site/GalerieSection';
+import HomeFallingGallery, { buildFallingPhotos, type FallingPhoto } from '../components/site/HomeFallingGallery';
 import MissionSection from '../components/site/MissionSection';
 import NehemiahLabSection from '../components/site/NehemiahLabSection';
 import FloatingOrbs from '../components/site/FloatingOrbs';
@@ -18,6 +19,12 @@ import {
   PROGRAMS,
 } from '../constants/branding';
 import { useInscriptionFormateursOuverte } from '../hooks/useInscriptionFormateursOuverte';
+import { siteService } from '../services/api';
+import { mediaUrl } from '../utils/media';
+
+const HERO_CARD_TRANSITION = { duration: 14, repeat: Infinity, ease: 'easeInOut' as const };
+const HERO_HALO_TRANSITION = { duration: 25, repeat: Infinity, ease: 'linear' as const };
+const techLetters = 'technologies'.split('');
 
 const programIcons = { programmation: Code, modelisation: Box, electronique: Cpu, business: LineChart };
 const programColors: Record<string, { color: string; shadow: string }> = {
@@ -32,6 +39,10 @@ const heroWords = ['Faites', 'entrer', 'votre', 'enfant', 'dans', 'le', 'monde',
 export default function HomePage() {
   const { scrollY } = useScroll();
   const [showBackTop, setShowBackTop] = useState(false);
+  const [heroImage, setHeroImage] = useState<string>(HERO_IMAGE);
+  const [heroAlt, setHeroAlt] = useState('Atelier Smart Kids Academy');
+  const [fallingPhotos, setFallingPhotos] = useState<FallingPhoto[]>([]);
+  const [galerieReady, setGalerieReady] = useState(false);
   const { ouverte: inscriptionsOuvertes } = useInscriptionFormateursOuverte();
   const heroImageY = useTransform(scrollY, [0, 600], [0, 80]);
   const heroImageScale = useTransform(scrollY, [0, 600], [1, 1.08]);
@@ -41,6 +52,37 @@ export default function HomePage() {
     const onScroll = () => setShowBackTop(window.scrollY > 720);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    let settled = false;
+
+    const showFalling = (data: import('../types').GaleriePhoto[]) => {
+      if (settled) return;
+      settled = true;
+      setFallingPhotos(buildFallingPhotos(data));
+      setGalerieReady(true);
+    };
+
+    const fallbackTimer = window.setTimeout(() => showFalling([]), 350);
+
+    siteService
+      .getGalerie()
+      .then((r) => {
+        const heroPhoto = r.data.find((p) => p.ordre === 0) ?? r.data[0];
+        if (heroPhoto?.imageUrl) {
+          setHeroImage(mediaUrl(heroPhoto.imageUrl));
+          if (heroPhoto.legende) setHeroAlt(heroPhoto.legende);
+        }
+        window.clearTimeout(fallbackTimer);
+        showFalling(r.data);
+      })
+      .catch(() => {
+        window.clearTimeout(fallbackTimer);
+        showFalling([]);
+      });
+
+    return () => window.clearTimeout(fallbackTimer);
   }, []);
 
   useEffect(() => {
@@ -92,12 +134,60 @@ export default function HomePage() {
                 </motion.span>
               ))}
               <motion.span
-                initial={{ opacity: 0, y: 24, scale: 0.9 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ delay: 0.72, duration: 0.55 }}
-                className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-[#004b57] via-[#006878] to-[#004b57] animate-gradient-x bg-[length:200%_auto]"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.72, duration: 0.5 }}
+                className="relative inline-block align-baseline ml-[0.12em]"
               >
-                technologies
+                <motion.span
+                  className="relative z-10 inline-flex flex-wrap"
+                  animate={{ scale: [1, 1.025, 1] }}
+                  transition={{ delay: 1.4, duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  {techLetters.map((letter, i) => (
+                    <motion.span
+                      key={`${letter}-${i}`}
+                      initial={{ opacity: 0, y: 28, rotateX: -70 }}
+                      animate={{ opacity: 1, y: 0, rotateX: 0 }}
+                      transition={{
+                        delay: 0.78 + i * 0.04,
+                        duration: 0.48,
+                        ease: [0.22, 1, 0.36, 1],
+                      }}
+                      className="inline-block font-extrabold text-[#004b57] hero-tech-letter"
+                      style={{ transformOrigin: 'bottom center' }}
+                    >
+                      {letter}
+                    </motion.span>
+                  ))}
+                </motion.span>
+                <motion.span
+                  aria-hidden
+                  className="absolute -bottom-1 left-0 right-0 h-[3px] rounded-full bg-gradient-to-r from-[#004b57] via-[#006878] to-[#004b57] origin-left"
+                  initial={{ scaleX: 0, opacity: 0 }}
+                  animate={{ scaleX: 1, opacity: 1 }}
+                  transition={{ delay: 1.1, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+                />
+                <motion.span
+                  aria-hidden
+                  className="absolute -inset-x-1 -inset-y-0.5 rounded-md bg-[#004b57]/10 blur-md -z-10"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 0.7, 0.35, 0.7] }}
+                  transition={{ delay: 1.2, duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                />
+                <motion.span
+                  aria-hidden
+                  className="absolute inset-0 overflow-hidden rounded-sm pointer-events-none"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1.15, duration: 0.35 }}
+                >
+                  <motion.span
+                    className="absolute inset-y-0 w-[42%] bg-gradient-to-r from-transparent via-white/70 to-transparent skew-x-12"
+                    animate={{ left: ['-48%', '160%'] }}
+                    transition={{ duration: 2.2, repeat: Infinity, repeatDelay: 0.9, ease: 'easeInOut' }}
+                  />
+                </motion.span>
               </motion.span>
             </h1>
 
@@ -150,14 +240,19 @@ export default function HomePage() {
             style={{ y: heroImageY, scale: heroImageScale }}
             className="relative perspective-1000"
           >
-            <div className="relative">
+            <motion.div
+              animate={{ rotateY: [-10, 10, -10], rotateZ: [0, 1.5, 0, -1.5, 0] }}
+              transition={HERO_CARD_TRANSITION}
+              style={{ transformStyle: 'preserve-3d' }}
+              className="relative"
+            >
               <motion.div
                 animate={{ rotate: [0, 360] }}
-                transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
+                transition={HERO_HALO_TRANSITION}
                 className="absolute -inset-3 rounded-[2.2rem] bg-gradient-to-br from-[#004b57]/35 via-transparent to-[#004b57]/15 opacity-70 blur-sm"
               />
               <div className="relative aspect-[4/5] max-h-[460px] sm:max-h-[560px] rounded-[2rem] overflow-hidden border border-slate-200 shadow-2xl shadow-slate-900/10">
-                <img src={HERO_IMAGE} alt="Atelier Smart Kids Academy" className="w-full h-full object-cover" />
+                <img src={heroImage} alt={heroAlt} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#004b57]/80 via-[#004b57]/15 to-transparent" />
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -171,10 +266,12 @@ export default function HomePage() {
                   </div>
                 </motion.div>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
         </div>
       </section>
+
+      <HomeFallingGallery photos={fallingPhotos} ready={galerieReady} />
 
       <StatsBar />
       <PublicationsBanner />

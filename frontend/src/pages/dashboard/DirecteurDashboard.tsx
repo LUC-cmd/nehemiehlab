@@ -9,6 +9,7 @@ import { dashboardService, centreService, eleveService, signalementService, tran
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import type { DashboardStats, Centre, Signalement, Transaction } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { formatFullName } from '../../utils/displayName';
 import { fetchWithOfflineCache } from '../../utils/offlineCache';
 import EnfantsProfilesShowcase from '../../components/dashboard/EnfantsProfilesShowcase';
 import LocalisationDashboardSection from '../../components/dashboard/LocalisationDashboardSection';
@@ -87,6 +88,7 @@ export default function DirecteurDashboard() {
   ];
 
   const actions = [
+    { label: 'Journal d\'activité', href: '/dashboard/journal-activite', color: 'text-violet-400' },
     { label: 'Profils & projets enfants', href: '/dashboard/profils-enfants', color: 'text-[#5ED9FF]' },
     { label: 'Ajouter un centre', href: '/dashboard/centres', color: 'text-blue-400' },
     { label: 'Valider les formateurs', href: '/dashboard/formateurs', color: 'text-purple-400' },
@@ -100,7 +102,7 @@ export default function DirecteurDashboard() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-white">
-          Bonjour, {user?.prenom}
+          Bonjour, {formatFullName(user?.prenom, user?.nom) || user?.prenom}
         </h1>
         <p className="text-dark-400 mt-1">Voici l'état de la plateforme Nehemiah Lab aujourd'hui.</p>
         {usingOfflineCache && (

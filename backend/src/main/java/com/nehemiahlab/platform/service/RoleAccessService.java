@@ -28,7 +28,9 @@ public class RoleAccessService {
             "eleves",
             "sessions",
             "formations",
+            "supports-cours",
             "journal-activite",
+            "evaluation-formateur",
             "transactions",
             "rapports",
             "publications",
@@ -59,8 +61,8 @@ public class RoleAccessService {
     public Map<String, Set<String>> defaultMatrix() {
         Map<String, Set<String>> m = new LinkedHashMap<>();
         m.put(Role.DIRECTEUR.name(), set(
-                "home", "centres", "formateurs", "eleves", "sessions", "formations",
-                "journal-activite",
+                "home", "centres", "formateurs", "eleves", "sessions", "formations", "supports-cours",
+                "journal-activite", "evaluation-formateur",
                 "transactions", "rapports", "publications", "actualites", "galerie", "ressources",
                 "communaute", "profils-enfants", "controle-gestion", "utilisateurs",
                 "permissions", "profil",
@@ -68,17 +70,17 @@ public class RoleAccessService {
                 "manage_signalements"
         ));
         m.put(Role.FORMATEUR.name(), set(
-                "home", "mes-centres", "eleves", "sessions", "formations", "ressources",
+                "home", "mes-centres", "eleves", "sessions", "formations", "supports-cours", "evaluation-formateur", "ressources",
                 "communaute", "profils-enfants", "transactions", "rapports", "profil",
                 "edit_centre_location", "create_eleve", "manage_sessions", "validate_transactions"
         ));
         m.put(Role.COORDINATEUR.name(), set(
-                "home", "mes-centres", "eleves", "formations", "ressources", "communaute",
+                "home", "mes-centres", "eleves", "formations", "supports-cours", "ressources", "communaute",
                 "profils-enfants", "signalements", "rapports", "profil",
                 "edit_centre_location", "create_eleve", "manage_signalements"
         ));
         m.put(Role.RESPONSABLE_CLUSTER.name(), set(
-                "home", "mes-centres", "eleves", "sessions", "formations", "ressources", "communaute",
+                "home", "mes-centres", "eleves", "sessions", "formations", "supports-cours", "ressources", "communaute",
                 "profils-enfants", "signalements", "rapports", "profil",
                 "edit_centre_location", "create_eleve", "manage_signalements"
         ));

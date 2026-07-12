@@ -80,14 +80,18 @@ public class DemoAccountsBootstrap implements CommandLineRunner {
             return;
         }
         String encoded = passwordEncoder.encode(demoPassword);
-        int staffSynced = syncAllSkaStaff(encoded);
-        int responsables = ensureResponsables(encoded);
-        int directorRoles = ensureDirectorCreatedStaff(encoded);
-        int parents = ensureDemoParents(encoded);
-        log.info(
-                "Comptes démo prêts — staff @ska.tg: {}, responsables: {}, rôles directeur: {}, parents: {}",
-                staffSynced, responsables, directorRoles, parents
-        );
+        try {
+            int staffSynced = syncAllSkaStaff(encoded);
+            int responsables = ensureResponsables(encoded);
+            int directorRoles = ensureDirectorCreatedStaff(encoded);
+            int parents = ensureDemoParents(encoded);
+            log.info(
+                    "Comptes démo prêts — staff @ska.tg: {}, responsables: {}, rôles directeur: {}, parents: {}",
+                    staffSynced, responsables, directorRoles, parents
+            );
+        } catch (Exception e) {
+            log.error("Échec partiel de la synchronisation des comptes démo: {}", e.getMessage(), e);
+        }
     }
 
     private int syncAllSkaStaff(String encodedPassword) {
@@ -119,6 +123,8 @@ public class DemoAccountsBootstrap implements CommandLineRunner {
                         .nom("Responsable " + num)
                         .prenom(cluster.replace("Cluster ", ""))
                         .role(Role.RESPONSABLE_CLUSTER)
+                        .motDePasse(encodedPassword)
+                        .assignedCluster(cluster)
                         .telephone("+228 90 00 00 " + String.format("%02d", idx))
                         .actif(true)
                         .build());
@@ -141,6 +147,7 @@ public class DemoAccountsBootstrap implements CommandLineRunner {
                             .nom(def.nom())
                             .prenom(def.prenom())
                             .role(def.role())
+                            .motDePasse(encodedPassword)
                             .telephone("+228 91 00 00 0" + phoneSuffix)
                             .actif(true)
                             .build())
@@ -180,12 +187,16 @@ public class DemoAccountsBootstrap implements CommandLineRunner {
 
             String parentEmail = parentEmailFor(matricule);
             User parent = userRepository.findByEmailIgnoreCase(parentEmail).orElseGet(() ->
-                    User.builder()
+                    userRepository.save(User.builder()
                             .email(parentEmail)
                             .nom(eleve.getNom())
                             .prenom("Parent de " + eleve.getPrenom())
                             .role(Role.PARENT)
-                            .build()
+                            .motDePasse(encodedPassword)
+                            .eleveId(eleve.getId())
+                            .parentCredentialsActivated(true)
+                            .actif(true)
+                            .build())
             );
             parent.setRole(Role.PARENT);
             parent.setEleveId(eleve.getId());

@@ -25,6 +25,7 @@ import ElevesPage from './pages/dashboard/ElevesPage';
 import SessionsPage from './pages/dashboard/SessionsPage';
 import FormationsPage from './pages/dashboard/FormationsPage';
 import JournalActivitePage from './pages/dashboard/JournalActivitePage';
+import EvaluationFormateurPage from './pages/dashboard/EvaluationFormateurPage';
 import TransactionsPage from './pages/dashboard/TransactionsPage';
 import RapportsPage from './pages/dashboard/RapportsPage';
 import UtilisateursPage from './pages/dashboard/UtilisateursPage';
@@ -38,6 +39,7 @@ import ProfilsEnfantsPage from './pages/dashboard/ProfilsEnfantsPage';
 import ControleGestionPage from './pages/dashboard/ControleGestionPage';
 import PermissionsPage from './pages/dashboard/PermissionsPage';
 import GaleriePage from './pages/dashboard/GaleriePage';
+import SupportsCoursPage from './pages/dashboard/SupportsCoursPage';
 
 function PageTransition({ children }: { children: React.ReactNode }) {
   return (
@@ -115,10 +117,23 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
 
+          {/* Supports de cours / modules SKA */}
+          <Route path="supports-cours" element={
+            <ProtectedRoute roles={PAGE_ROLES['supports-cours']} feature="supports-cours">
+              <PageTransition><SupportsCoursPage /></PageTransition>
+            </ProtectedRoute>
+          } />
+
           {/* Journal d'activité — Directeur */}
           <Route path="journal-activite" element={
             <ProtectedRoute roles={PAGE_ROLES['journal-activite']} feature="journal-activite">
               <PageTransition><JournalActivitePage /></PageTransition>
+            </ProtectedRoute>
+          } />
+
+          <Route path="evaluation-formateur" element={
+            <ProtectedRoute roles={PAGE_ROLES['evaluation-formateur']} feature="evaluation-formateur">
+              <PageTransition><EvaluationFormateurPage /></PageTransition>
             </ProtectedRoute>
           } />
 
@@ -174,7 +189,7 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
 
-          {/* Contenu interne CEDJ */}
+          {/* Contenu interne CDEJ */}
           <Route path="ressources" element={
             <ProtectedRoute roles={PAGE_ROLES.ressources} feature="ressources">
               <PageTransition><RessourcesPage /></PageTransition>

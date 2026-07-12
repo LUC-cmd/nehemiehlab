@@ -161,9 +161,12 @@ export default function SiteFooter({ onContactClick }: Props) {
         </div>
 
         <div className="border-t border-white/10 pb-[env(safe-area-inset-bottom)]" style={{ backgroundColor: BRAND_TEAL_DEEP }}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/55">
-            <p className="text-center sm:text-left">© {new Date().getFullYear()} {SITE_INFO.parentOrg} · Smart Kids Academy. Tous droits réservés.</p>
-            <p className="text-white/40 text-center sm:text-right">Plateforme de gestion &amp; site officiel SKA</p>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col items-center gap-4">
+            <img src={LOGO_SRC} alt="Smart Kids Academy" className="h-12 w-auto rounded-lg shadow-lg" />
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/55 w-full">
+              <p className="text-center sm:text-left">© {new Date().getFullYear()} {SITE_INFO.parentOrg} · Smart Kids Academy. Tous droits réservés.</p>
+              <p className="text-white/40 text-center sm:text-right">Plateforme de gestion &amp; site officiel SKA</p>
+            </div>
           </div>
         </div>
       </div>

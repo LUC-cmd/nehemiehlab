@@ -6,11 +6,11 @@ if (-not $listeners) {
 }
 
 $pids = $listeners | Select-Object -ExpandProperty OwningProcess -Unique
-foreach ($pid in $pids) {
-    $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+foreach ($procId in $pids) {
+    $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
     $name = if ($proc) { $proc.ProcessName } else { "?" }
-    Write-Host "Arrêt PID $pid ($name)..." -ForegroundColor Yellow
-    Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+    Write-Host "Arrêt PID $procId ($name)..." -ForegroundColor Yellow
+    Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
 }
 
 Start-Sleep -Seconds 2

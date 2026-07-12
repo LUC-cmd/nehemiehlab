@@ -1,5 +1,6 @@
 package com.nehemiahlab.platform.controller;
 
+import com.nehemiahlab.platform.model.ModuleCours;
 import com.nehemiahlab.platform.model.ModuleFormation;
 import com.nehemiahlab.platform.model.User;
 import com.nehemiahlab.platform.repository.EleveRepository;
@@ -7,6 +8,7 @@ import com.nehemiahlab.platform.repository.ModuleFormationRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
 import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.service.CentreAccessService;
+import com.nehemiahlab.platform.service.ModuleCoursService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -37,6 +39,9 @@ public class ModuleFormationController {
     @Autowired
     private CentreAccessService centreAccessService;
 
+    @Autowired
+    private ModuleCoursService moduleCoursService;
+
     @PostMapping
     @PreAuthorize("hasRole('FORMATEUR')")
     public ResponseEntity<?> create(@RequestBody Map<String, Object> body, Authentication auth) {
@@ -44,6 +49,10 @@ public class ModuleFormationController {
 
         Long centreId = Long.valueOf(body.get("centreId").toString());
         centreAccessService.requireCentreAccess(formateur, centreId);
+
+        Long moduleCoursId = body.get("moduleCoursId") != null
+                ? Long.valueOf(body.get("moduleCoursId").toString()) : null;
+        ModuleCours catalogModule = moduleCoursService.requireActive(moduleCoursId);
 
         @SuppressWarnings("unchecked")
         List<Object> elevesRaw = (List<Object>) body.get("elevesPresents");
@@ -57,14 +66,32 @@ public class ModuleFormationController {
                     "message", "La liste contient un élève absent ou rattaché à un autre centre."));
         }
 
+        String remarques = body.get("remarques") != null
+                ? InputSanitizer.clean(body.get("remarques").toString()) : "";
+        String description = catalogModule.getDescription() != null ? catalogModule.getDescription() : "";
+        if (!remarques.isBlank()) {
+            description = description.isBlank()
+                    ? remarques
+                    : description + "\n\nRemarques formateur : " + remarques;
+        }
+
+        double dureeHeures;
+        if (body.get("dureeHeures") != null && !body.get("dureeHeures").toString().isBlank()) {
+            dureeHeures = Double.parseDouble(body.get("dureeHeures").toString());
+        } else if (catalogModule.getDureeRecommandeeHeures() != null) {
+            dureeHeures = catalogModule.getDureeRecommandeeHeures();
+        } else {
+            dureeHeures = 1.0;
+        }
+
         ModuleFormation formation = ModuleFormation.builder()
                 .date(LocalDate.parse(body.get("date").toString()))
                 .centreId(centreId)
                 .formateurId(formateur.getId())
-                .titre(InputSanitizer.clean(body.get("titre").toString()))
-                .description(body.get("description") != null
-                        ? InputSanitizer.clean(body.get("description").toString()) : "")
-                .dureeHeures(Double.valueOf(body.get("dureeHeures").toString()))
+                .moduleCoursId(catalogModule.getId())
+                .titre(catalogModule.getTitre())
+                .description(description)
+                .dureeHeures(dureeHeures)
                 .elevesPresents(elevesPresents)
                 .build();
 
@@ -78,12 +105,16 @@ public class ModuleFormationController {
     public ResponseEntity<List<ModuleFormation>> getByCentre(
             @PathVariable Long centreId,
             @RequestParam(required = false) Long formateurId,
+            @RequestParam(required = false) Long moduleCoursId,
             Authentication auth
     ) {
         centreAccessService.requireCentreAccess((User) auth.getPrincipal(), centreId);
         List<ModuleFormation> list = moduleFormationRepository.findByCentreIdOrderByDateDesc(centreId);
         if (formateurId != null) {
             list = list.stream().filter(f -> Objects.equals(f.getFormateurId(), formateurId)).toList();
+        }
+        if (moduleCoursId != null) {
+            list = list.stream().filter(f -> Objects.equals(f.getModuleCoursId(), moduleCoursId)).toList();
         }
         enrich(list);
         return ResponseEntity.ok(list);

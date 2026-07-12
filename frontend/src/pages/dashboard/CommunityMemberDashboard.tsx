@@ -6,9 +6,9 @@ import type { Role } from '../../types';
 
 const roleWelcome: Record<string, string> = {
   STAFF_NEHEMIAH: 'Staff Nehemiah',
-  ANIMATEUR: 'Animateur CEDJ',
-  BENEVOLE: 'Bénévole CEDJ',
-  PARTICIPANT: 'Participant CEDJ',
+  ANIMATEUR: 'Animateur CDEJ',
+  BENEVOLE: 'Bénévole CDEJ',
+  PARTICIPANT: 'Participant CDEJ',
 };
 
 const canAccessRessources = (role: Role | null) =>
@@ -16,7 +16,7 @@ const canAccessRessources = (role: Role | null) =>
 
 export default function CommunityMemberDashboard() {
   const { user, role } = useAuth();
-  const label = (role && roleWelcome[role]) || 'Membre CEDJ';
+  const label = (role && roleWelcome[role]) || 'Membre CDEJ';
   const showRessources = canAccessRessources(role);
 
   return (
@@ -26,7 +26,7 @@ export default function CommunityMemberDashboard() {
           Bonjour{user?.prenom ? `, ${user.prenom}` : ''}
         </h1>
         <p className="text-dark-400 mt-1">
-          Espace interne CEDJ — {label}. Vous n&apos;êtes pas seul·e dans la communauté.
+          Espace interne CDEJ — {label}. Vous n&apos;êtes pas seul·e dans la communauté.
         </p>
       </div>
 
@@ -41,7 +41,7 @@ export default function CommunityMemberDashboard() {
                 <UsersRound className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-white font-semibold">Communauté CEDJ</h2>
+                <h2 className="text-white font-semibold">Communauté CDEJ</h2>
                 <p className="text-sm text-dark-400 mt-1">
                   Voir les membres, formateurs SKA et participants.
                 </p>

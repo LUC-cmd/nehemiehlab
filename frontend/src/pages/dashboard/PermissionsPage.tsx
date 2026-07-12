@@ -114,7 +114,7 @@ export default function PermissionsPage() {
           <p className="text-slate-500 mt-1 max-w-2xl">
             Activez ou désactivez ce que chaque rôle peut <strong>voir</strong> et{' '}
             <strong>modifier</strong>. Exemple : ajouter Sessions au Coordinateur, ou retirer
-            Communauté à un rôle CEDJ.
+            Communauté à un rôle CDEJ.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">

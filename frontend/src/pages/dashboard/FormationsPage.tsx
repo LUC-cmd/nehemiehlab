@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { formationService, centreService, eleveService, userService } from '../../services/api';
-import type { ModuleFormation, Centre, Eleve, User as UserType } from '../../types';
+import { formationService, centreService, eleveService, userService, moduleCoursService } from '../../services/api';
+import type { ModuleFormation, Centre, Eleve, User as UserType, ModuleCours } from '../../types';
+import { formatFullName } from '../../utils/displayName';
 import { Plus, BookOpen, Calendar, Clock, User, Check, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CardsSkeleton, PageLoadingSkeleton } from '../../components/ui/DashboardSkeletons';
 import { useMinDelayLoading } from '../../hooks/useMinDelayLoading';
 import Modal from '../../components/ui/Modal';
+import ModuleSupportsPanel from '../../components/dashboard/ModuleSupportsPanel';
 import {
   clearOfflineFormations,
   enqueueOfflineFormation,
@@ -21,6 +23,7 @@ export default function FormationsPage() {
   const [centres, setCentres] = useState<Centre[]>([]);
   const [eleves, setEleves] = useState<Eleve[]>([]);
   const [formateurs, setFormateurs] = useState<UserType[]>([]);
+  const [modulesCatalog, setModulesCatalog] = useState<ModuleCours[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -29,9 +32,10 @@ export default function FormationsPage() {
 
   const [selectedCentreId, setSelectedCentreId] = useState('');
   const [selectedFormateurId, setSelectedFormateurId] = useState('');
+  const [selectedModuleCoursId, setSelectedModuleCoursId] = useState('');
   const [newFormation, setNewFormation] = useState({
-    titre: '',
-    description: '',
+    moduleCoursId: '',
+    remarques: '',
     dureeHeures: '',
     date: new Date().toISOString().split('T')[0],
   });
@@ -56,8 +60,8 @@ export default function FormationsPage() {
         try {
           await formationService.create({
             centreId: draft.centreId,
-            titre: draft.titre,
-            description: draft.description,
+            moduleCoursId: draft.moduleCoursId,
+            remarques: draft.remarques,
             dureeHeures: draft.dureeHeures,
             date: draft.date,
             elevesPresents: draft.elevesPresents,
@@ -97,6 +101,24 @@ export default function FormationsPage() {
         formRes = { data: [] as ModuleFormation[] };
       }
       setFormations(formRes.data);
+
+      if (isFormateur) {
+        try {
+          const modRes = await moduleCoursService.list();
+          setModulesCatalog((modRes.data || []).filter((m) => m.actif).slice(0, 4));
+        } catch {
+          setModulesCatalog([]);
+        }
+      }
+
+      if (!isFormateur) {
+        try {
+          const modRes = await moduleCoursService.list();
+          setModulesCatalog((modRes.data || []).filter((m) => m.actif).slice(0, 4));
+        } catch {
+          setModulesCatalog([]);
+        }
+      }
 
       const centresRes = hasRole('DIRECTEUR')
         ? await centreService.getAll()
@@ -152,40 +174,48 @@ export default function FormationsPage() {
     }
   };
 
+  const loadFormations = async (centreId: string, formateurId: string, moduleCoursId: string) => {
+    if (!centreId) return;
+    setLoading(true);
+    try {
+      const res = await formationService.getByCentre(Number(centreId), {
+        formateurId: formateurId ? Number(formateurId) : undefined,
+        moduleCoursId: moduleCoursId ? Number(moduleCoursId) : undefined,
+      });
+      setFormations(res.data);
+    } catch {
+      toast.error('Erreur lors du chargement des modules.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCentreChange = async (centreId: string) => {
     setSelectedCentreId(centreId);
     if (!isFormateur && centreId) {
-      setLoading(true);
-      try {
-        const res = await formationService.getByCentre(
-          Number(centreId),
-          selectedFormateurId ? { formateurId: Number(selectedFormateurId) } : undefined,
-        );
-        setFormations(res.data);
-      } catch {
-        toast.error('Erreur lors du chargement des modules de ce centre.');
-      } finally {
-        setLoading(false);
-      }
+      await loadFormations(centreId, selectedFormateurId, selectedModuleCoursId);
     }
   };
 
   const handleFormateurChange = async (formateurId: string) => {
     setSelectedFormateurId(formateurId);
     if (!selectedCentreId) return;
+    await loadFormations(selectedCentreId, formateurId, selectedModuleCoursId);
+  };
 
-    setLoading(true);
-    try {
-      const res = await formationService.getByCentre(
-        Number(selectedCentreId),
-        formateurId ? { formateurId: Number(formateurId) } : undefined,
-      );
-      setFormations(res.data);
-    } catch {
-      toast.error('Erreur lors du filtrage des modules par formateur.');
-    } finally {
-      setLoading(false);
+  const handleModuleFilterChange = async (moduleCoursId: string) => {
+    setSelectedModuleCoursId(moduleCoursId);
+    if (!selectedCentreId) return;
+    await loadFormations(selectedCentreId, selectedFormateurId, moduleCoursId);
+  };
+
+  const selectFormateurFromCard = (formateurId: number) => {
+    const id = String(formateurId);
+    setSelectedFormateurId(id);
+    if (selectedCentreId) {
+      void loadFormations(selectedCentreId, id, selectedModuleCoursId);
     }
+    toast.success('Filtre formateur appliqué.');
   };
 
   const toggleStudentPresence = (id: number) => {
@@ -200,12 +230,23 @@ export default function FormationsPage() {
       toast.error('Veuillez sélectionner un centre.');
       return;
     }
+    if (!newFormation.moduleCoursId) {
+      toast.error('Veuillez sélectionner un module du catalogue.');
+      return;
+    }
+
+    const selectedModule = modulesCatalog.find(
+      (m) => m.id === Number(newFormation.moduleCoursId),
+    );
+    const defaultDuree = selectedModule?.dureeRecommandeeHeures ?? 1;
 
     const formationData = {
       centreId: Number(selectedCentreId),
-      titre: newFormation.titre,
-      description: newFormation.description,
-      dureeHeures: Number(newFormation.dureeHeures),
+      moduleCoursId: Number(newFormation.moduleCoursId),
+      remarques: newFormation.remarques.trim() || undefined,
+      dureeHeures: newFormation.dureeHeures
+        ? Number(newFormation.dureeHeures)
+        : defaultDuree,
       date: newFormation.date,
       elevesPresents: presents,
     };
@@ -213,14 +254,20 @@ export default function FormationsPage() {
     if (!navigator.onLine) {
       enqueueOfflineFormation({
         localId: newLocalId('formation'),
-        ...formationData,
+        centreId: formationData.centreId,
+        moduleCoursId: formationData.moduleCoursId,
+        moduleTitre: selectedModule?.titre || 'Module',
+        remarques: formationData.remarques,
+        dureeHeures: formationData.dureeHeures,
+        date: formationData.date,
+        elevesPresents: formationData.elevesPresents,
         createdAt: Date.now(),
       });
       toast.success('Module enregistré hors ligne. Il sera synchronisé au retour de la connexion.');
       setShowAddModal(false);
       setNewFormation({
-        titre: '',
-        description: '',
+        moduleCoursId: '',
+        remarques: '',
         dureeHeures: '',
         date: new Date().toISOString().split('T')[0],
       });
@@ -233,8 +280,8 @@ export default function FormationsPage() {
       toast.success('Module enseigné enregistré dans le journal.');
       setShowAddModal(false);
       setNewFormation({
-        titre: '',
-        description: '',
+        moduleCoursId: '',
+        remarques: '',
         dureeHeures: '',
         date: new Date().toISOString().split('T')[0],
       });
@@ -263,14 +310,14 @@ export default function FormationsPage() {
           <h1 className="text-2xl font-bold text-slate-900">Modules enseignés</h1>
           <p className="text-slate-500 mt-1 max-w-2xl">
             {isFormateur
-              ? 'Journal pédagogique : saisissez le contenu enseigné (thème, description, durée). Pour le chrono et les notes en direct, utilisez « Séances terrain ».'
+              ? 'Choisissez un module défini par le Directeur, indiquez les élèves présents et enregistrez.'
               : 'Consultation du journal pédagogique des modules enseignés par centre.'}
           </p>
         </div>
         {isFormateur && (
           <button type="button" onClick={() => setShowAddModal(true)} className="btn-primary shrink-0">
             <Plus className="w-4 h-4" />
-            Saisir un module
+            Enseigner un module
           </button>
         )}
       </div>
@@ -279,18 +326,18 @@ export default function FormationsPage() {
         <div className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
           <Info className="w-5 h-5 shrink-0 mt-0.5 text-sky-600" />
           <div>
-            <p className="font-semibold">Deux outils différents</p>
+            <p className="font-semibold">Catalogue du Directeur</p>
             <p className="text-sky-800/90 mt-0.5 text-xs sm:text-sm leading-relaxed">
-              <strong>Séances terrain</strong> = démarrer / clôturer sur place (présences, notes, GPS).{' '}
-              <strong>Modules enseignés</strong> = écrire ce qui a été enseigné (contenu pédagogique).
-              Vous pouvez saisir un module ici même sans avoir démarré une séance.
+              Les modules sont créés par le <strong>Directeur</strong> dans « Supports de cours ».
+              Vous <strong>sélectionnez</strong> le module à enseigner — pas de saisie libre.
+              Pour le chrono et les notes en direct : <strong>Séances terrain</strong>.
             </p>
           </div>
         </div>
       )}
 
       {!isFormateur && centres.length > 0 && (
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
           <div className="flex items-center gap-2 max-w-xs">
             <label className="text-sm text-slate-500 whitespace-nowrap">Centre :</label>
             <select
@@ -313,7 +360,22 @@ export default function FormationsPage() {
               <option value="">Tous les formateurs</option>
               {formateurs.map((formateur) => (
                 <option key={formateur.id} value={formateur.id}>
-                  {formateur.prenom} {formateur.nom}
+                  {formatFullName(formateur.prenom, formateur.nom)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2 max-w-xs">
+            <label className="text-sm text-slate-500 whitespace-nowrap">Module :</label>
+            <select
+              className="input-field py-2 text-sm"
+              value={selectedModuleCoursId}
+              onChange={(e) => handleModuleFilterChange(e.target.value)}
+            >
+              <option value="">Tous les modules</option>
+              {modulesCatalog.map((m) => (
+                <option key={m.id} value={m.id}>
+                  #{m.numeroOrdre} — {m.titre}
                 </option>
               ))}
             </select>
@@ -352,7 +414,17 @@ export default function FormationsPage() {
                   </span>
                   <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
                     <User className="w-3.5 h-3.5" />
-                    {[f.formateurPrenom, f.formateurNom].filter(Boolean).join(' ') || 'Formateur inconnu'}
+                    {f.formateurId && !isFormateur ? (
+                      <button
+                        type="button"
+                        className="underline decoration-dotted hover:text-primary-700"
+                        onClick={() => selectFormateurFromCard(f.formateurId)}
+                      >
+                        {formatFullName(f.formateurPrenom, f.formateurNom) || 'Formateur inconnu'}
+                      </button>
+                    ) : (
+                      formatFullName(f.formateurPrenom, f.formateurNom) || 'Formateur inconnu'
+                    )}
                   </span>
                   <span className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 text-emerald-800 px-3 py-1.5 rounded-lg">
                     <User className="w-3.5 h-3.5" />
@@ -366,7 +438,7 @@ export default function FormationsPage() {
           {formations.length === 0 && (
             <div className="card border border-slate-200 bg-white text-center py-12 text-slate-500">
               {isFormateur
-                ? 'Aucun module saisi pour le moment. Cliquez sur « Saisir un module » pour enregistrer le contenu enseigné.'
+                ? 'Aucun module enseigné. Le Directeur doit d\'abord publier des modules dans « Supports de cours ».'
                 : 'Aucun module enregistré pour ce centre.'}
             </div>
           )}
@@ -375,7 +447,7 @@ export default function FormationsPage() {
 
       <Modal
         open={showAddModal}
-        title="Saisir un module enseigné"
+        title="Enseigner un module"
         size="lg"
         onClose={() => setShowAddModal(false)}
         footer={
@@ -399,8 +471,7 @@ export default function FormationsPage() {
       >
         <form id="add-formation-form" onSubmit={handleAddFormation} className="space-y-3 sm:space-y-4">
           <p className="text-xs text-slate-500 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
-            Journal pédagogique (contenu enseigné). Pour démarrer le chrono et noter les élèves en direct, allez dans{' '}
-            <strong>Séances terrain</strong>.
+            Sélectionnez un module du catalogue Directeur. Consultez les supports dans « Supports de cours ».
           </p>
           <div>
             <label className="label">Centre</label>
@@ -417,36 +488,65 @@ export default function FormationsPage() {
             </select>
           </div>
           <div>
-            <label className="label">Titre du module / thème</label>
-            <input
-              type="text"
-              required
-              placeholder="Ex: Introduction au Lean Startup"
+            <label className="label">Module à enseigner *</label>
+            <select
               className="input-field"
-              value={newFormation.titre}
-              onChange={(e) => setNewFormation({ ...newFormation, titre: e.target.value })}
-            />
+              required
+              value={newFormation.moduleCoursId}
+              onChange={(e) => {
+                const id = e.target.value;
+                const mod = modulesCatalog.find((m) => m.id === Number(id));
+                setNewFormation({
+                  ...newFormation,
+                  moduleCoursId: id,
+                  dureeHeures: mod?.dureeRecommandeeHeures?.toString() || '',
+                });
+              }}
+            >
+              <option value="">Choisir un module...</option>
+              {modulesCatalog.map((m) => (
+                <option key={m.id} value={m.id}>
+                  #{m.numeroOrdre} — {m.titre}
+                </option>
+              ))}
+            </select>
+            {modulesCatalog.length === 0 && (
+              <p className="text-xs text-amber-700 mt-1">
+                Aucun module disponible. Demandez au Directeur d&apos;en publier dans « Supports de cours ».
+              </p>
+            )}
           </div>
+          {newFormation.moduleCoursId && (() => {
+            const mod = modulesCatalog.find((m) => m.id === Number(newFormation.moduleCoursId));
+            if (!mod) return null;
+            return (
+              <div className="space-y-3">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 space-y-1">
+                  {mod.description && <p>{mod.description}</p>}
+                  {mod.objectifs && <p><strong>Objectifs :</strong> {mod.objectifs}</p>}
+                </div>
+                <ModuleSupportsPanel moduleId={Number(newFormation.moduleCoursId)} />
+              </div>
+            );
+          })()}
           <div>
-            <label className="label">Contenu enseigné</label>
+            <label className="label">Remarques (optionnel)</label>
             <textarea
-              rows={3}
-              required
-              placeholder="Décrivez ce qui a été enseigné…"
+              rows={2}
+              placeholder="Observations après la séance…"
               className="input-field"
-              value={newFormation.description}
-              onChange={(e) => setNewFormation({ ...newFormation, description: e.target.value })}
+              value={newFormation.remarques}
+              onChange={(e) => setNewFormation({ ...newFormation, remarques: e.target.value })}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="label">Durée (heures)</label>
+              <label className="label">Durée réelle (heures)</label>
               <input
                 type="number"
                 step="0.5"
                 min={0.5}
-                required
-                placeholder="Ex: 2"
+                placeholder="Durée conseillée pré-remplie"
                 className="input-field"
                 value={newFormation.dureeHeures}
                 onChange={(e) => setNewFormation({ ...newFormation, dureeHeures: e.target.value })}

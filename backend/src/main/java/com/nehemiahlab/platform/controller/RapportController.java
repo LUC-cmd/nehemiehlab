@@ -6,6 +6,7 @@ import com.nehemiahlab.platform.model.Eleve;
 import com.nehemiahlab.platform.model.ModuleFormation;
 import com.nehemiahlab.platform.model.EvaluationSession;
 import com.nehemiahlab.platform.model.Projet;
+import com.nehemiahlab.platform.model.RapportSyntheseCentre;
 import com.nehemiahlab.platform.model.Role;
 import com.nehemiahlab.platform.model.SessionCours;
 import com.nehemiahlab.platform.model.Signalement;
@@ -21,7 +22,10 @@ import com.nehemiahlab.platform.repository.SignalementRepository;
 import com.nehemiahlab.platform.repository.TransactionRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
 import com.nehemiahlab.platform.service.CentreAccessService;
+import com.nehemiahlab.platform.service.RapportExecutionSeancePdfBuilder;
+import com.nehemiahlab.platform.service.RapportFormateurPdfBuilder;
 import com.nehemiahlab.platform.util.PdfTextUtil;
+import com.nehemiahlab.platform.util.RapportAnnuelUtil;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -108,6 +112,12 @@ public class RapportController {
 
     @Autowired
     private CentreAccessService centreAccessService;
+
+    @Autowired
+    private RapportFormateurPdfBuilder rapportFormateurPdfBuilder;
+
+    @Autowired
+    private RapportExecutionSeancePdfBuilder rapportExecutionSeancePdfBuilder;
 
     private CellStyle buildHeaderStyle(Workbook workbook) {
         Font headerFont = workbook.createFont();
@@ -330,8 +340,9 @@ public class RapportController {
                     footer.setNonStrokingColor(new Color(51, 65, 85));
                     footer.newLineAtOffset(margin, 24);
                     footer.showText(PdfTextUtil.sanitize(
-                            "Smart Kids Academy · Nehemiah Lab · " + title
-                                    + " · Page " + (i + 1) + "/" + totalPages
+                            RapportAnnuelUtil.SKA_FOOTER_LEFT + "  " + RapportAnnuelUtil.SKA_FOOTER_PHONE
+                                    + "  " + RapportAnnuelUtil.SKA_FOOTER_WEB
+                                    + "  ·  " + title + "  ·  Page " + (i + 1) + "/" + totalPages
                     ));
                     footer.endText();
                 }
@@ -1011,7 +1022,11 @@ public class RapportController {
                     footer.setFont(bodyFont, 8);
                     footer.setNonStrokingColor(new Color(51, 65, 85));
                     footer.newLineAtOffset(margin, 24);
-                    footer.showText("Smart Kids Academy - Fiche pedagogique - Page " + (i + 1) + "/" + totalPages);
+                    footer.showText(PdfTextUtil.sanitize(
+                            RapportAnnuelUtil.SKA_FOOTER_LEFT + "  " + RapportAnnuelUtil.SKA_FOOTER_PHONE
+                                    + "  " + RapportAnnuelUtil.SKA_FOOTER_WEB
+                                    + "  ·  Fiche enfant  ·  Page " + (i + 1) + "/" + totalPages
+                    ));
                     footer.endText();
                 }
             }
@@ -1439,6 +1454,10 @@ public class RapportController {
                 .body(pdf);
     }
 
+    /**
+     * Rapport d'exécution SKA Program (format officiel type Yoto Sud) :
+     * uniquement les séances clôturées et les données saisies par le formateur.
+     */
     @GetMapping("/seances/pdf")
     public ResponseEntity<byte[]> exportSeancesPdf(
             @RequestParam(required = false) Long centreId,
@@ -1448,11 +1467,158 @@ public class RapportController {
             @RequestParam(required = false) String fin,
             Authentication auth
     ) throws IOException {
+        return exportExecutionPdf(centreId, region, cluster, null, debut, fin, auth);
+    }
+
+    @GetMapping("/execution/pdf")
+    public ResponseEntity<byte[]> exportExecutionPdf(
+            @RequestParam(required = false) Long centreId,
+            @RequestParam(required = false) String region,
+            @RequestParam(required = false) String cluster,
+            @RequestParam(required = false) Long formateurId,
+            @RequestParam(required = false) String debut,
+            @RequestParam(required = false) String fin,
+            Authentication auth
+    ) throws IOException {
         User user = (User) auth.getPrincipal();
-        List<Long> centreIds = filterCentreIds(user, centreId, region, cluster);
         LocalDate debutDate = parseDateOrDefault(debut, LocalDate.of(2000, 1, 1));
         LocalDate finDate = parseDateOrDefault(fin, LocalDate.now().plusYears(2));
+        List<SessionCours> sessions = loadFilteredClosedSessions(
+                user, centreId, region, cluster, formateurId, debutDate, finDate);
+        Map<Long, List<EvaluationSession>> evalsBySession = loadEvaluationsBySession(sessions);
 
+        byte[] pdf = rapportExecutionSeancePdfBuilder.build(
+                sessions, evalsBySession, cluster, region, debutDate, finDate);
+
+        String scope = cluster != null && !cluster.isBlank()
+                ? cluster.replaceAll("[^a-zA-Z0-9_-]", "_")
+                : (region != null && !region.isBlank()
+                ? region.replaceAll("[^a-zA-Z0-9_-]", "_")
+                : (formateurId != null ? "formateur_" + formateurId : "tous"));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=rapport_execution_ska_" + scope + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    @GetMapping("/execution/seances")
+    public ResponseEntity<Map<String, Object>> listExecutionSeances(
+            @RequestParam(required = false) Long centreId,
+            @RequestParam(required = false) String region,
+            @RequestParam(required = false) String cluster,
+            @RequestParam(required = false) Long formateurId,
+            @RequestParam(required = false) String debut,
+            @RequestParam(required = false) String fin,
+            Authentication auth
+    ) {
+        User user = (User) auth.getPrincipal();
+        LocalDate debutDate = parseDateOrDefault(debut, LocalDate.of(2000, 1, 1));
+        LocalDate finDate = parseDateOrDefault(fin, LocalDate.now().plusYears(2));
+        List<SessionCours> sessions = loadFilteredClosedSessions(
+                user, centreId, region, cluster, formateurId, debutDate, finDate);
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        int presentsTotal = 0;
+        for (SessionCours session : sessions) {
+            List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursId(session.getId());
+            int presents = (int) evals.stream().filter(EvaluationSession::isPresent).count();
+            presentsTotal += presents;
+            rows.add(toExecutionSeanceRow(session, evals.size(), presents));
+        }
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("total", rows.size());
+        body.put("presentsTotal", presentsTotal);
+        body.put("periodeDebut", debutDate.toString());
+        body.put("periodeFin", finDate.toString());
+        body.put("sessions", rows);
+        return ResponseEntity.ok(body);
+    }
+
+    private Map<String, Object> toExecutionSeanceRow(SessionCours session, int totalEleves, int presents) {
+        Centre centre = session.getCentre();
+        User formateur = session.getFormateur();
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", session.getId());
+        row.put("date", session.getHeureDebut() != null
+                ? session.getHeureDebut().toLocalDate().toString() : null);
+        row.put("heureDebut", session.getHeureDebut() != null
+                ? session.getHeureDebut().toLocalTime().toString() : null);
+        row.put("creneau", formatSessionCreneau(session));
+        row.put("centreId", centre != null ? centre.getId() : null);
+        row.put("centreNom", centre != null ? centre.getNom() : null);
+        row.put("codeCdej", centre != null ? centre.getCodeCdej() : null);
+        row.put("lieuFormation", centre != null ? centre.getLieuFormation() : null);
+        row.put("region", centre != null ? centre.getRegion() : null);
+        row.put("cluster", centre != null ? centre.getCluster() : null);
+        row.put("formateurId", formateur != null ? formateur.getId() : null);
+        row.put("formateurNom", formateur != null
+                ? formateur.getPrenom() + " " + formateur.getNom() : null);
+        row.put("moduleFait", session.getModuleFait() != null ? session.getModuleFait() : session.getTitre());
+        row.put("presents", presents);
+        row.put("totalEleves", totalEleves);
+        row.put("defisSession", session.getDefisSession());
+        row.put("etatEquipements", session.getEtatEquipements());
+        row.put("statut", session.getStatut());
+        return row;
+    }
+
+    private static String formatSessionCreneau(SessionCours session) {
+        if (session.getHeureDebut() == null) return "-";
+        DateTimeFormatter tf = DateTimeFormatter.ofPattern("H'h'mm");
+        String start = session.getHeureDebut().toLocalTime().format(tf);
+        String end;
+        if (session.getHeureFin() != null) {
+            end = session.getHeureFin().toLocalTime().format(tf);
+        } else if (session.getDureeReelleMinutes() != null && session.getDureeReelleMinutes() > 0) {
+            end = session.getHeureDebut().plusMinutes(session.getDureeReelleMinutes()).toLocalTime().format(tf);
+        } else if (session.getDureePrevueMinutes() != null && session.getDureePrevueMinutes() > 0) {
+            end = session.getHeureDebut().plusMinutes(session.getDureePrevueMinutes()).toLocalTime().format(tf);
+        } else {
+            end = "-";
+        }
+        return start + "-" + end;
+    }
+
+    @GetMapping("/seances/{sessionId}/execution-pdf")
+    public ResponseEntity<byte[]> exportSessionExecutionPdf(
+            @PathVariable Long sessionId,
+            Authentication auth
+    ) throws IOException {
+        User user = (User) auth.getPrincipal();
+        SessionCours session = sessionCoursRepository.findById(sessionId).orElse(null);
+        if (session == null) return ResponseEntity.notFound().build();
+        if (session.getCentre() != null) {
+            centreAccessService.requireCentreAccess(user, session.getCentre().getId());
+        }
+        if (user.getRole() == Role.FORMATEUR
+                && session.getFormateur() != null
+                && !session.getFormateur().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).build();
+        }
+
+        List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursId(sessionId);
+        byte[] pdf = rapportExecutionSeancePdfBuilder.buildSingle(session, evals);
+
+        String centreName = session.getCentre() != null && session.getCentre().getNom() != null
+                ? session.getCentre().getNom().replaceAll("[^a-zA-Z0-9_-]", "_")
+                : "centre";
+        String date = session.getHeureDebut() != null
+                ? session.getHeureDebut().toLocalDate().format(REPORT_DATE).replace("/", "-")
+                : "seance";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=rapport_execution_" + centreName + "_" + date + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    private List<SessionCours> loadFilteredClosedSessions(
+            User user, Long centreId, String region, String cluster, Long formateurId,
+            LocalDate debutDate, LocalDate finDate
+    ) {
+        List<Long> centreIds = filterCentreIds(user, centreId, region, cluster);
         List<SessionCours> sessions;
         if (user.getRole() == Role.FORMATEUR) {
             sessions = sessionCoursRepository.findByFormateurIdOrderByCreatedAtDesc(user.getId()).stream()
@@ -1463,83 +1629,27 @@ public class RapportController {
                     .filter(s -> s.getCentre() != null && centreIds.contains(s.getCentre().getId()))
                     .toList();
         }
-        sessions = sessions.stream().filter(s -> {
-            LocalDate date = s.getHeureDebut() != null ? s.getHeureDebut().toLocalDate() : null;
-            return date != null && !date.isBefore(debutDate) && !date.isAfter(finDate);
-        }).toList();
-
-        Set<Long> urgentCentreIds = signalementRepository.findByCentreIdInOrderByCreatedAtDesc(centreIds).stream()
-                .filter(a -> "CENTRE".equalsIgnoreCase(a.getCibleType()))
-                .filter(a -> "EN_ATTENTE".equalsIgnoreCase(a.getStatut()))
-                .filter(a -> "URGENTE".equalsIgnoreCase(a.getPriorite()))
-                .map(Signalement::getCentreId)
-                .filter(id -> id != null)
-                .collect(Collectors.toSet());
-
-        List<List<String>> rows = new ArrayList<>();
-        for (SessionCours session : sessions) {
-            Long currentCentreId = session.getCentre() != null ? session.getCentre().getId() : null;
-            boolean urgent = currentCentreId != null && urgentCentreIds.contains(currentCentreId);
-            List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursId(session.getId());
-            for (EvaluationSession ev : evals) {
-                if (ev.getEleve() == null) continue;
-                double rawNote = ev.getNote() != null ? ev.getNote() : 0.0;
-                double participation10 = rawNote > 10 ? Math.round((rawNote / 2.0) * 10.0) / 10.0 : Math.round(rawNote * 10.0) / 10.0;
-                String presence = ev.isPresent() ? "PRESENT" : "ABSENT";
-                String heures = ev.getDureeMinutes() != null
-                        ? String.format("%.1f", ev.getDureeMinutes() / 60.0)
-                        : (ev.isPresent() && session.getDureeReelleMinutes() != null
-                        ? String.format("%.1f", session.getDureeReelleMinutes() / 60.0) : "0");
-                String arrivee = ev.getHeureArrivee() != null
-                        ? ev.getHeureArrivee().toLocalTime().withSecond(0).withNano(0).toString()
-                        : "-";
-                rows.add(List.of(
-                        ev.getEleve().getNom() != null ? ev.getEleve().getNom() : "-",
-                        ev.getEleve().getPrenom() != null ? ev.getEleve().getPrenom() : "-",
-                        ev.getEleve().getSexe() != null ? String.valueOf(ev.getEleve().getSexe()) : "-",
-                        ev.getEleve().getAge() != null ? String.valueOf(ev.getEleve().getAge()) : "-",
-                        ev.getEleve().getClasse() != null ? ev.getEleve().getClasse() : "-",
-                        session.getHeureDebut() != null ? session.getHeureDebut().toLocalDate().format(REPORT_DATE) : "-",
-                        session.getTitre() != null ? session.getTitre() : "-",
-                        presence,
-                        arrivee,
-                        heures,
-                        String.format("%.1f", participation10),
-                        session.getCentre() != null ? session.getCentre().getNom() : "-",
-                        session.getEtatEquipements() != null ? session.getEtatEquipements() : "-",
-                        session.getDefisSession() != null ? session.getDefisSession() : "-",
-                        urgent ? "OUI" : "NON"
-                ));
-            }
+        if (formateurId != null) {
+            sessions = sessions.stream()
+                    .filter(s -> s.getFormateur() != null && formateurId.equals(s.getFormateur().getId()))
+                    .toList();
         }
+        return sessions.stream()
+                .filter(s -> "CLOTUREE".equalsIgnoreCase(s.getStatut()))
+                .filter(s -> {
+                    LocalDate date = s.getHeureDebut() != null ? s.getHeureDebut().toLocalDate() : null;
+                    return date != null && !date.isBefore(debutDate) && !date.isAfter(finDate);
+                })
+                .sorted(Comparator.comparing(SessionCours::getHeureDebut))
+                .toList();
+    }
 
-        Map<String, String> meta = new LinkedHashMap<>();
-        meta.put("Période début", debutDate.format(REPORT_DATE));
-        meta.put("Période fin", finDate.format(REPORT_DATE));
-        meta.put("Region", region == null ? "-" : region);
-        meta.put("Cluster", cluster == null ? "-" : cluster);
-        meta.put("Lignes", String.valueOf(rows.size()));
-
-        byte[] pdf = buildPdfTableReport(
-                "Suivi des seances",
-                List.of(
-                        "Nom", "Prénoms", "Sexe", "Âge", "Classe", "Date", "Module",
-                        "Présence", "Arrivée", "Heures", "Note/10", "Centre",
-                        "Équipements", "Défis", "Alerte"
-                ),
-                rows,
-                meta,
-                ReportTemplate.SEANCES,
-                new float[]{
-                        48f, 48f, 28f, 28f, 38f, 48f, 65f, 48f,
-                        42f, 38f, 38f, 58f, 70f, 70f, 38f
-                }
-        );
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=suivi_seances.pdf")
-                .contentType(MediaType.APPLICATION_PDF)
-                .body(pdf);
+    private Map<Long, List<EvaluationSession>> loadEvaluationsBySession(List<SessionCours> sessions) {
+        Map<Long, List<EvaluationSession>> map = new HashMap<>();
+        for (SessionCours session : sessions) {
+            map.put(session.getId(), evaluationSessionRepository.findBySessionCoursId(session.getId()));
+        }
+        return map;
     }
 
     @GetMapping("/activites/pdf")
@@ -1696,6 +1806,73 @@ public class RapportController {
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=rapport_financier.pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    /**
+     * Rapport annuel formateur par centre : agrège les données de chaque séance,
+     * le projet final de chaque enfant et la synthèse saisie par le formateur.
+     */
+    @GetMapping("/centre/{centreId}/rapport-formateur-apercu")
+    public ResponseEntity<?> apercuRapportFormateur(
+            @PathVariable Long centreId,
+            @RequestParam String debut,
+            @RequestParam String fin,
+            Authentication auth
+    ) {
+        User user = (User) auth.getPrincipal();
+        centreAccessService.requireCentreAccess(user, centreId);
+        Centre centre = centreRepository.findById(centreId).orElse(null);
+        if (centre == null) return ResponseEntity.notFound().build();
+
+        LocalDate debutDate = LocalDate.parse(debut);
+        LocalDate finDate = LocalDate.parse(fin);
+        if (finDate.isBefore(debutDate)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "La date de fin doit être postérieure à la date de début."
+            ));
+        }
+
+        List<Eleve> eleves = eleveRepository.findByCentreId(centreId);
+        return ResponseEntity.ok(rapportFormateurPdfBuilder.buildApercu(centre, eleves, debutDate, finDate));
+    }
+
+    @GetMapping("/centre/{centreId}/rapport-formateur-pdf")
+    public ResponseEntity<byte[]> exportRapportFormateurCentre(
+            @PathVariable Long centreId,
+            @RequestParam String debut,
+            @RequestParam String fin,
+            @RequestParam(defaultValue = "Module 01 : Apprendre à coder avec Scratch") String moduleLabel,
+            Authentication auth
+    ) throws IOException {
+        User user = (User) auth.getPrincipal();
+        centreAccessService.requireCentreAccess(user, centreId);
+
+        Centre centre = centreRepository.findById(centreId).orElse(null);
+        if (centre == null) return ResponseEntity.notFound().build();
+
+        LocalDate debutDate = LocalDate.parse(debut);
+        LocalDate finDate = LocalDate.parse(fin);
+        if (finDate.isBefore(debutDate)) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        List<Eleve> eleves = eleveRepository.findByCentreId(centreId);
+        RapportSyntheseCentre synthese = rapportFormateurPdfBuilder
+                .loadSynthese(centreId, moduleLabel, debutDate, finDate)
+                .orElse(null);
+
+        byte[] pdf = rapportFormateurPdfBuilder.build(
+                centre, user, eleves, synthese, debutDate, finDate, moduleLabel);
+
+        String safeName = centre.getNom() != null
+                ? centre.getNom().replaceAll("[^a-zA-Z0-9_-]", "_")
+                : "centre";
+        String periode = debutDate.format(REPORT_DATE) + "_au_" + finDate.format(REPORT_DATE);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=rapport_formateur_" + safeName + "_" + periode + ".pdf")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
     }

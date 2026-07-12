@@ -29,6 +29,9 @@ public class ModuleFormation {
     @Column(nullable = false)
     private Long formateurId;
 
+    /** Référence au module défini par le Directeur (catalogue SKA) */
+    private Long moduleCoursId;
+
     @Column(nullable = false)
     private String titre;
 

@@ -1,13 +1,11 @@
 package com.nehemiahlab.platform.controller;
 
-import com.nehemiahlab.platform.model.Notification;
 import com.nehemiahlab.platform.model.Role;
 import com.nehemiahlab.platform.model.Transaction;
 import com.nehemiahlab.platform.model.User;
-import com.nehemiahlab.platform.repository.NotificationRepository;
 import com.nehemiahlab.platform.repository.TransactionRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
-import com.nehemiahlab.platform.service.EmailNotificationService;
+import com.nehemiahlab.platform.service.NotificationDispatchService;
 import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.security.SecureFileStorage;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,10 +35,7 @@ public class TransactionController {
     private UserRepository userRepository;
 
     @Autowired
-    private NotificationRepository notificationRepository;
-
-    @Autowired
-    private EmailNotificationService emailNotificationService;
+    private NotificationDispatchService notificationDispatchService;
 
     @Autowired
     private SecureFileStorage secureFileStorage;
@@ -143,23 +138,8 @@ public class TransactionController {
                     : "Un paiement de " + tx.getMontant() + " FCFA a été saisi pour vous. Une information manque (justificatif) — vous pouvez quand même valider.";
 
             String notifTitre = hasProof ? "Nouveau paiement en attente" : "Paiement saisi — information manquante";
-            notificationRepository.save(Notification.builder()
-                    .userId(formateurId)
-                    .titre(notifTitre)
-                    .message(notifMsg)
-                    .type("TRANSACTION")
-                    .lienId(tx.getId())
-                    .build());
-
             User formateur = formateurOpt.get();
-            emailNotificationService.sendSafe(
-                    formateur.getEmail(),
-                    "[SKA] " + notifTitre,
-                    "Bonjour " + formateur.getPrenom() + " " + formateur.getNom() + ",\n\n"
-                            + notifMsg + "\n\n"
-                            + "Connectez-vous à la plateforme pour consulter et valider ce paiement.\n\n"
-                            + "Smart Kids Academy"
-            );
+            notificationDispatchService.notify(formateur, notifTitre, notifMsg, "TRANSACTION", tx.getId());
 
             return ResponseEntity.ok(tx);
         } catch (IllegalArgumentException ex) {
@@ -195,19 +175,7 @@ public class TransactionController {
 
             if (wasMissing && tx.getFormateur() != null) {
                 String msg = "Le justificatif du paiement de " + tx.getMontant() + " FCFA a été joint. Vous pouvez le consulter.";
-                notificationRepository.save(Notification.builder()
-                        .userId(tx.getFormateur().getId())
-                        .titre("Justificatif ajouté")
-                        .message(msg)
-                        .type("TRANSACTION")
-                        .lienId(tx.getId())
-                        .build());
-                emailNotificationService.sendSafe(
-                        tx.getFormateur().getEmail(),
-                        "[SKA] Justificatif ajouté",
-                        "Bonjour " + tx.getFormateur().getPrenom() + " " + tx.getFormateur().getNom() + ",\n\n"
-                                + msg + "\n\nSmart Kids Academy"
-                );
+                notificationDispatchService.notify(tx.getFormateur(), "Justificatif ajouté", msg, "TRANSACTION", tx.getId());
             }
             return ResponseEntity.ok(tx);
         } catch (IllegalArgumentException ex) {
@@ -234,23 +202,9 @@ public class TransactionController {
         tx.setValidatedAt(LocalDateTime.now());
         transactionRepository.save(tx);
 
-        List<User> comptables = userRepository.findByRole(Role.COMPTABLE);
+        List<User> comptables = userRepository.findByRoleAndActifTrue(Role.COMPTABLE);
         String msg = "Le formateur " + formateur.getPrenom() + " " + formateur.getNom() + " a validé le paiement de " + tx.getMontant() + " FCFA.";
-        for (User comptable : comptables) {
-            notificationRepository.save(Notification.builder()
-                    .userId(comptable.getId())
-                    .titre("Paiement validé")
-                    .message(msg)
-                    .type("TRANSACTION")
-                    .lienId(tx.getId())
-                    .build());
-            emailNotificationService.sendSafe(
-                    comptable.getEmail(),
-                    "[SKA] Paiement validé",
-                    "Bonjour " + comptable.getPrenom() + " " + comptable.getNom() + ",\n\n"
-                            + msg + "\n\nSmart Kids Academy"
-            );
-        }
+        notificationDispatchService.notifyMany(comptables, "Paiement validé", msg, "TRANSACTION", tx.getId());
 
         return ResponseEntity.ok(Map.of("success", true));
     }
@@ -272,25 +226,72 @@ public class TransactionController {
         tx.setValidatedAt(LocalDateTime.now());
         transactionRepository.save(tx);
 
-        List<User> comptables = userRepository.findByRole(Role.COMPTABLE);
+        List<User> comptables = userRepository.findByRoleAndActifTrue(Role.COMPTABLE);
         String msg = "Le formateur " + formateur.getPrenom() + " " + formateur.getNom() + " a refusé le paiement de " + tx.getMontant() + " FCFA.";
-        for (User comptable : comptables) {
-            notificationRepository.save(Notification.builder()
-                    .userId(comptable.getId())
-                    .titre("Paiement refusé")
-                    .message(msg)
-                    .type("TRANSACTION")
-                    .lienId(tx.getId())
-                    .build());
-            emailNotificationService.sendSafe(
-                    comptable.getEmail(),
-                    "[SKA] Paiement refusé",
-                    "Bonjour " + comptable.getPrenom() + " " + comptable.getNom() + ",\n\n"
-                            + msg + "\n\nSmart Kids Academy"
-            );
-        }
+        notificationDispatchService.notifyMany(comptables, "Paiement refusé", msg, "TRANSACTION", tx.getId());
 
         return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    /**
+     * Le directeur notifie formateurs et/ou comptable concernant un paiement.
+     */
+    @PostMapping("/{id}/relayer")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<?> relayer(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
+        User directeur = (User) auth.getPrincipal();
+        Optional<Transaction> txOpt = transactionRepository.findById(id);
+        if (txOpt.isEmpty()) return ResponseEntity.notFound().build();
+
+        Transaction tx = txOpt.get();
+        @SuppressWarnings("unchecked")
+        List<String> roleNames = body.get("roles") instanceof List<?> list
+                ? list.stream().map(String::valueOf).toList()
+                : List.of("FORMATEUR");
+
+        List<User> recipients;
+        if (notificationDispatchService.isBroadcastAllRoles(roleNames)) {
+            recipients = notificationDispatchService.resolveAllActiveUsers();
+        } else {
+            List<Role> roles = roleNames.stream()
+                    .map(r -> {
+                        try {
+                            return Role.valueOf(r.trim().toUpperCase());
+                        } catch (IllegalArgumentException e) {
+                            return null;
+                        }
+                    })
+                    .filter(r -> r != null)
+                    .toList();
+
+            if (roles.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Sélectionnez au moins un destinataire."));
+            }
+
+            recipients = new java.util.ArrayList<>();
+            for (Role role : roles) {
+                if (role == Role.FORMATEUR && tx.getFormateur() != null && tx.getFormateur().isActif()) {
+                    recipients.add(tx.getFormateur());
+                } else {
+                    recipients.addAll(notificationDispatchService.resolveRecipients(List.of(role), null, null));
+                }
+            }
+        }
+
+        String formateurNom = tx.getFormateur() != null
+                ? tx.getFormateur().getPrenom() + " " + tx.getFormateur().getNom()
+                : "—";
+        String extra = body.get("message") != null ? "\n" + String.valueOf(body.get("message")).trim() : "";
+        String msg = "Paiement de " + tx.getMontant() + " FCFA (" + tx.getType() + ") — formateur " + formateurNom
+                + " — statut : " + tx.getStatut() + "." + extra
+                + "\n\n— Relais du Directeur " + directeur.getPrenom() + " " + directeur.getNom();
+
+        notificationDispatchService.notifyMany(recipients, "Information paiement", msg, "TRANSACTION", tx.getId());
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Notification envoyée à " + recipients.size() + " personne(s).",
+                "destinataires", recipients.size()
+        ));
     }
 
     private SavedProof saveJustificatif(MultipartFile file) throws Exception {

@@ -13,9 +13,12 @@ import { PageLoadingSkeleton } from '../../components/ui/DashboardSkeletons';
 import { useMinDelayLoading } from '../../hooks/useMinDelayLoading';
 import InscriptionsToggle from '../../components/dashboard/InscriptionsToggle';
 import UserAvatar from '../../components/ui/UserAvatar';
+import { formatFullName } from '../../utils/displayName';
+import { computeFormateurExperience } from '../../utils/formateurExperience';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import SecureImage from '../../components/ui/SecureImage';
+import ValidationActionButton from '../../components/ui/ValidationActionButton';
 
 function formatDate(value?: string) {
   if (!value) return 'Non renseigné';
@@ -26,9 +29,9 @@ function formatDate(value?: string) {
   }
 }
 
-type AssignPicker = { region: string; cluster: string; centreId: string };
+type AssignPicker = { centreId: string };
 
-const emptyPicker = (): AssignPicker => ({ region: '', cluster: '', centreId: '' });
+const emptyPicker = (): AssignPicker => ({ centreId: '' });
 
 function centreLabel(c: Centre): string {
   const parts = [c.nom, c.ville];
@@ -186,15 +189,7 @@ export default function FormateursPage() {
   ) => {
     setAssignPickers((current) => {
       const prev = current[formateurId] || emptyPicker();
-      const next = { ...prev, [field]: value };
-      if (field === 'region') {
-        next.cluster = '';
-        next.centreId = '';
-      }
-      if (field === 'cluster') {
-        next.centreId = '';
-      }
-      return { ...current, [formateurId]: next };
+      return { ...current, [formateurId]: { ...prev, [field]: value } };
     });
   };
 
@@ -230,22 +225,15 @@ export default function FormateursPage() {
     return unique.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
   }, [centres, formateurs, isDir, regionFilter, clusterFilter]);
 
-  const availableCentresFor = (formateur: User, picker: AssignPicker): Centre[] => {
+  const availableCentresFor = (formateur: User): Centre[] => {
     const assignedIds = new Set((formateur.centres || []).map((c) => c.id));
     return centres
       .filter((c) => {
         if (assignedIds.has(c.id)) return false;
         if (centreHasOtherFormateur(c, formateur.id)) return false;
-        if (picker.region && c.region !== picker.region) return false;
-        if (picker.cluster && c.cluster !== picker.cluster) return false;
         return true;
       })
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
-  };
-
-  const pickerClusters = (region: string) => {
-    const list = region ? centres.filter((c) => c.region === region) : centres;
-    return [...new Set(list.map((c) => c.cluster).filter(Boolean) as string[])].sort();
   };
 
   const filtered = useMemo(() => formateurs.filter((f) => {
@@ -411,7 +399,7 @@ export default function FormateursPage() {
                     <UserAvatar user={formateur} size="md" rounded="xl" />
                     <div>
                       <h3 className="text-white font-bold">
-                        {formateur.prenom} {formateur.nom}
+                        {formatFullName(formateur.prenom, formateur.nom)}
                       </h3>
                       <span className="badge badge-warning mt-1">En attente de validation</span>
                       <div className="mt-2">
@@ -442,15 +430,16 @@ export default function FormateursPage() {
                       <Eye className="w-4 h-4" />
                       Voir le dossier
                     </button>
-                    <button
-                      type="button"
+                    <ValidationActionButton
+                      fullWidth
+                      size="lg"
+                      variant="success"
+                      icon={CheckCircle2}
+                      loading={validatingId === formateur.id}
                       onClick={() => handleValider(formateur.id)}
-                      disabled={validatingId === formateur.id}
-                      className="btn-primary w-full justify-center disabled:opacity-50"
                     >
-                      <CheckCircle2 className="w-4 h-4" />
-                      {validatingId === formateur.id ? 'Validation...' : 'Valider le compte'}
-                    </button>
+                      {validatingId === formateur.id ? 'Validation…' : 'Valider le compte'}
+                    </ValidationActionButton>
                   </div>
                 </div>
               ))}
@@ -469,7 +458,7 @@ export default function FormateursPage() {
                   <UserAvatar user={formateur} size="md" rounded="xl" />
                   <div>
                     <h3 className="text-white font-bold">
-                      {formateur.prenom} {formateur.nom}
+                      {formatFullName(formateur.prenom, formateur.nom)}
                     </h3>
                     <span className={`badge mt-1 ${formateur.actif ? 'badge-success' : 'badge-warning'}`}>
                       {formateur.actif ? 'Compte validé' : 'En attente'}
@@ -551,7 +540,7 @@ export default function FormateursPage() {
                                     setConfirmRemoveCentre({
                                       formateurId: formateur.id,
                                       centreId: c.id,
-                                      formateurName: `${formateur.prenom} ${formateur.nom}`,
+                                      formateurName: formatFullName(formateur.prenom, formateur.nom),
                                       centreName: c.nom,
                                     })
                                   }
@@ -583,40 +572,23 @@ export default function FormateursPage() {
 
                   {isDir && formateur.actif && (() => {
                     const picker = getPicker(formateur.id);
-                    const options = availableCentresFor(formateur, picker);
-                    const clusters = pickerClusters(picker.region);
+                    const options = availableCentresFor(formateur);
+                    const experience = computeFormateurExperience(formateur.totalHeuresSeances);
                     return (
                       <div className="space-y-2 rounded-xl border border-dashed border-dark-600 p-3 bg-dark-900/30">
-                        <label className="flex items-center gap-1.5 text-xs font-medium text-dark-300">
-                          <Building2 className="w-3.5 h-3.5" />
-                          {formateur.centres?.length ? 'Ajouter un centre' : 'Assigner un centre'}
-                        </label>
-                        <select
-                          className="input-field text-sm"
-                          value={picker.region}
-                          onChange={(e) => setPickerField(formateur.id, 'region', e.target.value)}
-                        >
-                          <option value="">Région…</option>
-                          {regions.map((r) => (
-                            <option key={r} value={r}>{r}</option>
-                          ))}
-                        </select>
-                        <select
-                          className="input-field text-sm"
-                          value={picker.cluster}
-                          onChange={(e) => setPickerField(formateur.id, 'cluster', e.target.value)}
-                          disabled={!picker.region}
-                        >
-                          <option value="">Cluster…</option>
-                          {clusters.map((cl) => (
-                            <option key={cl} value={cl}>{cl}</option>
-                          ))}
-                        </select>
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="flex items-center gap-1.5 text-xs font-medium text-dark-300">
+                            <Building2 className="w-3.5 h-3.5" />
+                            {formateur.centres?.length ? 'Ajouter un centre' : 'Assigner un centre'}
+                          </label>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${experience.badgeClass}`}>
+                            {experience.label} · {Math.round(formateur.totalHeuresSeances ?? 0)} h
+                          </span>
+                        </div>
                         <select
                           className="input-field text-sm"
                           value={picker.centreId}
                           onChange={(e) => setPickerField(formateur.id, 'centreId', e.target.value)}
-                          disabled={!picker.region}
                         >
                           <option value="">
                             {options.length === 0
@@ -630,7 +602,7 @@ export default function FormateursPage() {
                           ))}
                         </select>
                         <p className="text-[10px] text-dark-500 leading-relaxed">
-                          Centres sans formateur ou déjà les vôtres. Vous pouvez en ajouter plusieurs.
+                          Sélectionnez directement le centre à assigner. Un centre = un formateur à la fois.
                         </p>
                         <button
                           type="button"
@@ -665,15 +637,15 @@ export default function FormateursPage() {
         onClose={() => setDetailFormateur(null)}
         footer={
           detailFormateur && !detailFormateur.actif ? (
-            <button
-              type="button"
-              className="btn-primary w-full sm:w-auto justify-center"
-              disabled={validatingId === detailFormateur.id}
+            <ValidationActionButton
+              size="lg"
+              variant="success"
+              icon={CheckCircle2}
+              loading={validatingId === detailFormateur.id}
               onClick={() => handleValider(detailFormateur.id)}
             >
-              <CheckCircle2 className="w-4 h-4" />
-              {validatingId === detailFormateur.id ? 'Validation...' : 'Valider le compte'}
-            </button>
+              {validatingId === detailFormateur.id ? 'Validation…' : 'Valider le compte'}
+            </ValidationActionButton>
           ) : undefined
         }
       >
