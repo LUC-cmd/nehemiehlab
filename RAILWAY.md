@@ -67,22 +67,30 @@ APP_SEED_DEMO_PASSWORD=password123
 
 ---
 
-## 3. Frontend
+## 3. Frontend (`nehemiahlab-web`)
 
-**Option A — Static site sur Railway**
-
-1. Service avec `root directory` = `frontend`
-2. Build : `npm ci && npm run build`
-3. Start / publish : `dist`
-4. Variable :
+1. Service avec **Root Directory** = `frontend`
+2. Le dépôt contient `nixpacks.toml` : build + `npm run start` (sert le dossier `dist`)
+3. Variables **obligatoires** :
 
 ```env
 VITE_API_URL=https://VOTRE-API.up.railway.app/api
 ```
 
-**Option B — Build local puis deploy**
+> Sans `VITE_API_URL`, le site s’affiche mais l’API ne répond pas.  
+> Si le service **Crashed** : vérifiez les logs — souvent il manquait `start` (corrigé dans le repo).
 
-Build avec `VITE_API_URL` pointant vers l’API Railway, puis déployez `frontend/dist`.
+**Build Command** (si Railway demande manuellement) : `npm ci && npm run build`  
+**Start Command** : `npm run start`
+
+---
+
+## 3 bis. PostgreSQL (souvent oublié)
+
+Sur votre capture, il manque la base **PostgreSQL**. Sans elle, l’API échoue au démarrage.
+
+1. Projet Railway → **+ New** → **Database** → **PostgreSQL**
+2. Liez les variables `DB_*` sur `nehemiahlab-api` (voir section 1)
 
 ---
 
