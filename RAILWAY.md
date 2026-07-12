@@ -21,12 +21,13 @@ En attendant, testez d’abord en **local** (voir section en bas).
 
 1. Projet Railway → **+ New** → **Database** → **PostgreSQL**
 2. Attendez que le service PostgreSQL soit **Active**
-3. Cliquez sur **nehemiahlab-api** → onglet **Variables**
-4. **+ New Variable** → **Add Reference** (ou **Connect** selon l’interface)
-5. Sélectionnez le service **PostgreSQL** → cochez **PGHOST**, **PGPORT**, **PGDATABASE**, **PGUSER**, **PGPASSWORD**
-6. Railway injecte ces variables automatiquement — **pas besoin de `DB_*`**
+3. Cliquez sur le service **API** → onglet **Variables**
+4. **+ New Variable** → **Add Reference** (ou **Connect**)
+5. Sélectionnez **PostgreSQL** → cochez **`DATABASE_URL`** (ou `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`)
+6. Railway injecte la connexion — **pas besoin de saisir `DB_*` à la main**
 
-> L’erreur `UnknownHostException: ${DB_HOST}` signifie que PostgreSQL n’existe pas ou que `DB_HOST` a été saisi en texte brut (`${{Postgres.PGHOST}}`) au lieu d’une **référence Railway**.
+> Le code convertit automatiquement `DATABASE_URL` ou `PGHOST` en `DB_HOST`, `DB_PORT`, etc. au démarrage.  
+> L’erreur `UnknownHostException: ${DB_HOST}` signifie une référence PostgreSQL manquante ou mal liée.
 
 ### Méthode manuelle (si besoin)
 
@@ -52,11 +53,10 @@ Remplacez `NomDuServicePostgres` par le nom exact du service (souvent `Postgres`
 
 ```env
 SPRING_PROFILES_ACTIVE=demo
-JWT_SECRET=(générez 64+ caractères aléatoires)
-CORS_ORIGINS=https://VOTRE-FRONTEND.up.railway.app
 
-# PostgreSQL : connectez la base via "Add Reference" (PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD)
-# OU mappez manuellement DB_* — voir section 1
+# PostgreSQL : Add Reference → DATABASE_URL (recommandé)
+# JWT_SECRET et CORS_ORIGINS : optionnels sur Railway (valeurs auto si absents)
+# Pour la prod, définissez-les explicitement — voir railway.env.example
 
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
@@ -156,14 +156,16 @@ Déjà configuré avec `hiwendjanounai78@gmail.com` (envoi Smart Kids Academy).
 ## Checklist Railway (ordre strict)
 
 1. **PostgreSQL** : `+ New` → `Database` → `PostgreSQL` → attendre **Active**
-2. **Connecter la base à l’API** : `nehemiahlab-api` → `Variables` → `Add Reference` → PostgreSQL → cocher **PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD**
+2. **Connecter la base à l’API** : service API → `Variables` → `Add Reference` → PostgreSQL → cocher **`DATABASE_URL`**
 3. **Supprimer** les anciennes variables `DB_*` mal saisies (valeur `${DB_HOST}` ou `${{Postgres...}}` en texte)
-4. **Variables API obligatoires** (en plus de PostgreSQL) :
+4. **Variables API minimales** :
 
 ```env
 SPRING_PROFILES_ACTIVE=demo
-JWT_SECRET=(64 caractères minimum — générez une chaîne aléatoire)
-CORS_ORIGINS=https://VOTRE-URL-WEB.up.railway.app
+
+# PostgreSQL via Add Reference → DATABASE_URL (obligatoire)
+# JWT_SECRET et CORS_ORIGINS : auto sur Railway si absents
+
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
 MAIL_USERNAME=hiwendjanounai78@gmail.com
@@ -173,7 +175,9 @@ MAIL_OTP_FROM=hiwendjanounai78@gmail.com
 APP_SEED_ENABLED=true
 ```
 
-5. **Frontend** : `nehemiahlab-web` → Root Directory = `frontend` → `VITE_API_URL=https://VOTRE-API.up.railway.app/api`
-6. **Redeploy** les deux services après modification des variables
+5. **Frontend** : Root Directory = `frontend` → `VITE_API_URL=https://VOTRE-API.up.railway.app/api`
+6. **Redeploy** les deux services → les tables PostgreSQL apparaissent après le premier démarrage API réussi
+
+Modèle complet : [`railway.env.example`](railway.env.example)
 
 Le fichier `railway.toml` configure le healthcheck sur `/api/actuator/health`.

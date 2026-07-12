@@ -12,10 +12,11 @@ import org.springframework.stereotype.Component;
 public class DemoConfigurationValidator {
 
     public DemoConfigurationValidator(Environment environment) {
-        requireDatabaseVariable(environment, "DB_HOST");
-        requireDatabaseVariable(environment, "DB_NAME");
-        requireDatabaseVariable(environment, "DB_USER");
-        requireDatabaseVariable(environment, "DB_PASSWORD");
+        var databaseConfig = RailwayDatabaseEnvironment.resolve(environment);
+        requireDatabaseField(databaseConfig, "DB_HOST");
+        requireDatabaseField(databaseConfig, "DB_NAME");
+        requireDatabaseField(databaseConfig, "DB_USER");
+        requireDatabaseField(databaseConfig, "DB_PASSWORD");
         requireNonBlank(environment, "JWT_SECRET");
         requireNonBlank(environment, "CORS_ORIGINS");
 
@@ -25,24 +26,21 @@ public class DemoConfigurationValidator {
         }
 
         String corsOrigins = environment.getProperty("CORS_ORIGINS", "");
-        if (corsOrigins.contains("*") || !allOriginsUseHttps(corsOrigins)) {
+        if (!allOriginsUseHttps(corsOrigins)) {
             throw new IllegalStateException(
-                    "CORS_ORIGINS doit contenir uniquement des origines HTTPS explicites.");
+                    "CORS_ORIGINS doit contenir uniquement des origines HTTPS explicites "
+                            + "(ex. https://votre-frontend.up.railway.app ou https://*.up.railway.app).");
         }
     }
 
-    private static void requireDatabaseVariable(Environment environment, String variable) {
-        String value = environment.getProperty(variable);
-        if (value == null || value.isBlank() || looksUnresolved(value)) {
+    private static void requireDatabaseField(java.util.Map<String, Object> databaseConfig, String field) {
+        Object value = databaseConfig.get(field);
+        if (value == null || String.valueOf(value).isBlank()) {
             throw new IllegalStateException(
-                    "Connexion PostgreSQL non configurée (" + variable + "). "
-                            + "Sur Railway : + New → Database → PostgreSQL, puis sur nehemiahlab-api → Variables → "
-                            + "Add Reference → PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD (ou DATABASE_URL).");
+                    "Connexion PostgreSQL non configurée (" + field + "). "
+                            + "Sur Railway : liez PostgreSQL via Add Reference → DATABASE_URL "
+                            + "ou PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD.");
         }
-    }
-
-    private static boolean looksUnresolved(String value) {
-        return value.startsWith("${") && value.endsWith("}");
     }
 
     private static void requireNonBlank(Environment environment, String variable) {

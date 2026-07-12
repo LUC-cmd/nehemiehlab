@@ -60,4 +60,30 @@ class RailwayDatabaseEnvironmentTest {
     void detectsUnresolvedRailwayReferenceSyntax() {
         assertTrue(RailwayDatabaseEnvironment.looksUnresolved("${{Postgres.PGHOST}}"));
     }
+
+    @Test
+    void railwayDefaultsApplyWhenOnRailwayWithoutJwtOrCors() {
+        MockEnvironment env = new MockEnvironment();
+        env.setProperty("RAILWAY_ENVIRONMENT", "production");
+        env.setProperty("DATABASE_URL", "postgresql://user:secret@db.railway.internal:5432/railway");
+
+        Map<String, Object> database = RailwayDatabaseEnvironment.resolve(env);
+        Map<String, Object> defaults = RailwayEnvironmentDefaults.resolve(env);
+
+        assertEquals("db.railway.internal", database.get("DB_HOST"));
+        assertEquals(RailwayEnvironmentDefaults.RAILWAY_CORS_FALLBACK, defaults.get("CORS_ORIGINS"));
+        assertEquals(RailwayEnvironmentDefaults.RAILWAY_JWT_FALLBACK, defaults.get("JWT_SECRET"));
+    }
+
+    @Test
+    void railwayDefaultsKeepExplicitJwtAndCors() {
+        MockEnvironment env = new MockEnvironment();
+        env.setProperty("RAILWAY_ENVIRONMENT", "production");
+        env.setProperty("CORS_ORIGINS", "https://mon-frontend.up.railway.app");
+        env.setProperty("JWT_SECRET", "a".repeat(64));
+
+        Map<String, Object> defaults = RailwayEnvironmentDefaults.resolve(env);
+
+        assertTrue(defaults.isEmpty());
+    }
 }
