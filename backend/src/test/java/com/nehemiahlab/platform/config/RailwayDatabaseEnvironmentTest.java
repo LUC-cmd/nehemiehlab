@@ -64,6 +64,7 @@ class RailwayDatabaseEnvironmentTest {
     @Test
     void railwayDefaultsApplyWhenOnRailwayWithoutJwtOrCors() {
         MockEnvironment env = new MockEnvironment();
+        env.setProperty("SPRING_PROFILES_ACTIVE", "demo");
         env.setProperty("RAILWAY_ENVIRONMENT", "production");
         env.setProperty("DATABASE_URL", "postgresql://user:secret@db.railway.internal:5432/railway");
 
@@ -73,6 +74,15 @@ class RailwayDatabaseEnvironmentTest {
         assertEquals("db.railway.internal", database.get("DB_HOST"));
         assertEquals(RailwayEnvironmentDefaults.RAILWAY_CORS_FALLBACK, defaults.get("CORS_ORIGINS"));
         assertEquals(RailwayEnvironmentDefaults.RAILWAY_JWT_FALLBACK, defaults.get("JWT_SECRET"));
+    }
+
+    @Test
+    void railwayDefaultsDoNotApplyForFieldProfile() {
+        MockEnvironment env = new MockEnvironment();
+        env.setProperty("SPRING_PROFILES_ACTIVE", "field");
+        env.setProperty("RAILWAY_ENVIRONMENT", "production");
+
+        assertFalse(RailwayEnvironmentDefaults.isDemoProfile(env));
     }
 
     @Test

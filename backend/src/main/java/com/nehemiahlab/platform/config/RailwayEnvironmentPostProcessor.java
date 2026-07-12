@@ -18,7 +18,8 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
         Map<String, Object> resolved = new java.util.LinkedHashMap<>(RailwayDatabaseEnvironment.resolve(environment));
 
-        if (RailwayEnvironmentDefaults.isRailway(environment)) {
+        if (RailwayEnvironmentDefaults.isDemoProfile(environment)
+                && RailwayEnvironmentDefaults.isRailway(environment)) {
             RailwayEnvironmentDefaults.resolve(environment).forEach(resolved::putIfAbsent);
         }
 

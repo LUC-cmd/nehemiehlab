@@ -18,6 +18,10 @@ public final class RailwayEnvironmentDefaults {
     private RailwayEnvironmentDefaults() {
     }
 
+    public static boolean isDemoProfile(Environment environment) {
+        return "demo".equalsIgnoreCase(environment.getProperty("SPRING_PROFILES_ACTIVE"));
+    }
+
     public static boolean isRailway(Environment environment) {
         return RailwayDatabaseEnvironment.isUsable(environment.getProperty("RAILWAY_ENVIRONMENT"))
                 || RailwayDatabaseEnvironment.isUsable(environment.getProperty("RAILWAY_PROJECT_ID"))

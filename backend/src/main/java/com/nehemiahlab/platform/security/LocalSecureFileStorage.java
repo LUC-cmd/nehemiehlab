@@ -12,7 +12,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
 @Service
-@Profile({"local", "demo"})
+@Profile({"local", "demo", "field"})
 public class LocalSecureFileStorage extends AbstractSecureFileStorage {
 
     private final Path root;
