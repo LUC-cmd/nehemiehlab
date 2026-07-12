@@ -153,10 +153,27 @@ Déjà configuré avec `hiwendjanounai78@gmail.com` (envoi Smart Kids Academy).
 
 ---
 
-## Checklist avant mise en ligne Railway
+## Checklist Railway (ordre strict)
 
-- [ ] PostgreSQL Railway connecté à l’API
-- [ ] 6 variables `MAIL_*` renseignées
-- [ ] `CORS_ORIGINS` = URL frontend Railway
-- [ ] `VITE_API_URL` = URL API Railway + `/api`
-- [ ] Test inscription → email reçu en production
+1. **PostgreSQL** : `+ New` → `Database` → `PostgreSQL` → attendre **Active**
+2. **Connecter la base à l’API** : `nehemiahlab-api` → `Variables` → `Add Reference` → PostgreSQL → cocher **PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD**
+3. **Supprimer** les anciennes variables `DB_*` mal saisies (valeur `${DB_HOST}` ou `${{Postgres...}}` en texte)
+4. **Variables API obligatoires** (en plus de PostgreSQL) :
+
+```env
+SPRING_PROFILES_ACTIVE=demo
+JWT_SECRET=(64 caractères minimum — générez une chaîne aléatoire)
+CORS_ORIGINS=https://VOTRE-URL-WEB.up.railway.app
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=hiwendjanounai78@gmail.com
+MAIL_PASSWORD=(mot de passe application Gmail)
+MAIL_FROM=hiwendjanounai78@gmail.com
+MAIL_OTP_FROM=hiwendjanounai78@gmail.com
+APP_SEED_ENABLED=true
+```
+
+5. **Frontend** : `nehemiahlab-web` → Root Directory = `frontend` → `VITE_API_URL=https://VOTRE-API.up.railway.app/api`
+6. **Redeploy** les deux services après modification des variables
+
+Le fichier `railway.toml` configure le healthcheck sur `/api/actuator/health`.

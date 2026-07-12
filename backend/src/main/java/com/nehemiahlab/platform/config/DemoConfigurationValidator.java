@@ -12,10 +12,10 @@ import org.springframework.stereotype.Component;
 public class DemoConfigurationValidator {
 
     public DemoConfigurationValidator(Environment environment) {
-        requireDatabaseVariable(environment, "PGHOST", "DB_HOST");
-        requireDatabaseVariable(environment, "PGDATABASE", "DB_NAME");
-        requireDatabaseVariable(environment, "PGUSER", "DB_USER");
-        requireDatabaseVariable(environment, "PGPASSWORD", "DB_PASSWORD");
+        requireDatabaseVariable(environment, "DB_HOST");
+        requireDatabaseVariable(environment, "DB_NAME");
+        requireDatabaseVariable(environment, "DB_USER");
+        requireDatabaseVariable(environment, "DB_PASSWORD");
         requireNonBlank(environment, "JWT_SECRET");
         requireNonBlank(environment, "CORS_ORIGINS");
 
@@ -31,22 +31,14 @@ public class DemoConfigurationValidator {
         }
     }
 
-    private static void requireDatabaseVariable(Environment environment, String railwayVar, String legacyVar) {
-        String value = firstNonBlank(
-                environment.getProperty(railwayVar),
-                environment.getProperty(legacyVar));
+    private static void requireDatabaseVariable(Environment environment, String variable) {
+        String value = environment.getProperty(variable);
         if (value == null || value.isBlank() || looksUnresolved(value)) {
             throw new IllegalStateException(
-                    "Connexion PostgreSQL non configurée (" + railwayVar + " ou " + legacyVar + "). "
-                            + "Sur Railway : + New → Database → PostgreSQL, puis connectez la base au service nehemiahlab-api.");
+                    "Connexion PostgreSQL non configurée (" + variable + "). "
+                            + "Sur Railway : + New → Database → PostgreSQL, puis sur nehemiahlab-api → Variables → "
+                            + "Add Reference → PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD (ou DATABASE_URL).");
         }
-    }
-
-    private static String firstNonBlank(String primary, String fallback) {
-        if (primary != null && !primary.isBlank()) {
-            return primary;
-        }
-        return fallback;
     }
 
     private static boolean looksUnresolved(String value) {
