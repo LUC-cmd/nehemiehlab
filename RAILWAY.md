@@ -72,7 +72,8 @@ Modèle complet : [`railway.env.example`](railway.env.example)
 | Paramètre | Valeur |
 |-----------|--------|
 | **Root Directory** | `frontend` |
-| `VITE_API_URL` | `https://VOTRE-API.up.railway.app/api` |
+| **Build Command** | *(laisser vide — le Dockerfile gère le build)* |
+| `VITE_API_URL` | `https://nehemiahlab-api-production.up.railway.app/api` |
 
 Build : `npm ci && npm run build`  
 Start : `npm run start`
