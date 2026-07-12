@@ -12,10 +12,10 @@ import org.springframework.stereotype.Component;
 public class DemoConfigurationValidator {
 
     public DemoConfigurationValidator(Environment environment) {
-        requireNonBlank(environment, "DB_HOST");
-        requireNonBlank(environment, "DB_NAME");
-        requireNonBlank(environment, "DB_USER");
-        requireNonBlank(environment, "DB_PASSWORD");
+        requireDatabaseVariable(environment, "PGHOST", "DB_HOST");
+        requireDatabaseVariable(environment, "PGDATABASE", "DB_NAME");
+        requireDatabaseVariable(environment, "PGUSER", "DB_USER");
+        requireDatabaseVariable(environment, "PGPASSWORD", "DB_PASSWORD");
         requireNonBlank(environment, "JWT_SECRET");
         requireNonBlank(environment, "CORS_ORIGINS");
 
@@ -29,6 +29,28 @@ public class DemoConfigurationValidator {
             throw new IllegalStateException(
                     "CORS_ORIGINS doit contenir uniquement des origines HTTPS explicites.");
         }
+    }
+
+    private static void requireDatabaseVariable(Environment environment, String railwayVar, String legacyVar) {
+        String value = firstNonBlank(
+                environment.getProperty(railwayVar),
+                environment.getProperty(legacyVar));
+        if (value == null || value.isBlank() || looksUnresolved(value)) {
+            throw new IllegalStateException(
+                    "Connexion PostgreSQL non configurée (" + railwayVar + " ou " + legacyVar + "). "
+                            + "Sur Railway : + New → Database → PostgreSQL, puis connectez la base au service nehemiahlab-api.");
+        }
+    }
+
+    private static String firstNonBlank(String primary, String fallback) {
+        if (primary != null && !primary.isBlank()) {
+            return primary;
+        }
+        return fallback;
+    }
+
+    private static boolean looksUnresolved(String value) {
+        return value.startsWith("${") && value.endsWith("}");
     }
 
     private static void requireNonBlank(Environment environment, String variable) {

@@ -15,20 +15,32 @@ En attendant, testez d’abord en **local** (voir section en bas).
 
 ---
 
-## 1. Base PostgreSQL
+## 1. Base PostgreSQL (obligatoire — sans ça l’API crash)
 
-1. Nouveau projet Railway → **Add PostgreSQL**
-2. Notez les variables générées : `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`
+### Méthode recommandée (1 clic)
 
-Mappez-les vers le backend :
+1. Projet Railway → **+ New** → **Database** → **PostgreSQL**
+2. Attendez que le service PostgreSQL soit **Active**
+3. Cliquez sur **nehemiahlab-api** → onglet **Variables**
+4. **+ New Variable** → **Add Reference** (ou **Connect** selon l’interface)
+5. Sélectionnez le service **PostgreSQL** → cochez **PGHOST**, **PGPORT**, **PGDATABASE**, **PGUSER**, **PGPASSWORD**
+6. Railway injecte ces variables automatiquement — **pas besoin de `DB_*`**
 
-| Variable backend | Variable Railway Postgres |
-|------------------|---------------------------|
-| `DB_HOST` | `PGHOST` |
-| `DB_PORT` | `PGPORT` |
-| `DB_NAME` | `PGDATABASE` |
-| `DB_USER` | `PGUSER` |
-| `DB_PASSWORD` | `PGPASSWORD` |
+> L’erreur `UnknownHostException: ${DB_HOST}` signifie que PostgreSQL n’existe pas ou que `DB_HOST` a été saisi en texte brut (`${{Postgres.PGHOST}}`) au lieu d’une **référence Railway**.
+
+### Méthode manuelle (si besoin)
+
+| Variable sur l’API | Référence Railway |
+|--------------------|-------------------|
+| `DB_HOST` | `${{NomDuServicePostgres.PGHOST}}` |
+| `DB_PORT` | `${{NomDuServicePostgres.PGPORT}}` |
+| `DB_NAME` | `${{NomDuServicePostgres.PGDATABASE}}` |
+| `DB_USER` | `${{NomDuServicePostgres.PGUSER}}` |
+| `DB_PASSWORD` | `${{NomDuServicePostgres.PGPASSWORD}}` |
+
+Remplacez `NomDuServicePostgres` par le nom exact du service (souvent `Postgres`).
+
+**Supprimez** toute variable `DB_HOST` dont la valeur est littéralement `${DB_HOST}` ou `${{...}}` non résolu.
 
 ---
 
@@ -43,11 +55,8 @@ SPRING_PROFILES_ACTIVE=demo
 JWT_SECRET=(générez 64+ caractères aléatoires)
 CORS_ORIGINS=https://VOTRE-FRONTEND.up.railway.app
 
-DB_HOST=${{Postgres.PGHOST}}
-DB_PORT=${{Postgres.PGPORT}}
-DB_NAME=${{Postgres.PGDATABASE}}
-DB_USER=${{Postgres.PGUSER}}
-DB_PASSWORD=${{Postgres.PGPASSWORD}}
+# PostgreSQL : connectez la base via "Add Reference" (PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD)
+# OU mappez manuellement DB_* — voir section 1
 
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
