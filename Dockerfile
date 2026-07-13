@@ -15,4 +15,4 @@ RUN useradd --system --uid 10001 --no-create-home appuser
 COPY --from=build --chown=appuser:appuser /app/target/*.jar app.jar
 USER appuser
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Limites JVM adaptées à un petit cont

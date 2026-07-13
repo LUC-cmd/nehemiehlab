@@ -1,0 +1,21 @@
+# Normalisation des fins de ligne : LF dans le dépôt, natif dans le working tree.
+* text=auto
+
+# Fichiers Windows explicitement CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Scripts shell toujours LF
+*.sh text eol=lf
+
+# Binaires : jamais de conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.jar binary
