@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
  * Ce correctif s'exécute au démarrage lorsque Flyway est désactivé (profils local/demo).
  */
 @Component
-@Profile({"local", "demo"})
+@Profile({"local", "demo", "field"})
 @Order(500)
 public class UserRoleConstraintPatch implements CommandLineRunner {
 

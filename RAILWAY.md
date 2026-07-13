@@ -84,7 +84,7 @@ Start : `npm run start`
 
 | Profil | Usage |
 |--------|-------|
-| `field` | **Terrain / pilote Railway** — Flyway, pas de démo, stockage local |
+| `field` | **Terrain / pilote Railway** — schéma auto, pas de démo, stockage local |
 | `prod` | Production complète avec S3/R2 obligatoire |
 | `demo` | Présentation gratuite uniquement (Render/Neon) |
 
