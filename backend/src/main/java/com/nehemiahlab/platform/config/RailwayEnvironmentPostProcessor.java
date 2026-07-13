@@ -27,6 +27,7 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
             }
             RailwayEnvironmentDefaults.resolveRailwayCors(environment).forEach(resolved::put);
             applyResolvedCorsProperties(environment, resolved);
+            warnIfMissingPlatformUrl(environment);
             requireDatabaseOnRailway(environment, resolved);
             logDatabaseTarget(resolved);
         }
@@ -35,6 +36,17 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
             return;
         }
         environment.getPropertySources().addFirst(new MapPropertySource(PROPERTY_SOURCE, resolved));
+    }
+
+    private static void warnIfMissingPlatformUrl(ConfigurableEnvironment environment) {
+        String platformUrl = environment.getProperty("APP_PLATFORM_URL");
+        String corsOrigins = environment.getProperty("CORS_ORIGINS");
+        if (RailwayDatabaseEnvironment.isUsable(platformUrl) || RailwayDatabaseEnvironment.isUsable(corsOrigins)) {
+            return;
+        }
+        log.warn(
+                "CORS/domaine custom : ajoutez APP_PLATFORM_URL=https://ska-management.com "
+                        + "et CORS_ORIGINS=https://ska-management.com,https://www.ska-management.com sur nehemiahlab-api.");
     }
 
     private static void applyResolvedCorsProperties(ConfigurableEnvironment environment, Map<String, Object> resolved) {

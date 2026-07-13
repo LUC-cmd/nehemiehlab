@@ -1,10 +1,10 @@
 package com.nehemiahlab.platform.security;
 
-import com.nehemiahlab.platform.config.RailwayEnvironmentDefaults;
+import com.nehemiahlab.platform.config.PlatformCorsConfiguration;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
@@ -18,9 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
-import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
@@ -32,12 +30,6 @@ public class SecurityConfig {
 
     @Autowired
     private AuthRateLimitFilter authRateLimitFilter;
-
-    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173}")
-    private String allowedOrigins;
-
-    @Value("${app.platform.url:}")
-    private String platformUrl;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -100,11 +92,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        CorsConfiguration config = new CorsConfiguration();
-        RailwayEnvironmentDefaults.applyCorsConfiguration(config, allowedOrigins, platformUrl);
-        source.registerCorsConfiguration("/**", config);
-        return source;
+    public CorsConfigurationSource corsConfigurationSource(Environment environment) {
+        return PlatformCorsConfiguration.configurationSource(environment);
     }
 }

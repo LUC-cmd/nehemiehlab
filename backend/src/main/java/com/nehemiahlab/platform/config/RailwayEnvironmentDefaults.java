@@ -50,19 +50,13 @@ public final class RailwayEnvironmentDefaults {
 
     public static Map<String, Object> resolveRailwayCors(Environment environment) {
         Map<String, Object> resolved = new LinkedHashMap<>();
-        if (!isRailway(environment) || (!isDemoProfile(environment) && !isFieldProfile(environment))) {
+        if (!isRailway(environment)) {
             return resolved;
         }
 
-        if (isFieldProfile(environment)) {
-            String merged = resolveMergedCorsOrigins(
-                    environment.getProperty("CORS_ORIGINS"),
-                    environment.getProperty("APP_PLATFORM_URL"));
-            resolved.put("CORS_ORIGINS", merged);
-            return resolved;
-        }
-
-        String merged = mergeCorsOrigins(environment.getProperty("CORS_ORIGINS"), RAILWAY_CORS_FALLBACK);
+        String merged = resolveMergedCorsOrigins(
+                environment.getProperty("CORS_ORIGINS"),
+                environment.getProperty("APP_PLATFORM_URL"));
         resolved.put("CORS_ORIGINS", merged);
         return resolved;
     }
