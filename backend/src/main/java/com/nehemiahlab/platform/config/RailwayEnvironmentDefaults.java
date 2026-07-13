@@ -56,6 +56,7 @@ public final class RailwayEnvironmentDefaults {
 
         if (isFieldProfile(environment)) {
             String merged = mergeCorsOrigins(environment.getProperty("CORS_ORIGINS"), RAILWAY_CORS_FALLBACK);
+            merged = mergePlatformUrl(environment, merged);
             resolved.put("CORS_ORIGINS", merged);
             return resolved;
         }
@@ -63,6 +64,19 @@ public final class RailwayEnvironmentDefaults {
         String merged = mergeCorsOrigins(environment.getProperty("CORS_ORIGINS"), RAILWAY_CORS_FALLBACK);
         resolved.put("CORS_ORIGINS", merged);
         return resolved;
+    }
+
+    static String mergePlatformUrl(Environment environment, String cors) {
+        String platformUrl = environment.getProperty("APP_PLATFORM_URL");
+        if (!RailwayDatabaseEnvironment.isUsable(platformUrl)) {
+            return cors;
+        }
+        String origin = normalizeOrigins(platformUrl);
+        String merged = mergeCorsOrigins(cors, origin);
+        if (origin.startsWith("https://") && !origin.startsWith("https://www.")) {
+            merged = mergeCorsOrigins(merged, "https://www." + origin.substring("https://".length()));
+        }
+        return merged;
     }
 
     static String mergeCorsOrigins(String existing, String fallbackPattern) {

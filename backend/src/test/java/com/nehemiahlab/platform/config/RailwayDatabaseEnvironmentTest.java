@@ -102,6 +102,20 @@ class RailwayDatabaseEnvironmentTest {
     }
 
     @Test
+    void railwayFieldProfileUsesPlatformUrlForCors() {
+        MockEnvironment env = new MockEnvironment();
+        env.setProperty("SPRING_PROFILES_ACTIVE", "field");
+        env.setProperty("RAILWAY_ENVIRONMENT", "production");
+        env.setProperty("APP_PLATFORM_URL", "https://ska-management.com");
+
+        Map<String, Object> cors = RailwayEnvironmentDefaults.resolveRailwayCors(env);
+
+        assertEquals(
+                "https://ska-management.com,https://www.ska-management.com,https://*.up.railway.app",
+                cors.get("CORS_ORIGINS"));
+    }
+
+    @Test
     void railwayFieldProfileNormalizesExplicitCors() {
         MockEnvironment env = new MockEnvironment();
         env.setProperty("SPRING_PROFILES_ACTIVE", "field");
