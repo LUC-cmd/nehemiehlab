@@ -1,21 +1,21 @@
 package com.nehemiahlab.platform.config;
 
-import com.nehemiahlab.platform.model.Role;
+import com.nehemiahlab.platform.model.Eleve;
 import com.nehemiahlab.platform.model.ResourceCategory;
 import com.nehemiahlab.platform.model.RessourceItem;
+import com.nehemiahlab.platform.model.Role;
 import com.nehemiahlab.platform.model.User;
-import com.nehemiahlab.platform.model.Eleve;
+import com.nehemiahlab.platform.repository.EleveRepository;
 import com.nehemiahlab.platform.repository.RessourceItemRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
-import com.nehemiahlab.platform.repository.EleveRepository;
 import com.nehemiahlab.platform.service.InscriptionSettingsService;
 import com.nehemiahlab.platform.service.MatriculeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -34,7 +34,7 @@ public class DataInitializer implements CommandLineRunner {
     @Value("${app.seed.director-password:password123}")
     private String seedDirectorPassword;
 
-    @Value("${app.seed.demo-password:password123}")
+    @Value("${app.seed.demo-password:}")
     private String seedDemoPassword;
 
     @Autowired
@@ -55,17 +55,21 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired
     private MatriculeService matriculeService;
 
-    @Autowired
+    @Autowired(required = false)
     private TogoDemoDataSeeder togoDemoDataSeeder;
 
     @Override
     public void run(String... args) throws Exception {
-        if (seedDirectorPassword.isBlank() || seedDemoPassword.isBlank()) {
+        if (seedDirectorPassword.isBlank()) {
             throw new IllegalStateException(
-                    "APP_SEED_DIRECTOR_PASSWORD et APP_SEED_DEMO_PASSWORD sont obligatoires lorsque app.seed.enabled=true.");
+                    "APP_SEED_DIRECTOR_PASSWORD est obligatoire lorsque app.seed.enabled=true.");
+        }
+        if (togoDemoDataSeeder != null && seedDemoPassword.isBlank()) {
+            throw new IllegalStateException(
+                    "APP_SEED_DEMO_PASSWORD est obligatoire pour le seed de démonstration (profils local/demo).");
         }
 
-        log.info("Initialisation explicite des données locales");
+        log.info("Initialisation des données de démarrage");
         Optional<User> directorOpt = userRepository.findByEmail(seedDirectorEmail);
 
         if (directorOpt.isEmpty()) {
@@ -79,15 +83,13 @@ public class DataInitializer implements CommandLineRunner {
                     .actif(true)
                     .build();
             userRepository.save(director);
-            log.warn("Compte directeur de démonstration créé. Changez immédiatement ses identifiants.");
+            log.warn("Compte directeur initial créé pour {}.", seedDirectorEmail);
         }
 
-        // Assure la présence du réglage (fermé par défaut tant que le Directeur ne l'ouvre pas).
         if (!inscriptionSettingsService.isInscriptionFormateursOuverte()) {
             inscriptionSettingsService.setInscriptionFormateursOuverte(false);
         }
 
-        // Backfill matricules pour les élèves existants
         List<Eleve> sansMatricule = eleveRepository.findByMatriculeIsNull();
         for (Eleve e : sansMatricule) {
             e.setMatricule(matriculeService.generateUniqueMatricule());
@@ -115,13 +117,14 @@ public class DataInitializer implements CommandLineRunner {
                     .build());
         }
 
-        // Jeu de données Togo (centres GPS, élèves, séances) — une seule fois
-        try {
-            togoDemoDataSeeder.seedIfNeeded();
-        } catch (Exception e) {
-            log.error("Échec de l'initialisation des données de démonstration", e);
+        if (togoDemoDataSeeder != null) {
+            try {
+                togoDemoDataSeeder.seedIfNeeded();
+            } catch (Exception e) {
+                log.error("Échec de l'initialisation des données de démonstration", e);
+            }
         }
 
-        log.info("Initialisation des données locales terminée");
+        log.info("Initialisation des données de démarrage terminée");
     }
 }
