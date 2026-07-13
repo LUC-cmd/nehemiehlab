@@ -46,6 +46,15 @@ class RailwayDatabaseEnvironmentTest {
     }
 
     @Test
+    void corsFilterAlwaysIncludesSkaManagementDomains() {
+        MockEnvironment env = new MockEnvironment();
+        var origins = PlatformCorsFilterConfig.buildAllowedOrigins(env);
+
+        assertTrue(origins.contains(PlatformCorsFilterConfig.SKA_ORIGIN));
+        assertTrue(origins.contains(PlatformCorsFilterConfig.SKA_WWW_ORIGIN));
+    }
+
+    @Test
     void applyCorsConfigurationAcceptsSkaManagementOrigin() {
         CorsConfiguration config = new CorsConfiguration();
         RailwayEnvironmentDefaults.applyCorsConfiguration(

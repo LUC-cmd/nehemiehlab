@@ -4,13 +4,14 @@ import com.nehemiahlab.platform.model.ModuleCours;
 import com.nehemiahlab.platform.repository.ModuleCoursRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Component
 @Order(20)
-public class ModuleCoursBootstrap implements CommandLineRunner {
+public class ModuleCoursBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(ModuleCoursBootstrap.class);
 
@@ -20,8 +21,9 @@ public class ModuleCoursBootstrap implements CommandLineRunner {
         this.moduleCoursRepository = moduleCoursRepository;
     }
 
-    @Override
-    public void run(String... args) {
+    @EventListener(ApplicationReadyEvent.class)
+    @Order(20)
+    public void bootstrapOnReady() {
         if (moduleCoursRepository.count() > 0) {
             return;
         }

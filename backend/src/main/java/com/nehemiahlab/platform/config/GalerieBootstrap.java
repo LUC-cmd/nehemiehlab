@@ -4,7 +4,8 @@ import com.nehemiahlab.platform.model.GaleriePhoto;
 import com.nehemiahlab.platform.repository.GaleriePhotoRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +14,7 @@ import java.util.List;
 /** Initialise la galerie publique avec les visuels par défaut si la table est vide. */
 @Component
 @Order(900)
-public class GalerieBootstrap implements CommandLineRunner {
+public class GalerieBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(GalerieBootstrap.class);
 
@@ -23,8 +24,8 @@ public class GalerieBootstrap implements CommandLineRunner {
         this.galeriePhotoRepository = galeriePhotoRepository;
     }
 
-    @Override
-    public void run(String... args) {
+    @EventListener(ApplicationReadyEvent.class)
+    public void bootstrapOnReady() {
         if (galeriePhotoRepository.count() > 0) {
             return;
         }
