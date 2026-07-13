@@ -2,11 +2,13 @@ package com.nehemiahlab.platform.config;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
+import org.springframework.web.cors.CorsConfiguration;
 
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RailwayDatabaseEnvironmentTest {
@@ -44,13 +46,16 @@ class RailwayDatabaseEnvironmentTest {
     }
 
     @Test
-    void resolveAllowedOriginPatternsReturnsDistinctOrigins() {
-        var patterns = RailwayEnvironmentDefaults.resolveAllowedOriginPatterns(
-                "https://ska-management.com",
+    void applyCorsConfigurationAcceptsSkaManagementOrigin() {
+        CorsConfiguration config = new CorsConfiguration();
+        RailwayEnvironmentDefaults.applyCorsConfiguration(
+                config,
+                "https://ska-management.com,https://www.ska-management.com",
                 "https://ska-management.com");
 
-        assertTrue(patterns.contains("https://ska-management.com"));
-        assertTrue(patterns.contains("https://www.ska-management.com"));
+        assertEquals("https://ska-management.com", config.checkOrigin("https://ska-management.com"));
+        assertEquals("https://www.ska-management.com", config.checkOrigin("https://www.ska-management.com"));
+        assertNull(config.checkOrigin("https://evil.example.com"));
     }
 
     @Test

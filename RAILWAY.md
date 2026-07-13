@@ -1,129 +1,105 @@
 # Déploiement Railway — Smart Kids Academy (terrain)
 
-Guide pour héberger l’API et le frontend sur [Railway](https://railway.app) en **mode terrain** (vrai déploiement, pas démo).
+Guide pour héberger l'API et le frontend sur [Railway](https://railway.app) en **mode terrain** (vrai déploiement, pas démo).
+
+**Domaine production :** `ska-management.com` / `api.ska-management.com`
 
 ---
 
 ## Architecture
 
-| Service Railway | Rôle |
-|-----------------|------|
-| **PostgreSQL** | Base de données |
-| **API** | Backend Spring Boot (Dockerfile racine), profil `field` |
-| **Frontend** | React (`frontend/`), build Nixpacks |
+| Service Railway | Rôle | URL |
+|-----------------|------|-----|
+| **PostgreSQL** | Base de données | interne |
+| **nehemiahlab-api** | Backend Spring Boot (Dockerfile racine), profil `field` | `https://api.ska-management.com` |
+| **nehemiahlab-web** | Frontend React (`frontend/`) | `https://ska-management.com` |
 
 ---
 
 ## 1. PostgreSQL
 
 1. **+ New** → **Database** → **PostgreSQL** → attendre **Active**
-2. Service **API** → **Variables** → **Add Reference** → PostgreSQL → **`DATABASE_URL`**
-3. Supprimer toute variable `DB_HOST` mal saisie (`${DB_HOST}` en texte brut)
-
-Le code convertit `DATABASE_URL` en `DB_HOST`, `DB_PORT`, etc. automatiquement.
+2. **nehemiahlab-api** → **Variables** → **Add Reference** → PostgreSQL → **`DATABASE_URL`**
+3. Supprimer toute variable `DB_*` ou `PG*` saisie à la main
 
 ---
 
-## 2. API backend (Docker)
+## 2. API (nehemiahlab-api)
 
-1. **New Service** → dépôt GitHub `nehemiahlab`
-2. Railway utilise le `Dockerfile` à la racine
-3. **Settings → Root Directory** : laissez **vide** (racine du repo, pas `backend` ni `frontend`)
-3. Variables **obligatoires** :
+### Settings
+
+| Paramètre | Valeur |
+|-----------|--------|
+| **Root Directory** | *(vide)* |
+| **Build / Start Command** | *(vide)* |
+| **Port domaine custom** | **8080** |
+
+### Variables obligatoires
 
 ```env
 SPRING_PROFILES_ACTIVE=field
 
-# PostgreSQL via Add Reference → DATABASE_URL
-
 JWT_SECRET=(64+ caractères aléatoires)
-CORS_ORIGINS=https://VOTRE-FRONTEND.up.railway.app
+
+APP_PLATFORM_URL=https://ska-management.com
+CORS_ORIGINS=https://ska-management.com,https://www.ska-management.com
 
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
 MAIL_USERNAME=votre-compte@gmail.com
-MAIL_PASSWORD=(mot de passe application Gmail)
+MAIL_PASSWORD=(mot de passe application Gmail, sans espace)
 MAIL_FROM=votre-compte@gmail.com
 MAIL_OTP_FROM=votre-compte@gmail.com
 
-APP_SEED_ENABLED=false
-```
-
-### Premier déploiement — créer le directeur
-
-Pour le tout premier lancement (base vide), activez temporairement :
-
-```env
 APP_SEED_ENABLED=true
-APP_SEED_DIRECTOR_EMAIL=director@votre-domaine.com
+APP_SEED_DIRECTOR_EMAIL=contact@nehemiahlab.com
 APP_SEED_DIRECTOR_PASSWORD=(mot de passe fort)
 ```
 
-Redéployez → connectez-vous → repassez `APP_SEED_ENABLED=false` et redéployez.
+Après première connexion : `APP_SEED_ENABLED=false` puis redéployer.
 
-> **Pas de `password123`** — ce profil n’injecte aucun compte démo automatique.
+### Si « Needs approval »
 
-Modèle complet : [`railway.env.example`](railway.env.example)
+**nehemiahlab-api** → **Deployments** → **Approve** / **Deploy**.
+
+### Logs attendus
+
+```
+PostgreSQL Railway : host=postgres.railway.internal ...
+CORS configuré pour: https://ska-management.com,...
+SMTP configure — envoi d'emails actif
+```
 
 ---
 
-## 3. Frontend
+## 3. Frontend (nehemiahlab-web)
 
 | Paramètre | Valeur |
 |-----------|--------|
 | **Root Directory** | `frontend` |
-| **Build Command** | *(laisser vide — le Dockerfile gère le build)* |
-| `VITE_API_URL` | `https://nehemiahlab-api-production.up.railway.app/api` |
+| **Build / Start Command** | *(vide)* |
+| **Port domaine custom** | **4173** |
+| `VITE_API_URL` | `https://api.ska-management.com/api` |
 
-Build : `npm ci && npm run build`  
-Start : `npm run start`
-
----
-
-## 4. Profils Spring
-
-| Profil | Usage |
-|--------|-------|
-| `field` | **Terrain / pilote Railway** — schéma auto, pas de démo, stockage local |
-| `prod` | Production complète avec S3/R2 obligatoire |
-| `demo` | Présentation gratuite uniquement (Render/Neon) |
+Ne pas mettre `DATABASE_URL`, `JWT_SECRET` ou `MAIL_*` sur le frontend.
 
 ---
 
-## 5. Checklist terrain
+## 4. Checklist
 
-1. PostgreSQL **Active** + `DATABASE_URL` liée à l’API
-2. `SPRING_PROFILES_ACTIVE=field`
-3. `JWT_SECRET` (64+ caractères) et `CORS_ORIGINS` (URL HTTPS du frontend)
-4. Variables **MAIL_*** configurées
-5. `APP_SEED_ENABLED=false` (sauf 1er déploiement)
-6. Frontend : `VITE_API_URL` + Root Directory `frontend`
-7. Redéployer API puis frontend
-8. Vérifier : `https://VOTRE-API.up.railway.app/api/actuator/health`
+1. PostgreSQL **Active** + `DATABASE_URL` = `${{Postgres.DATABASE_URL}}`
+2. API **Active** (pas « Needs approval »)
+3. `APP_PLATFORM_URL` + `CORS_ORIGINS` sur l'API
+4. Frontend `VITE_API_URL` correct + redéployé
+5. Health : `https://api.ska-management.com/api/actuator/health` → UP
+6. Connexion : `https://ska-management.com/connexion` sans erreur CORS
 
-Les tables sont créées par **Flyway** au premier démarrage réussi.
+## Dépannage CORS
 
----
+| Symptôme | Solution |
+|----------|----------|
+| `blocked by CORS policy` | Variables CORS sur l'API + **Redeploy** |
+| `403` preflight | Approuver déploiement « Needs approval » |
+| Log `CORS vide` | Ajouter `APP_PLATFORM_URL` et `CORS_ORIGINS` |
 
-## Test local
-
-```powershell
-cd C:\projets\nehemiahlab\backend
-$env:SPRING_PROFILES_ACTIVE="local"
-mvn spring-boot:run
-```
-
-```powershell
-cd C:\projets\nehemiahlab\frontend
-npm run dev
-```
-
----
-
-## Git ≠ secrets
-
-- **GitHub** : code uniquement
-- **Railway → Variables** : JWT, MAIL, DB
-- **`backend/.env`** : local uniquement (gitignoré)
-
-Le fichier `railway.toml` configure le healthcheck sur `/api/actuator/health`.
+Modèle : [`railway.env.example`](railway.env.example)
