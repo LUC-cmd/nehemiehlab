@@ -81,11 +81,24 @@ class RailwayDatabaseEnvironmentTest {
         MockEnvironment env = new MockEnvironment();
         env.setProperty("SPRING_PROFILES_ACTIVE", "field");
         env.setProperty("RAILWAY_ENVIRONMENT", "production");
-        env.setProperty("CORS_ORIGINS", "https://mauvaise-url.example.com");
 
         Map<String, Object> cors = RailwayEnvironmentDefaults.resolveRailwayCors(env);
 
         assertEquals(RailwayEnvironmentDefaults.RAILWAY_CORS_FALLBACK, cors.get("CORS_ORIGINS"));
+    }
+
+    @Test
+    void railwayFieldProfileKeepsCustomDomainCors() {
+        MockEnvironment env = new MockEnvironment();
+        env.setProperty("SPRING_PROFILES_ACTIVE", "field");
+        env.setProperty("RAILWAY_ENVIRONMENT", "production");
+        env.setProperty("CORS_ORIGINS", "https://www.nehemiahlab.com");
+
+        Map<String, Object> cors = RailwayEnvironmentDefaults.resolveRailwayCors(env);
+
+        assertEquals(
+                "https://www.nehemiahlab.com,https://*.up.railway.app",
+                cors.get("CORS_ORIGINS"));
     }
 
     @Test
@@ -97,7 +110,9 @@ class RailwayDatabaseEnvironmentTest {
 
         Map<String, Object> cors = RailwayEnvironmentDefaults.resolveRailwayCors(env);
 
-        assertEquals(RailwayEnvironmentDefaults.RAILWAY_CORS_FALLBACK, cors.get("CORS_ORIGINS"));
+        assertEquals(
+                "https://nehemiahlab-web-production.up.railway.app,https://*.up.railway.app",
+                cors.get("CORS_ORIGINS"));
     }
 
     @Test

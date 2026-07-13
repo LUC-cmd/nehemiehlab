@@ -55,7 +55,8 @@ public final class RailwayEnvironmentDefaults {
         }
 
         if (isFieldProfile(environment)) {
-            resolved.put("CORS_ORIGINS", RAILWAY_CORS_FALLBACK);
+            String merged = mergeCorsOrigins(environment.getProperty("CORS_ORIGINS"), RAILWAY_CORS_FALLBACK);
+            resolved.put("CORS_ORIGINS", merged);
             return resolved;
         }
 
