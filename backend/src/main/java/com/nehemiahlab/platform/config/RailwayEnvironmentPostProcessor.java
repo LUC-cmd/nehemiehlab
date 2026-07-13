@@ -22,6 +22,7 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
         Map<String, Object> resolved = new java.util.LinkedHashMap<>(RailwayDatabaseEnvironment.resolve(environment));
 
         if (RailwayEnvironmentDefaults.isRailway(environment)) {
+            log.info("Railway détecté — profil actif: {}", environment.getProperty("SPRING_PROFILES_ACTIVE", "local"));
             if (RailwayEnvironmentDefaults.isDemoProfile(environment)) {
                 RailwayEnvironmentDefaults.resolveDemo(environment).forEach(resolved::putIfAbsent);
             }
