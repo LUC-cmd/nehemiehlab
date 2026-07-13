@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
  */
 public final class RailwayEnvironmentDefaults {
 
-    static final String RAILWAY_CORS_FALLBACK = "https://*.up.railway.app";
+    public static final String RAILWAY_CORS_FALLBACK = "https://*.up.railway.app";
     static final String RAILWAY_JWT_FALLBACK =
             "nehemiahlab-smart-kids-academy-railway-demo-jwt-secret-2026-change-me";
 
@@ -55,8 +55,9 @@ public final class RailwayEnvironmentDefaults {
         }
 
         if (isFieldProfile(environment)) {
-            String merged = mergeCorsOrigins(environment.getProperty("CORS_ORIGINS"), RAILWAY_CORS_FALLBACK);
-            merged = mergePlatformUrl(environment, merged);
+            String merged = resolveMergedCorsOrigins(
+                    environment.getProperty("CORS_ORIGINS"),
+                    environment.getProperty("APP_PLATFORM_URL"));
             resolved.put("CORS_ORIGINS", merged);
             return resolved;
         }
@@ -66,8 +67,31 @@ public final class RailwayEnvironmentDefaults {
         return resolved;
     }
 
+    /**
+     * Fusionne CORS explicite, wildcard Railway et domaine plateforme (APP_PLATFORM_URL).
+     */
+    public static String resolveMergedCorsOrigins(String corsOrigins, String platformUrl) {
+        String merged = mergeCorsOrigins(corsOrigins, RAILWAY_CORS_FALLBACK);
+        return mergePlatformUrl(platformUrl, merged);
+    }
+
+    public static java.util.List<String> resolveAllowedOriginPatterns(String corsOrigins, String platformUrl) {
+        String merged = resolveMergedCorsOrigins(corsOrigins, platformUrl);
+        if (!RailwayDatabaseEnvironment.isUsable(merged)) {
+            return java.util.List.of();
+        }
+        return java.util.Arrays.stream(merged.split(","))
+                .map(String::trim)
+                .map(origin -> origin.endsWith("/") ? origin.substring(0, origin.length() - 1) : origin)
+                .filter(origin -> !origin.isEmpty())
+                .collect(Collectors.toList());
+    }
+
     static String mergePlatformUrl(Environment environment, String cors) {
-        String platformUrl = environment.getProperty("APP_PLATFORM_URL");
+        return mergePlatformUrl(environment.getProperty("APP_PLATFORM_URL"), cors);
+    }
+
+    static String mergePlatformUrl(String platformUrl, String cors) {
         if (!RailwayDatabaseEnvironment.isUsable(platformUrl)) {
             return cors;
         }

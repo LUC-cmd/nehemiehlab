@@ -34,6 +34,7 @@ public final class RailwayDatabaseEnvironment {
         String pgHost = environment.getProperty("PGHOST");
         if (isUsable(pgHost)) {
             putIfUsable(resolved, "DB_HOST", pgHost);
+            resolved.put("DB_SSL_MODE", sslModeForHost(pgHost));
             putIfUsable(resolved, "DB_PORT", environment.getProperty("PGPORT"));
             putIfUsable(resolved, "DB_NAME", environment.getProperty("PGDATABASE"));
             putIfUsable(resolved, "DB_USER", environment.getProperty("PGUSER"));
@@ -70,6 +71,7 @@ public final class RailwayDatabaseEnvironment {
             }
             if (host != null) {
                 resolved.put("DB_HOST", host);
+                resolved.put("DB_SSL_MODE", sslModeForHost(host));
             }
             resolved.put("DB_PORT", String.valueOf(port));
             resolved.put("DB_NAME", databaseName);
@@ -84,6 +86,18 @@ public final class RailwayDatabaseEnvironment {
 
     static boolean looksUnresolved(String value) {
         return value.contains("${") || value.contains("${{");
+    }
+
+    /** Réseau privé Railway : pas de SSL ; proxy public : préférer SSL sans forcer. */
+    static String sslModeForHost(String host) {
+        if (host == null || host.isBlank()) {
+            return "prefer";
+        }
+        String normalized = host.toLowerCase();
+        if (normalized.contains("railway.internal")) {
+            return "disable";
+        }
+        return "prefer";
     }
 
     private static void copyIfUsable(Map<String, Object> resolved, Environment environment, String key) {

@@ -23,6 +23,34 @@ class RailwayDatabaseEnvironmentTest {
         assertEquals("railway", resolved.get("DB_NAME"));
         assertEquals("user", resolved.get("DB_USER"));
         assertEquals("secret", resolved.get("DB_PASSWORD"));
+        assertEquals("disable", resolved.get("DB_SSL_MODE"));
+    }
+
+    @Test
+    void sslModeDisableForRailwayInternalHost() {
+        assertEquals("disable", RailwayDatabaseEnvironment.sslModeForHost("postgres.railway.internal"));
+        assertEquals("prefer", RailwayDatabaseEnvironment.sslModeForHost("containers-us-west-123.railway.app"));
+    }
+
+    @Test
+    void resolveMergedCorsOriginsIncludesPlatformUrl() {
+        String merged = RailwayEnvironmentDefaults.resolveMergedCorsOrigins(
+                "https://ska-management.com",
+                "https://ska-management.com");
+
+        assertTrue(merged.contains("https://ska-management.com"));
+        assertTrue(merged.contains("https://www.ska-management.com"));
+        assertTrue(merged.contains("https://*.up.railway.app"));
+    }
+
+    @Test
+    void resolveAllowedOriginPatternsReturnsDistinctOrigins() {
+        var patterns = RailwayEnvironmentDefaults.resolveAllowedOriginPatterns(
+                "https://ska-management.com",
+                "https://ska-management.com");
+
+        assertTrue(patterns.contains("https://ska-management.com"));
+        assertTrue(patterns.contains("https://www.ska-management.com"));
     }
 
     @Test
