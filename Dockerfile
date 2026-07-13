@@ -18,5 +18,5 @@ EXPOSE 8080
 # Limite mémoire JVM adaptée à un petit conteneur (Railway) : la JVM n'utilise que
 # 75% de la RAM du conteneur, ce qui évite l'OOM-kill du conteneur.
 # JAVA_TOOL_OPTIONS peut être surchargé via une variable Railway sans rebuild.
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0"
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -Djava.net.preferIPv6Addresses=true"
 ENTRYPOINT ["java", "-jar", "app.jar"]
