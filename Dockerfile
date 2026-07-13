@@ -15,4 +15,8 @@ RUN useradd --system --uid 10001 --no-create-home appuser
 COPY --from=build --chown=appuser:appuser /app/target/*.jar app.jar
 USER appuser
 EXPOSE 8080
-# Limites JVM adaptées à un petit cont
+# Limite mémoire JVM adaptée à un petit conteneur (Railway) : la JVM n'utilise que
+# 75% de la RAM du conteneur, ce qui évite l'OOM-kill du conteneur.
+# JAVA_TOOL_OPTIONS peut être surchargé via une variable Railway sans rebuild.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0"
+ENTRYPOINT ["java", "-jar", "app.jar"]

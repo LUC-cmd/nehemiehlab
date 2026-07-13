@@ -3,7 +3,9 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# Liveness uniquement (pas DB/SMTP) — évite Healthcheck failure 10 min sur Railway.
-healthcheckPath = "/api/actuator/health/liveness"
+# /api/actuator/health existe dans TOUS les profils (liveness n'existe qu'en profil "field",
+# ce qui faisait échouer le healthcheck de chaque déploiement si le profil différait).
+# En profils field/prod, les checks DB/SMTP du health sont désactivés → pas de blocage.
+healthcheckPath = "/api/actuator/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
