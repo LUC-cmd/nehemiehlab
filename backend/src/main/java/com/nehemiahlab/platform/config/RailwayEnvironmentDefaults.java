@@ -79,15 +79,21 @@ public final class RailwayEnvironmentDefaults {
         return merged;
     }
 
-    static String mergeCorsOrigins(String existing, String fallbackPattern) {
+    static String mergeCorsOrigins(String existing, String addition) {
         String normalizedExisting = normalizeOrigins(existing);
+        String normalizedAddition = normalizeOrigins(addition);
+        if (!RailwayDatabaseEnvironment.isUsable(normalizedAddition)) {
+            return RailwayDatabaseEnvironment.isUsable(normalizedExisting) ? normalizedExisting : "";
+        }
         if (!RailwayDatabaseEnvironment.isUsable(normalizedExisting)) {
-            return fallbackPattern;
+            return normalizedAddition;
         }
-        if (normalizedExisting.contains("*.up.railway.app")) {
-            return normalizedExisting;
+        for (String origin : normalizedAddition.split(",")) {
+            if (!normalizedExisting.contains(origin)) {
+                normalizedExisting = normalizedExisting + "," + origin;
+            }
         }
-        return normalizedExisting + "," + fallbackPattern;
+        return normalizedExisting;
     }
 
     static String normalizeOrigins(String origins) {

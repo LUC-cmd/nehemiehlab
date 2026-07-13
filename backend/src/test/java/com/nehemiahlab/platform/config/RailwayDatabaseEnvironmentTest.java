@@ -111,7 +111,7 @@ class RailwayDatabaseEnvironmentTest {
         Map<String, Object> cors = RailwayEnvironmentDefaults.resolveRailwayCors(env);
 
         assertEquals(
-                "https://ska-management.com,https://www.ska-management.com,https://*.up.railway.app",
+                "https://*.up.railway.app,https://ska-management.com,https://www.ska-management.com",
                 cors.get("CORS_ORIGINS"));
     }
 
