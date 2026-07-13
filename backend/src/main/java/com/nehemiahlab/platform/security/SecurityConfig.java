@@ -105,6 +105,7 @@ public class SecurityConfig {
         config.setAllowCredentials(true);
         List<String> origins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
+                .map(origin -> origin.endsWith("/") ? origin.substring(0, origin.length() - 1) : origin)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
         config.setAllowedOriginPatterns(origins);

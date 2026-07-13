@@ -4,10 +4,10 @@ import org.springframework.core.env.Environment;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
- * Valeurs par défaut pour le profil demo hébergé sur Railway lorsque certaines
- * variables ne sont pas encore configurées manuellement.
+ * Valeurs par défaut Railway (CORS, JWT demo) appliquées avant l'auto-configuration Spring.
  */
 public final class RailwayEnvironmentDefaults {
 
@@ -22,13 +22,17 @@ public final class RailwayEnvironmentDefaults {
         return "demo".equalsIgnoreCase(environment.getProperty("SPRING_PROFILES_ACTIVE"));
     }
 
+    public static boolean isFieldProfile(Environment environment) {
+        return "field".equalsIgnoreCase(environment.getProperty("SPRING_PROFILES_ACTIVE"));
+    }
+
     public static boolean isRailway(Environment environment) {
         return RailwayDatabaseEnvironment.isUsable(environment.getProperty("RAILWAY_ENVIRONMENT"))
                 || RailwayDatabaseEnvironment.isUsable(environment.getProperty("RAILWAY_PROJECT_ID"))
                 || RailwayDatabaseEnvironment.isUsable(environment.getProperty("RAILWAY_SERVICE_ID"));
     }
 
-    public static Map<String, Object> resolve(Environment environment) {
+    public static Map<String, Object> resolveDemo(Environment environment) {
         Map<String, Object> resolved = new LinkedHashMap<>();
 
         String corsOrigins = environment.getProperty("CORS_ORIGINS");
@@ -42,5 +46,39 @@ public final class RailwayEnvironmentDefaults {
         }
 
         return resolved;
+    }
+
+    public static Map<String, Object> resolveRailwayCors(Environment environment) {
+        Map<String, Object> resolved = new LinkedHashMap<>();
+        if (!isRailway(environment) || (!isDemoProfile(environment) && !isFieldProfile(environment))) {
+            return resolved;
+        }
+
+        String merged = mergeCorsOrigins(environment.getProperty("CORS_ORIGINS"), RAILWAY_CORS_FALLBACK);
+        resolved.put("CORS_ORIGINS", merged);
+        return resolved;
+    }
+
+    static String mergeCorsOrigins(String existing, String fallbackPattern) {
+        String normalizedExisting = normalizeOrigins(existing);
+        if (!RailwayDatabaseEnvironment.isUsable(normalizedExisting)) {
+            return fallbackPattern;
+        }
+        if (normalizedExisting.contains("*.up.railway.app")) {
+            return normalizedExisting;
+        }
+        return normalizedExisting + "," + fallbackPattern;
+    }
+
+    static String normalizeOrigins(String origins) {
+        if (origins == null || origins.isBlank()) {
+            return "";
+        }
+        return origins.lines()
+                .flatMap(line -> java.util.List.of(line.split(",")).stream())
+                .map(String::trim)
+                .map(origin -> origin.endsWith("/") ? origin.substring(0, origin.length() - 1) : origin)
+                .filter(origin -> !origin.isEmpty())
+                .collect(Collectors.joining(","));
     }
 }
