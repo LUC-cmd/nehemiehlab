@@ -22,8 +22,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.List;
-
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -61,6 +59,7 @@ public class SecurityConfig {
                     ))
             )
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // Disponibilité sans détails sensibles.
                 .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                 // Auth publique
@@ -104,12 +103,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowCredentials(true);
-        List<String> origins = RailwayEnvironmentDefaults.resolveAllowedOriginPatterns(allowedOrigins, platformUrl);
-        config.setAllowedOriginPatterns(origins);
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        config.setMaxAge(3600L);
+        RailwayEnvironmentDefaults.applyCorsConfiguration(config, allowedOrigins, platformUrl);
         source.registerCorsConfiguration("/**", config);
         return source;
     }

@@ -16,7 +16,6 @@ public class FieldConfigurationValidator {
 
     private static final List<String> REQUIRED_ENVIRONMENT_VARIABLES = List.of(
             "JWT_SECRET",
-            "CORS_ORIGINS",
             "MAIL_HOST",
             "MAIL_USERNAME",
             "MAIL_PASSWORD",
@@ -40,9 +39,18 @@ public class FieldConfigurationValidator {
         }
 
         String corsOrigins = environment.getProperty("CORS_ORIGINS", "");
-        if (!allOriginsUseHttps(corsOrigins)) {
+        String platformUrl = environment.getProperty("APP_PLATFORM_URL", "");
+        if (corsOrigins.isBlank() && platformUrl.isBlank()) {
+            throw new IllegalStateException(
+                    "CORS non configuré : renseignez CORS_ORIGINS et/ou APP_PLATFORM_URL "
+                            + "(ex. https://ska-management.com).");
+        }
+        if (!corsOrigins.isBlank() && !allOriginsUseHttps(corsOrigins)) {
             throw new IllegalStateException(
                     "CORS_ORIGINS doit contenir uniquement des origines HTTPS explicites.");
+        }
+        if (!platformUrl.isBlank() && !platformUrl.startsWith("https://")) {
+            throw new IllegalStateException("APP_PLATFORM_URL doit être une URL HTTPS.");
         }
 
         if (environment.getProperty("APP_SEED_ENABLED", Boolean.class, false)) {

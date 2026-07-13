@@ -87,6 +87,30 @@ public final class RailwayEnvironmentDefaults {
                 .collect(Collectors.toList());
     }
 
+    public static void applyCorsConfiguration(org.springframework.web.cors.CorsConfiguration config,
+                                              String corsOrigins,
+                                              String platformUrl) {
+        java.util.List<String> origins = resolveAllowedOriginPatterns(corsOrigins, platformUrl);
+        java.util.List<String> exactOrigins = origins.stream()
+                .filter(origin -> !origin.contains("*"))
+                .collect(Collectors.toList());
+        java.util.List<String> originPatterns = origins.stream()
+                .filter(origin -> origin.contains("*"))
+                .collect(Collectors.toList());
+
+        config.setAllowCredentials(true);
+        if (!exactOrigins.isEmpty()) {
+            config.setAllowedOrigins(exactOrigins);
+        }
+        if (!originPatterns.isEmpty()) {
+            config.setAllowedOriginPatterns(originPatterns);
+        }
+        config.setAllowedHeaders(java.util.List.of(
+                "Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
+        config.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        config.setMaxAge(3600L);
+    }
+
     static String mergePlatformUrl(Environment environment, String cors) {
         return mergePlatformUrl(environment.getProperty("APP_PLATFORM_URL"), cors);
     }

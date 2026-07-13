@@ -26,6 +26,7 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
                 RailwayEnvironmentDefaults.resolveDemo(environment).forEach(resolved::putIfAbsent);
             }
             RailwayEnvironmentDefaults.resolveRailwayCors(environment).forEach(resolved::put);
+            applyResolvedCorsProperties(environment, resolved);
             requireDatabaseOnRailway(environment, resolved);
             logDatabaseTarget(resolved);
         }
@@ -34,6 +35,20 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
             return;
         }
         environment.getPropertySources().addFirst(new MapPropertySource(PROPERTY_SOURCE, resolved));
+    }
+
+    private static void applyResolvedCorsProperties(ConfigurableEnvironment environment, Map<String, Object> resolved) {
+        Object corsOrigins = resolved.get("CORS_ORIGINS");
+        if (corsOrigins != null && !String.valueOf(corsOrigins).isBlank()) {
+            resolved.put("app.cors.allowed-origins", corsOrigins);
+        }
+        String platformUrl = environment.getProperty("APP_PLATFORM_URL");
+        if (RailwayDatabaseEnvironment.isUsable(platformUrl)) {
+            resolved.put("app.platform.url", RailwayEnvironmentDefaults.normalizeOrigins(platformUrl));
+        }
+        if (corsOrigins != null) {
+            log.info("CORS Railway préconfiguré: {}", corsOrigins);
+        }
     }
 
     private static void logDatabaseTarget(Map<String, Object> resolved) {
