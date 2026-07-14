@@ -39,6 +39,17 @@ public final class RailwayDatabaseEnvironment {
             putIfUsable(resolved, "DB_NAME", environment.getProperty("PGDATABASE"));
             putIfUsable(resolved, "DB_USER", environment.getProperty("PGUSER"));
             putIfUsable(resolved, "DB_PASSWORD", environment.getProperty("PGPASSWORD"));
+            String pgPort = resolved.containsKey("DB_PORT") ? String.valueOf(resolved.get("DB_PORT")) : "5432";
+            String pgDb = resolved.containsKey("DB_NAME") ? String.valueOf(resolved.get("DB_NAME")) : "railway";
+            resolved.put("spring.datasource.url",
+                    "jdbc:postgresql://" + pgHost + ":" + pgPort + "/" + pgDb
+                            + "?sslmode=" + sslModeForHost(pgHost));
+            if (resolved.containsKey("DB_USER")) {
+                resolved.put("spring.datasource.username", resolved.get("DB_USER"));
+            }
+            if (resolved.containsKey("DB_PASSWORD")) {
+                resolved.put("spring.datasource.password", resolved.get("DB_PASSWORD"));
+            }
             return resolved;
         }
 
@@ -72,6 +83,19 @@ public final class RailwayDatabaseEnvironment {
             if (host != null) {
                 resolved.put("DB_HOST", host);
                 resolved.put("DB_SSL_MODE", sslModeForHost(host));
+                // Court-circuite les placeholders ${DB_*} des fichiers de profil :
+                // on impose directement l'URL JDBC complete, prioritaire sur tout le reste.
+                resolved.put("spring.datasource.url",
+                        "jdbc:postgresql://" + host + ":" + port + "/" + databaseName
+                                + "?sslmode=" + sslModeForHost(host));
+                Object user = resolved.get("DB_USER");
+                if (user != null) {
+                    resolved.put("spring.datasource.username", user);
+                }
+                Object password = resolved.get("DB_PASSWORD");
+                if (password != null) {
+                    resolved.put("spring.datasource.password", password);
+                }
             }
             resolved.put("DB_PORT", String.valueOf(port));
             resolved.put("DB_NAME", databaseName);
