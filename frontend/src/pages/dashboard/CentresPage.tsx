@@ -1178,49 +1178,24 @@ export default function CentresPage() {
               onChange={(e) => setNewCentre({ ...newCentre, cluster: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="label">Tél. responsable</label>
-              <input
-                type="tel"
-                inputMode="numeric"
-                placeholder="Ex: 99099509"
-                className="input-field"
-                value={newCentre.telephoneResponsable}
-                onChange={(e) => setNewCentre({
-                  ...newCentre,
-                  telephoneResponsable: cleanPhoneInput(e.target.value),
-                })}
-              />
-            </div>
-            <div>
-              <label className="label">Tél. coordinateur</label>
-              <input
-                type="tel"
-                inputMode="numeric"
-                placeholder="Ex: 99099509"
-                className="input-field"
-                value={newCentre.telephoneCoordinateur}
-                onChange={(e) => setNewCentre({
-                  ...newCentre,
-                  telephoneCoordinateur: cleanPhoneInput(e.target.value),
-                })}
-              />
-            </div>
-            <div>
-              <label className="label">Tél. formateur</label>
-              <input
-                type="tel"
-                inputMode="numeric"
-                placeholder="Ex: 99099509"
-                className="input-field"
-                value={newCentre.telephoneFormateur}
-                onChange={(e) => setNewCentre({
-                  ...newCentre,
-                  telephoneFormateur: cleanPhoneInput(e.target.value),
-                })}
-              />
-            </div>
+          <div>
+            <label className="label">Numéro du centre *</label>
+            <input
+              type="tel"
+              inputMode="numeric"
+              required
+              placeholder="Ex: 99099509"
+              className="input-field"
+              value={newCentre.telephoneResponsable}
+              onChange={(e) => setNewCentre({
+                ...newCentre,
+                telephoneResponsable: cleanPhoneInput(e.target.value),
+              })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Le numéro du formateur n'est pas demandé ici : il est renseigné à la création de son compte et suit
+              automatiquement le formateur affecté au centre.
+            </p>
           </div>
 
           <CentreLocationFields

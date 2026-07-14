@@ -26,6 +26,11 @@ export interface User {
   telephoneSecondaire?: string;
   numeroCompteBancaire?: string;
   numeroMobileMoney?: string;
+  operateurMobileMoney?: 'MIXX_BY_YAS' | 'MOOV_MONEY' | '';
+  banqueNom?: string;
+  rib?: string;
+  codeAgence?: string;
+  intituleCompte?: string;
   avatar?: string;
   carteIdentiteRecto?: string;
   carteIdentiteVerso?: string;
@@ -561,4 +566,11 @@ export interface EnfantProfilePublic {
   projets: EnfantProject[];
   createdAt: string;
   updatedAt?: string;
+}
+
+// --- Banque (gérée par le comptable) ---
+export interface Banque {
+  id: number;
+  nom: string;
+  createdAt?: string;
 }

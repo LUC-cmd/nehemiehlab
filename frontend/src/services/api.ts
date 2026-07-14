@@ -222,6 +222,7 @@ export const userService = {
   updateProfile: (id: number, data: Partial<{
     nom: string; prenom: string; telephone: string; telephoneSecondaire: string;
     numeroCompteBancaire: string; numeroMobileMoney: string;
+    operateurMobileMoney: string; banqueNom: string; rib: string; codeAgence: string; intituleCompte: string;
     motDePasse: string; ancienMotDePasse: string;
     dateNaissance: string; lieuNaissance: string; adresse: string;
   }>) => api.put<User>(`/users/${id}`, data),
@@ -797,6 +798,15 @@ export const galerieService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+};
+
+// ============================================================
+//  Banques (gérées par le comptable)
+// ============================================================
+export const banqueService = {
+  list: () => api.get<import('../types').Banque[]>('/banques'),
+  create: (nom: string) => api.post<import('../types').Banque>('/banques', { nom }),
+  delete: (id: number) => api.delete(`/banques/${id}`),
 };
 
 export default api;

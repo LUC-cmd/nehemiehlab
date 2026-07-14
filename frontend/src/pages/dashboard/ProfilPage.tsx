@@ -1,6 +1,7 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { userService } from '../../services/api';
+import { banqueService, userService } from '../../services/api';
+import type { Banque } from '../../types';
 import {
   Building2, Camera, CreditCard, FileImage, Loader2, Lock, Mail, MapPin, Phone, Smartphone, Trash2, User,
 } from 'lucide-react';
@@ -32,7 +33,7 @@ export default function ProfilPage() {
 
   const profileIncomplete = useMemo(() => {
     if (!user) return true;
-    const missingPayment = !user.numeroCompteBancaire && !user.numeroMobileMoney;
+    const missingPayment = !user.rib && !user.numeroCompteBancaire && !user.numeroMobileMoney;
     const missingPhone = !user.telephone;
     return missingPayment || missingPhone;
   }, [user]);
@@ -47,12 +48,21 @@ export default function ProfilPage() {
     adresse: user?.adresse || '',
     numeroCompteBancaire: user?.numeroCompteBancaire || '',
     numeroMobileMoney: user?.numeroMobileMoney || '',
+    operateurMobileMoney: user?.operateurMobileMoney || '',
+    banqueNom: user?.banqueNom || '',
+    rib: user?.rib || '',
+    codeAgence: user?.codeAgence || '',
+    intituleCompte: user?.intituleCompte || '',
     ancienMotDePasse: '',
     motDePasse: '',
     confirmer: '',
   });
 
   const [loading, setLoading] = useState(false);
+  const [banques, setBanques] = useState<Banque[]>([]);
+  useEffect(() => {
+    banqueService.list().then(({ data }) => setBanques(data)).catch(() => setBanques([]));
+  }, []);
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [cniLoading, setCniLoading] = useState<'recto' | 'verso' | null>(null);
   const [showCompleteBanner, setShowCompleteBanner] = useState(profileIncomplete);
@@ -86,8 +96,16 @@ export default function ProfilPage() {
       return;
     }
 
-    if (!form.numeroCompteBancaire && !form.numeroMobileMoney) {
-      toast.error('Ajoutez un numéro de compte bancaire ou un numéro Mobile Money.');
+    if (!form.rib && !form.numeroMobileMoney) {
+      toast.error('Ajoutez un compte bancaire (RIB) ou un numéro Mobile Money.');
+      return;
+    }
+    if (form.numeroMobileMoney && !form.operateurMobileMoney) {
+      toast.error('Sélectionnez votre opérateur Mobile Money (Mixx by Yas ou Moov Money).');
+      return;
+    }
+    if (form.rib && (!form.codeAgence || !form.intituleCompte)) {
+      toast.error('Pour le compte bancaire, renseignez le RIB, le code agence et l’intitulé du compte.');
       return;
     }
 
@@ -103,6 +121,11 @@ export default function ProfilPage() {
         adresse: form.adresse || undefined,
         numeroCompteBancaire: form.numeroCompteBancaire || undefined,
         numeroMobileMoney: form.numeroMobileMoney || undefined,
+        operateurMobileMoney: form.operateurMobileMoney,
+        banqueNom: form.banqueNom,
+        rib: form.rib,
+        codeAgence: form.codeAgence,
+        intituleCompte: form.intituleCompte,
         ancienMotDePasse: form.ancienMotDePasse || undefined,
         motDePasse: form.motDePasse || undefined,
       });
@@ -117,6 +140,11 @@ export default function ProfilPage() {
         adresse: data.adresse ?? form.adresse,
         numeroCompteBancaire: data.numeroCompteBancaire ?? form.numeroCompteBancaire,
         numeroMobileMoney: data.numeroMobileMoney ?? form.numeroMobileMoney,
+        operateurMobileMoney: (data.operateurMobileMoney ?? form.operateurMobileMoney) as '' | 'MIXX_BY_YAS' | 'MOOV_MONEY',
+        banqueNom: data.banqueNom ?? form.banqueNom,
+        rib: data.rib ?? form.rib,
+        codeAgence: data.codeAgence ?? form.codeAgence,
+        intituleCompte: data.intituleCompte ?? form.intituleCompte,
         avatar: data.avatar,
         carteIdentiteRecto: data.carteIdentiteRecto,
         carteIdentiteVerso: data.carteIdentiteVerso,
@@ -434,31 +462,97 @@ export default function ProfilPage() {
             <p className="text-xs text-slate-500">
               Indiquez votre compte bancaire et/ou le numéro Mobile Money sur lequel on peut vous envoyer de l’argent.
             </p>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div>
-                <label className="label flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5" /> N° compte bancaire
-                </label>
-                <input
-                  className="input-field"
-                  inputMode="numeric"
-                  placeholder="Chiffres uniquement"
-                  value={form.numeroCompteBancaire}
-                  onChange={(e) => setForm({ ...form, numeroCompteBancaire: cleanPhoneInput(e.target.value, 34) })}
-                />
+            <div className="space-y-4">
+              <div className="rounded-xl border border-slate-200 p-3 space-y-3">
+                <p className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5" /> Mobile Money
+                </p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Opérateur</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {([['MIXX_BY_YAS', 'Mixx by Yas'], ['MOOV_MONEY', 'Moov Money']] as const).map(([val, lab]) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setForm({ ...form, operateurMobileMoney: form.operateurMobileMoney === val ? '' : val })}
+                          className={`py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
+                            form.operateurMobileMoney === val
+                              ? 'border-primary-500 bg-primary-50 text-primary-700'
+                              : 'border-slate-300 text-slate-500 hover:border-slate-400'
+                          }`}
+                        >
+                          {lab}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">N° Mobile Money</label>
+                    <input
+                      className="input-field"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder={PHONE_EXAMPLE}
+                      value={form.numeroMobileMoney}
+                      onChange={(e) => setForm({ ...form, numeroMobileMoney: cleanPhoneInput(e.target.value) })}
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="label flex items-center gap-1.5">
-                  <Smartphone className="w-3.5 h-3.5" /> N° Mobile Money / Flooz / TMoney
-                </label>
-                <input
-                  className="input-field"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  placeholder={PHONE_EXAMPLE}
-                  value={form.numeroMobileMoney}
-                  onChange={(e) => setForm({ ...form, numeroMobileMoney: cleanPhoneInput(e.target.value) })}
-                />
+
+              <div className="rounded-xl border border-slate-200 p-3 space-y-3">
+                <p className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5" /> Compte bancaire
+                </p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Banque</label>
+                    {banques.length === 0 ? (
+                      <p className="text-xs text-slate-500 border border-dashed border-slate-300 rounded-xl p-3">
+                        Aucune banque disponible pour le moment — le comptable doit d’abord les ajouter.
+                      </p>
+                    ) : (
+                      <select
+                        className="input-field"
+                        value={form.banqueNom}
+                        onChange={(e) => setForm({ ...form, banqueNom: e.target.value })}
+                      >
+                        <option value="">— Choisir une banque —</option>
+                        {banques.map((b) => (
+                          <option key={b.id} value={b.nom}>{b.nom}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <div>
+                    <label className="label">RIB</label>
+                    <input
+                      className="input-field"
+                      placeholder="Relevé d'identité bancaire"
+                      value={form.rib}
+                      onChange={(e) => setForm({ ...form, rib: e.target.value.replace(/[^A-Za-z0-9 ]/g, '').slice(0, 40) })}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Code agence</label>
+                    <input
+                      className="input-field"
+                      placeholder="Ex: 010"
+                      value={form.codeAgence}
+                      onChange={(e) => setForm({ ...form, codeAgence: e.target.value.replace(/[^A-Za-z0-9-]/g, '').slice(0, 12) })}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Intitulé du compte</label>
+                    <input
+                      className="input-field"
+                      placeholder="Nom figurant sur le compte"
+                      value={form.intituleCompte}
+                      onChange={(e) => setForm({ ...form, intituleCompte: e.target.value.slice(0, 100) })}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </section>

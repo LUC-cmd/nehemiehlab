@@ -46,6 +46,21 @@ public class User {
     /** Numéro Mobile Money / Flooz / TMoney si pas de carte bancaire */
     private String numeroMobileMoney;
 
+    /** Opérateur Mobile Money : MIXX_BY_YAS ou MOOV_MONEY */
+    private String operateurMobileMoney;
+
+    /** Banque choisie (parmi celles ajoutées par le comptable) */
+    private String banqueNom;
+
+    /** RIB du compte bancaire */
+    private String rib;
+
+    /** Code agence de la banque */
+    private String codeAgence;
+
+    /** Intitulé du compte bancaire */
+    private String intituleCompte;
+
     private String avatar;
 
     /** Photo recto de la carte d'identité (URL /uploads/identite/...) */

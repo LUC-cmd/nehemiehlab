@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CreditCard, Clock, CheckCircle, XCircle, TrendingUp, ArrowUpRight } from 'lucide-react';
+import { CreditCard, Clock, CheckCircle, XCircle, TrendingUp, ArrowUpRight, Landmark, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { dashboardService, transactionService } from '../../services/api';
+import { banqueService, dashboardService, transactionService } from '../../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import type { Transaction } from '../../types';
+import type { Banque, Transaction } from '../../types';
 import { fetchWithOfflineCache } from '../../utils/offlineCache';
+import toast from 'react-hot-toast';
 
 const chartTooltipStyle = { background: '#18152c', border: '1px solid #282343', borderRadius: '12px', color: '#fff' };
 
@@ -15,6 +16,44 @@ export default function ComptableDashboard() {
   const [stats, setStats] = useState<Record<string, number>>({});
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
   const [usingOfflineCache, setUsingOfflineCache] = useState(false);
+  const [banques, setBanques] = useState<Banque[]>([]);
+  const [newBanque, setNewBanque] = useState('');
+  const [banqueLoading, setBanqueLoading] = useState(false);
+
+  const loadBanques = async () => {
+    try {
+      const { data } = await banqueService.list();
+      setBanques(data);
+    } catch { /* silencieux */ }
+  };
+
+  const handleAddBanque = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const nom = newBanque.trim();
+    if (nom.length < 2) return;
+    setBanqueLoading(true);
+    try {
+      await banqueService.create(nom);
+      toast.success(`Banque « ${nom} » ajoutée.`);
+      setNewBanque('');
+      await loadBanques();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || 'Erreur lors de l\'ajout de la banque.');
+    } finally {
+      setBanqueLoading(false);
+    }
+  };
+
+  const handleDeleteBanque = async (b: Banque) => {
+    try {
+      await banqueService.delete(b.id);
+      toast.success(`Banque « ${b.nom} » supprimée.`);
+      await loadBanques();
+    } catch {
+      toast.error('Erreur lors de la suppression.');
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -31,6 +70,7 @@ export default function ComptableDashboard() {
       }
     };
     load();
+    loadBanques();
   }, []);
 
   const kpis = [
@@ -55,6 +95,51 @@ export default function ComptableDashboard() {
     { mois: 'Mai', montant: Math.round(montant * 0.13) },
     { mois: 'Jun', montant: Math.round(montant * 0.18) },
   ];
+
+  const banquesCard = (
+    <div className="card border border-dark-700">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-white font-semibold flex items-center gap-2">
+          <Landmark className="w-4 h-4 text-primary-400" /> Banques disponibles
+        </h2>
+        <span className="text-xs text-dark-400">{banques.length} banque{banques.length > 1 ? 's' : ''}</span>
+      </div>
+      <p className="text-xs text-dark-400 mb-3">
+        Seules les banques listées ici sont proposées au personnel pour renseigner leur compte bancaire.
+      </p>
+      <form onSubmit={handleAddBanque} className="flex gap-2 mb-4">
+        <input
+          className="input-field flex-1"
+          placeholder="Nom de la banque (ex: Ecobank, Orabank…)"
+          value={newBanque}
+          maxLength={120}
+          onChange={(e) => setNewBanque(e.target.value)}
+        />
+        <button type="submit" disabled={banqueLoading || newBanque.trim().length < 2} className="btn-primary px-4 flex items-center gap-1.5">
+          <Plus className="w-4 h-4" /> Ajouter
+        </button>
+      </form>
+      {banques.length === 0 ? (
+        <p className="text-sm text-dark-400 text-center py-4">Aucune banque ajoutée pour le moment.</p>
+      ) : (
+        <ul className="space-y-2">
+          {banques.map((b) => (
+            <li key={b.id} className="flex items-center justify-between rounded-xl bg-dark-900/40 border border-dark-700 px-3 py-2">
+              <span className="text-sm text-white">{b.nom}</span>
+              <button
+                type="button"
+                onClick={() => void handleDeleteBanque(b)}
+                className="text-dark-400 hover:text-red-400 transition-colors"
+                title="Supprimer"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-8">
@@ -139,6 +224,7 @@ export default function ComptableDashboard() {
           </div>
         )}
       </div>
+      {banquesCard}
     </div>
   );
 }

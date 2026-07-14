@@ -31,6 +31,9 @@ public class UserController {
     private UserRepository userRepository;
 
     @Autowired
+    private com.nehemiahlab.platform.repository.BanqueRepository banqueRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -244,6 +247,23 @@ public class UserController {
         if (body.containsKey("telephoneSecondaire")) user.setTelephoneSecondaire(InputSanitizer.digitsOnly(body.get("telephoneSecondaire"), 15));
         if (body.containsKey("numeroCompteBancaire")) user.setNumeroCompteBancaire(InputSanitizer.digitsOnly(body.get("numeroCompteBancaire"), 34));
         if (body.containsKey("numeroMobileMoney")) user.setNumeroMobileMoney(InputSanitizer.digitsOnly(body.get("numeroMobileMoney"), 15));
+        if (body.containsKey("operateurMobileMoney")) {
+            String op = body.get("operateurMobileMoney") == null ? "" : body.get("operateurMobileMoney").trim();
+            if (!op.isEmpty() && !op.equals("MIXX_BY_YAS") && !op.equals("MOOV_MONEY")) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Opérateur Mobile Money invalide (Mixx by Yas ou Moov Money)."));
+            }
+            user.setOperateurMobileMoney(op.isEmpty() ? null : op);
+        }
+        if (body.containsKey("banqueNom")) {
+            String bn = InputSanitizer.clean(body.get("banqueNom")).trim();
+            if (!bn.isEmpty() && !banqueRepository.existsByNomIgnoreCase(bn)) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Cette banque n'est pas disponible. Le comptable doit d'abord l'ajouter."));
+            }
+            user.setBanqueNom(bn.isEmpty() ? null : bn);
+        }
+        if (body.containsKey("rib")) user.setRib(InputSanitizer.clean(body.get("rib")).replaceAll("[^A-Za-z0-9 ]", "").trim());
+        if (body.containsKey("codeAgence")) user.setCodeAgence(InputSanitizer.clean(body.get("codeAgence")).replaceAll("[^A-Za-z0-9-]", "").trim());
+        if (body.containsKey("intituleCompte")) user.setIntituleCompte(InputSanitizer.clean(body.get("intituleCompte")).trim());
         if (body.containsKey("lieuNaissance")) user.setLieuNaissance(InputSanitizer.clean(body.get("lieuNaissance")));
         if (body.containsKey("adresse")) user.setAdresse(InputSanitizer.clean(body.get("adresse")));
         if (body.containsKey("dateNaissance") && body.get("dateNaissance") != null && !body.get("dateNaissance").isEmpty()) {
