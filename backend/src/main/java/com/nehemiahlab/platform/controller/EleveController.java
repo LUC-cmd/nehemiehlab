@@ -161,11 +161,41 @@ public class EleveController {
 
         String matricule = matriculeService.generateUniqueMatricule();
 
+        String nomClean = com.nehemiahlab.platform.security.InputSanitizer.clean(body.get("nom").toString()).trim();
+        String prenomClean = com.nehemiahlab.platform.security.InputSanitizer.clean(body.get("prenom").toString()).trim();
+
+        // Date de naissance → âge calculé automatiquement
+        LocalDate dateNaissance = null;
+        int ageCalcule;
+        if (body.get("dateNaissance") != null && !body.get("dateNaissance").toString().isBlank()) {
+            dateNaissance = LocalDate.parse(body.get("dateNaissance").toString());
+            ageCalcule = java.time.Period.between(dateNaissance, LocalDate.now()).getYears();
+        } else if (body.get("age") != null) {
+            ageCalcule = Integer.parseInt(body.get("age").toString());
+        } else {
+            return ResponseEntity.badRequest().body(Map.of("message", "La date de naissance est obligatoire."));
+        }
+        if (ageCalcule < 6 || ageCalcule > 22) {
+            return ResponseEntity.badRequest().body(Map.of("message", "L'âge calculé doit être entre 6 et 22 ans."));
+        }
+
+        // Anti-doublon : même nom + prénom dans le même centre (et même date de naissance si connue)
+        final LocalDate dn = dateNaissance;
+        boolean doublon = eleveRepository.findByCentreId(centreId).stream().anyMatch(e ->
+                e.getNom() != null && e.getNom().equalsIgnoreCase(nomClean)
+                && e.getPrenom() != null && e.getPrenom().equalsIgnoreCase(prenomClean)
+                && (dn == null || e.getDateNaissance() == null || dn.equals(e.getDateNaissance())));
+        if (doublon) {
+            return ResponseEntity.badRequest().body(Map.of("message",
+                    "Doublon détecté : un élève avec le même nom et prénom existe déjà dans ce centre."));
+        }
+
         Eleve eleve = Eleve.builder()
-                .nom(com.nehemiahlab.platform.security.InputSanitizer.clean(body.get("nom").toString()))
-                .prenom(com.nehemiahlab.platform.security.InputSanitizer.clean(body.get("prenom").toString()))
+                .nom(nomClean)
+                .prenom(prenomClean)
                 .matricule(matricule)
-                .age(Integer.valueOf(body.get("age").toString()))
+                .age(ageCalcule)
+                .dateNaissance(dateNaissance)
                 .sexe(body.get("sexe").toString())
                 .classe(body.get("classe").toString())
                 .centre(centre)
@@ -205,7 +235,15 @@ public class EleveController {
             }
             eleve.setPrenom(prenom);
         }
-        if (body.containsKey("age")) {
+        if (body.get("dateNaissance") != null && !body.get("dateNaissance").toString().isBlank()) {
+            LocalDate dn = LocalDate.parse(body.get("dateNaissance").toString());
+            int age = java.time.Period.between(dn, LocalDate.now()).getYears();
+            if (age < 6 || age > 22) {
+                return ResponseEntity.badRequest().body(Map.of("message", "L'âge calculé doit être entre 6 et 22 ans."));
+            }
+            eleve.setDateNaissance(dn);
+            eleve.setAge(age);
+        } else if (body.containsKey("age")) {
             int age = Integer.parseInt(body.get("age").toString());
             if (age < 6 || age > 22) {
                 return ResponseEntity.badRequest().body(Map.of("message", "L'âge doit être entre 6 et 22 ans."));

@@ -311,11 +311,11 @@ export const eleveService = {
   getById: (id: number) => api.get(`/eleves/${id}`),
   getSeances: (id: number) => api.get<ChildSessionRow[]>(`/eleves/${id}/seances`),
   create: (data: {
-    nom: string; prenom: string; age: number; sexe: string;
+    nom: string; prenom: string; dateNaissance?: string; age: number; sexe: string;
     classe: string; centreId: number; dateDebutFormation: string;
   }) => api.post('/eleves', data),
   update: (id: number, data: {
-    nom?: string; prenom?: string; age?: number; sexe?: string;
+    nom?: string; prenom?: string; dateNaissance?: string; age?: number; sexe?: string;
     classe?: string; dateDebutFormation?: string;
   }) => api.put(`/eleves/${id}`, data),
   issueParentActivationCode: (eleveId: number) =>

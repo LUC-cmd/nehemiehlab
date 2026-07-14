@@ -121,6 +121,7 @@ export default function ElevesPage() {
       const { data } = await eleveService.create({
         nom: ficheValues.nom,
         prenom: ficheValues.prenom,
+        dateNaissance: ficheValues.dateNaissance,
         age: Number(ficheValues.age),
         sexe: ficheValues.sexe,
         classe: ficheValues.classe,
@@ -137,8 +138,9 @@ export default function ElevesPage() {
       setShowAddModal(false);
       setFicheValues(emptyEleveFiche(selectedCentreId));
       fetchEleves(Number(selectedCentreId));
-    } catch {
-      toast.error('Erreur lors de l\'inscription de l\'élève.');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || 'Erreur lors de l\'inscription de l\'élève.');
     }
   };
 
@@ -149,6 +151,7 @@ export default function ElevesPage() {
       await eleveService.update(activeEleve.id, {
         nom: ficheValues.nom,
         prenom: ficheValues.prenom,
+        dateNaissance: ficheValues.dateNaissance,
         age: Number(ficheValues.age),
         sexe: ficheValues.sexe,
         classe: ficheValues.classe,

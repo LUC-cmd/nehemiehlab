@@ -6,6 +6,7 @@ import {
   AGE_MAX,
   AGE_MIN,
   CLASSE_PRESETS,
+  computeAgeFromDate,
   type EleveFicheValues,
 } from '../../utils/eleveForm';
 
@@ -42,8 +43,9 @@ export default function EleveFicheForm({
 
   const patch = (partial: Partial<EleveFicheValues>) => onChange({ ...values, ...partial });
 
-  const ageNum = Number(values.age);
-  const ageOk = values.age !== '' && !Number.isNaN(ageNum) && ageNum >= AGE_MIN && ageNum <= AGE_MAX;
+  const ageFromDate = computeAgeFromDate(values.dateNaissance);
+  const ageNum = ageFromDate ?? Number(values.age);
+  const ageOk = values.dateNaissance !== '' && ageFromDate !== null && ageFromDate >= AGE_MIN && ageFromDate <= AGE_MAX;
   const step0Ok = values.nom.trim().length >= 2 && values.prenom.trim().length >= 2;
   const step1Ok = ageOk && values.classe.trim().length >= 1;
   const step2Ok = !showCentreSelect || centres.length <= 1 || Boolean(values.centreId);
@@ -147,16 +149,26 @@ export default function EleveFicheForm({
         <div className="space-y-4 rounded-2xl border border-dark-700 bg-dark-900/40 p-4">
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
-              <label className="label">Âge * ({AGE_MIN}–{AGE_MAX} ans)</label>
+              <label className="label">Date de naissance *</label>
               <input
-                type="number"
+                type="date"
                 required
-                min={AGE_MIN}
-                max={AGE_MAX}
+                max={new Date().toISOString().split('T')[0]}
                 className="input-field"
-                value={values.age}
-                onChange={(e) => patch({ age: e.target.value })}
+                value={values.dateNaissance}
+                onChange={(e) => {
+                  const dn = e.target.value;
+                  const age = computeAgeFromDate(dn);
+                  patch({ dateNaissance: dn, age: age !== null ? String(age) : '' });
+                }}
               />
+              {values.dateNaissance !== '' && (
+                <p className={`mt-1 text-xs font-semibold ${ageOk ? 'text-primary-300' : 'text-red-400'}`}>
+                  {ageFromDate !== null
+                    ? `Âge : ${ageFromDate} an${ageFromDate > 1 ? 's' : ''}${ageOk ? '' : ` (doit être entre ${AGE_MIN} et ${AGE_MAX} ans)`}`
+                    : 'Date invalide'}
+                </p>
+              )}
             </div>
             <div>
               <label className="label">Date début formation *</label>

@@ -69,6 +69,7 @@ export interface Eleve {
   nom: string;
   prenom: string;
   matricule?: string;
+  dateNaissance?: string;
   age: number;
   sexe: 'M' | 'F';
   classe: string;

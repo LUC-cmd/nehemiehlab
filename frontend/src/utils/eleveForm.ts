@@ -7,9 +7,21 @@ export const CLASSE_PRESETS = [
 export const AGE_MIN = 6;
 export const AGE_MAX = 22;
 
+export function computeAgeFromDate(dateNaissance: string): number | null {
+  if (!dateNaissance) return null;
+  const dn = new Date(dateNaissance);
+  if (Number.isNaN(dn.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - dn.getFullYear();
+  const m = now.getMonth() - dn.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < dn.getDate())) age -= 1;
+  return age;
+}
+
 export type EleveFicheValues = {
   nom: string;
   prenom: string;
+  dateNaissance: string;
   age: string;
   sexe: 'M' | 'F';
   classe: string;
@@ -20,6 +32,7 @@ export type EleveFicheValues = {
 export const emptyEleveFiche = (centreId = ''): EleveFicheValues => ({
   nom: '',
   prenom: '',
+  dateNaissance: '',
   age: '',
   sexe: 'M',
   classe: '',
@@ -30,6 +43,7 @@ export const emptyEleveFiche = (centreId = ''): EleveFicheValues => ({
 export function eleveToFicheValues(eleve: {
   nom: string;
   prenom: string;
+  dateNaissance?: string;
   age: number;
   sexe: string;
   classe: string;
@@ -39,6 +53,7 @@ export function eleveToFicheValues(eleve: {
   return {
     nom: eleve.nom,
     prenom: eleve.prenom,
+    dateNaissance: eleve.dateNaissance?.split('T')[0] || '',
     age: String(eleve.age),
     sexe: eleve.sexe === 'F' ? 'F' : 'M',
     classe: eleve.classe,

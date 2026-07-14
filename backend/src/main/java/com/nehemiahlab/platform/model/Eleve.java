@@ -30,6 +30,9 @@ public class Eleve {
     @Column(nullable = false)
     private Integer age;
 
+    /** Date de naissance — l'âge est recalculé automatiquement à partir de cette date. */
+    private LocalDate dateNaissance;
+
     @Column(nullable = false)
     private String sexe; // "M" or "F"
 
