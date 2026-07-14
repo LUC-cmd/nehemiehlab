@@ -106,7 +106,7 @@ function NotificationsPanel({ onClose }: { onClose: () => void }) {
   return (
     <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 10, scale: 0.95 }} transition={{ duration: 0.15 }}
-      className="absolute right-0 top-12 w-[min(24rem,calc(100vw-1.5rem))] card z-50 shadow-xl shadow-slate-900/10 border border-slate-200">
+      className="fixed inset-x-3 top-[max(4rem,env(safe-area-inset-top))] sm:inset-x-auto sm:absolute sm:right-0 sm:top-12 sm:w-[min(24rem,calc(100vw-1.5rem))] card z-50 shadow-xl shadow-slate-900/10 border border-slate-200 max-h-[80dvh] overflow-y-auto">
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
         <h3 className="text-slate-900 font-semibold">Notifications</h3>
         <div className="flex items-center gap-2">
@@ -305,7 +305,7 @@ export default function DashboardLayout() {
         <aside className={`hidden lg:flex flex-col border-r border-slate-200 transition-all duration-300 bg-white ${
           sidebarOpen ? 'w-64' : 'w-20'
         }`}>
-          <SidebarContent />
+          {SidebarContent()}
         </aside>
 
         {/* Sidebar Mobile */}
@@ -330,7 +330,7 @@ export default function DashboardLayout() {
                     <X className="w-5 h-5" />
                   </button>
                 </div>
-                <SidebarContent />
+                {SidebarContent()}
               </motion.aside>
             </>
           )}
