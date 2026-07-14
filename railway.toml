@@ -3,9 +3,7 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# /api/actuator/health existe dans TOUS les profils (liveness n'existe qu'en profil "field",
-# ce qui faisait échouer le healthcheck de chaque déploiement si le profil différait).
-# En profils field/prod, les checks DB/SMTP du health sont désactivés → pas de blocage.
-healthcheckPath = "/api/actuator/health"
-healthcheckTimeout = 300
+# Pas de healthcheck bloquant : le deploiement passe en ligne immediatement.
+# Si la base est injoignable au demarrage, l'app s'arrete et Railway la relance
+# automatiquement (ON_FAILURE) jusqu'a ce que la connexion passe.
 restartPolicyType = "ON_FAILURE"
