@@ -526,6 +526,17 @@ export default function ProfilPage() {
                     )}
                   </div>
                   <div>
+                    <label className="label">Numéro de compte</label>
+                    <input
+                      className="input-field"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="Ex: 00123456789"
+                      value={form.numeroCompteBancaire}
+                      onChange={(e) => setForm({ ...form, numeroCompteBancaire: e.target.value.replace(/[^0-9]/g, '').slice(0, 34) })}
+                    />
+                  </div>
+                  <div>
                     <label className="label">RIB</label>
                     <input
                       className="input-field"
