@@ -10,6 +10,9 @@ import com.nehemiahlab.platform.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -21,6 +24,11 @@ import java.util.Set;
 
 @Service
 public class NotificationDispatchService {
+
+private static final Logger log = LoggerFactory.getLogger(NotificationDispatchService.class);
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
 
     @Autowired
     private NotificationRepository notificationRepository;
@@ -39,7 +47,7 @@ public class NotificationDispatchService {
 
     public void notify(User recipient, String titre, String message, String type, Long lienId) {
         if (recipient == null || recipient.getId() == null) return;
-        notificationRepository.save(Notification.builder()
+        Notification saved = notificationRepository.save(Notification.builder()
                 .userId(recipient.getId())
                 .titre(titre)
                 .message(message)
@@ -47,6 +55,11 @@ public class NotificationDispatchService {
                 .lienId(lienId)
                 .build());
         sendEmail(recipient, titre, message, type, lienId);
+        try {
+            messagingTemplate.convertAndSendToUser(recipient.getEmail(), "/queue/notifications", saved);
+        } catch (Exception e) {
+            log.warn("Push WebSocket notification echoue pour {}: {}", recipient.getEmail(), e.getMessage());
+        }
     }
 
     public void notifyMany(Collection<User> recipients, String titre, String message, String type, Long lienId) {

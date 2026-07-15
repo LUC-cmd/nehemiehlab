@@ -9,6 +9,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useAccess } from '../../context/AccessContext';
 import { notificationService } from '../../services/api';
+import { connectNotificationsSocket } from '../../services/notificationsSocket';
 import { LOGO_SRC, BRAND_TEAL } from '../../constants/branding';
 import { buildNavForRole, ROLE_LABELS } from '../../constants/roleAccess';
 import InscriptionsToggle from '../../components/dashboard/InscriptionsToggle';
@@ -226,6 +227,13 @@ export default function DashboardLayout() {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [refreshNotifications]);
 
+  // Notifications temps réel (WebSocket) : le polling ci-dessus reste actif
+  // en filet de sécurité si la connexion échoue ou se coupe.
+  useEffect(() => {
+    const disconnect = connectNotificationsSocket(() => refreshNotifications());
+    return disconnect;
+  }, [refreshNotifications]);
+
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -437,12 +445,12 @@ export default function DashboardLayout() {
             </div>
           </header>
 
-        {/* Contenu */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 md:p-6 lg:p-8 bg-slate-50 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <div className="mx-auto w-full max-w-7xl min-w-0">
-            <Outlet />
-          </div>
-        </main>
+          {/* Contenu */}
+          <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 md:p-6 lg:p-8 bg-slate-50 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="mx-auto w-full max-w-7xl min-w-0">
+              <Outlet />
+            </div>
+          </main>
         </div>
       </div>
 
