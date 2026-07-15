@@ -182,6 +182,18 @@
     color: #0f172a !important;
   }
 
+  /* Exception : boutons pleins (fond teal/rouge de marque) restent en texte blanc */
+  .dashboard-page main .btn-primary,
+  .dashboard-page aside .btn-primary,
+  .dashboard-page main .btn-danger,
+  .dashboard-page aside .btn-danger,
+  .dashboard-page main .btn-success,
+  .dashboard-page aside .btn-success,
+  .dashboard-page main button.bg-\[\#004b57\],
+  .dashboard-page aside button.bg-\[\#004b57\] {
+    color: #ffffff !important;
+  }
+
   .dashboard-page main .text-dark-200,
   .dashboard-page aside .text-dark-200 {
     color: #334155 !important;
@@ -590,6 +602,11 @@
   .modal-panel-xl { max-width: 34rem; }
 
   .modal-panel .text-white { color: #0f172a !important; }
+  .modal-panel .btn-primary,
+  .modal-panel .btn-danger,
+  .modal-panel .btn-success {
+    color: #ffffff !important;
+  }
   .modal-panel .text-dark-200,
   .modal-panel .text-dark-300,
   .modal-panel .text-dark-400,
