@@ -18,5 +18,8 @@ EXPOSE 8080
 # Limite mémoire JVM adaptée à un petit conteneur (Railway) : la JVM n'utilise que
 # 75% de la RAM du conteneur, ce qui évite l'OOM-kill du conteneur.
 # JAVA_TOOL_OPTIONS peut être surchargé via une variable Railway sans rebuild.
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0"
+# Force IPv4 pour les connexions sortantes (SMTP notamment) : sur Railway,
+# l'IPv6 sortant existe dans l'interface mais est black-holed (timeout au lieu
+# d'un rejet immediat), ce qui bloquait l'envoi des OTP par email vers Gmail.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -Djava.net.preferIPv4Stack=true"
 ENTRYPOINT ["java", "-jar", "app.jar"]
