@@ -222,6 +222,7 @@ export const userService = {
   updateProfile: (id: number, data: Partial<{
     nom: string; prenom: string; telephone: string; telephoneSecondaire: string;
     numeroCompteBancaire: string; numeroMobileMoney: string;
+    operateurMobileMoney: string; banqueNom: string; rib: string; codeAgence: string; intituleCompte: string;
     motDePasse: string; ancienMotDePasse: string;
     dateNaissance: string; lieuNaissance: string; adresse: string;
   }>) => api.put<User>(`/users/${id}`, data),
@@ -311,11 +312,11 @@ export const eleveService = {
   getById: (id: number) => api.get(`/eleves/${id}`),
   getSeances: (id: number) => api.get<ChildSessionRow[]>(`/eleves/${id}/seances`),
   create: (data: {
-    nom: string; prenom: string; age: number; sexe: string;
+    nom: string; prenom: string; dateNaissance?: string; age: number; sexe: string;
     classe: string; centreId: number; dateDebutFormation: string;
   }) => api.post('/eleves', data),
   update: (id: number, data: {
-    nom?: string; prenom?: string; age?: number; sexe?: string;
+    nom?: string; prenom?: string; dateNaissance?: string; age?: number; sexe?: string;
     classe?: string; dateDebutFormation?: string;
   }) => api.put(`/eleves/${id}`, data),
   issueParentActivationCode: (eleveId: number) =>
@@ -797,6 +798,15 @@ export const galerieService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+};
+
+// ============================================================
+//  Banques (gérées par le comptable)
+// ============================================================
+export const banqueService = {
+  list: () => api.get<import('../types').Banque[]>('/banques'),
+  create: (nom: string) => api.post<import('../types').Banque>('/banques', { nom }),
+  delete: (id: number) => api.delete(`/banques/${id}`),
 };
 
 export default api;
