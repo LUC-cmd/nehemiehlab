@@ -52,6 +52,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers("/site/**").permitAll()
+                                   .requestMatchers("/ws/**").permitAll()
                 .requestMatchers(HttpMethod.GET,
                         "/uploads/avatars/**",
                         "/secure-files/avatars/**",
