@@ -4,6 +4,7 @@ import com.nehemiahlab.platform.model.ModuleCours;
 import com.nehemiahlab.platform.repository.ModuleCoursRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @Order(20)
+@ConditionalOnProperty(name = "app.seed.enabled", havingValue = "true")
 public class ModuleCoursBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(ModuleCoursBootstrap.class);
