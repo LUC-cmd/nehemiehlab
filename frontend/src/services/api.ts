@@ -272,13 +272,13 @@ export const centreService = {
   getAll: () => api.get('/centres'),
   getById: (id: number) => api.get(`/centres/${id}`),
   create: (data: {
-    nom: string; adresse: string; ville: string; region?: string; cluster?: string;
+    nom: string; codeCdej?: string; adresse: string; ville: string; region?: string; cluster?: string;
     latitude?: number; longitude?: number;
     telephoneResponsable?: string; telephoneCoordinateur?: string; telephoneFormateur?: string;
     coordinateurNom?: string; coordinateurPrenom?: string;
   }) => api.post('/centres', data),
   update: (id: number, data: {
-    nom?: string; adresse?: string; ville?: string; region?: string; cluster?: string;
+    nom?: string; codeCdej?: string; adresse?: string; ville?: string; region?: string; cluster?: string;
     latitude?: number; longitude?: number;
     telephoneResponsable?: string; telephoneCoordinateur?: string; telephoneFormateur?: string;
     coordinateurNom?: string; coordinateurPrenom?: string;

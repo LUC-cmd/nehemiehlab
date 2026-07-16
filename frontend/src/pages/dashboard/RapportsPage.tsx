@@ -416,7 +416,7 @@ export default function RapportsPage() {
             icon={<ClipboardList className="w-5 h-5" />}
             eyebrow="Opérations terrain"
             title="Rapport d'exécution SKA Program"
-            description="Format officiel (type Yoto Sud) : CDEJ, formateur, créneau, effectif présent (P) et défis — généré depuis les séances clôturées saisies par les formateurs. Excel détaillé par enfant en complément."
+            description="Format officiel : CDEJ, formateur, créneau, effectif présent (P) et défis — généré depuis les séances clôturées saisies par les formateurs. Excel détaillé par enfant en complément."
           >
             <ExportButtons
               exporting={exporting}

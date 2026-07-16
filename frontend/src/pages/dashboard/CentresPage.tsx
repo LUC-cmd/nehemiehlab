@@ -36,6 +36,7 @@ import { cleanPhoneInput } from '../../utils/formInputs';
 const emptyLocation = { latitude: '', longitude: '', mapsLink: '' };
 const emptyCentreForm = {
   nom: '',
+  codeCdej: '',
   adresse: '',
   ville: '',
   region: '',
@@ -184,6 +185,7 @@ export default function CentresPage() {
       const hasGps = Number.isFinite(lat) && Number.isFinite(lng);
       await centreService.create({
         nom: newCentre.nom,
+        codeCdej: newCentre.codeCdej || undefined,
         adresse: newCentre.adresse,
         ville: newCentre.ville,
         region: newCentre.region,
@@ -727,7 +729,7 @@ export default function CentresPage() {
                     }`}
                     onClick={() => setMapFocusCentre(centre)}
                   >
-                    <td className="px-4 py-3 font-semibold text-slate-900">{centre.nom}</td>
+                    <td className="px-4 py-3 font-semibold text-slate-900">{centre.nom}{centre.codeCdej ? ` (${centre.codeCdej})` : ''}</td>
                     <td className="px-4 py-3 text-slate-600">{centre.region || '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{centre.cluster || '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{centre.ville || '—'}</td>
@@ -889,7 +891,7 @@ export default function CentresPage() {
                   )}
                 </div>
 
-                <h3 className="text-lg font-bold text-slate-900 mb-1">{centre.nom}</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-1">{centre.nom}{centre.codeCdej ? ` (${centre.codeCdej})` : ''}</h3>
                 {centre.region && (
                   <span className="inline-block px-2 py-0.5 mb-2 text-xs font-medium bg-slate-100 border border-slate-200 rounded-lg text-primary-700">
                     Région {centre.region}
@@ -1176,6 +1178,16 @@ export default function CentresPage() {
               className="input-field"
               value={newCentre.cluster}
               onChange={(e) => setNewCentre({ ...newCentre, cluster: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Code centre (CDEJ)</label>
+            <input
+              type="text"
+              placeholder="Ex: TG0815"
+              className="input-field"
+              value={newCentre.codeCdej}
+              onChange={(e) => setNewCentre({ ...newCentre, codeCdej: e.target.value })}
             />
           </div>
           <div>
