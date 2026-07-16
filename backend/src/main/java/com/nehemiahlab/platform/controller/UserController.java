@@ -9,6 +9,8 @@ import com.nehemiahlab.platform.service.EmailNotificationService;
 import com.nehemiahlab.platform.service.InscriptionSettingsService;
 import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.security.SecureFileStorage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -26,6 +28,8 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/users")
 public class UserController {
+
+    private static final Logger log = LoggerFactory.getLogger(UserController.class);
 
     @Autowired
     private UserRepository userRepository;
@@ -306,6 +310,7 @@ public class UserController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (Exception e) {
+            log.error("Echec upload avatar pour utilisateur {}", user.getId(), e);
             return ResponseEntity.internalServerError().body(Map.of("message", "Erreur lors de l'upload de la photo."));
         }
     }
@@ -350,6 +355,7 @@ public class UserController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (Exception e) {
+            log.error("Echec upload carte d'identite ({}) pour utilisateur {}", side, current.getId(), e);
             return ResponseEntity.internalServerError().body(Map.of(
                     "message", "Erreur lors de l'upload de la carte d'identité."
             ));
