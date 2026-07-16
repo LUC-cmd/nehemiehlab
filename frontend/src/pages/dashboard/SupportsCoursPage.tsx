@@ -64,6 +64,8 @@ export default function SupportsCoursPage() {
   const [serieFiles, setSerieFiles] = useState<File[]>([]);
   const [savingSerie, setSavingSerie] = useState(false);
   const [deleteSerieId, setDeleteSerieId] = useState<number | null>(null);
+  const [togglingModuleId, setTogglingModuleId] = useState<number | null>(null);
+  const [togglingSerieId, setTogglingSerieId] = useState<number | null>(null);
   const [uploadingSerieId, setUploadingSerieId] = useState<number | null>(null);
   const [confirmRemoveFile, setConfirmRemoveFile] = useState<{
     serieId: number;
@@ -235,6 +237,32 @@ export default function SupportsCoursPage() {
       moduleIds: serie.moduleIds ?? [],
     });
     setSerieFiles([]);
+  };
+
+  const toggleModuleActif = async (module: ModuleCours) => {
+    setTogglingModuleId(module.id);
+    try {
+      await moduleCoursService.update(module.id, { actif: !module.actif });
+      toast.success(module.actif ? 'Module dépublié — masqué aux formateurs.' : 'Module publié — visible par tous les centres.');
+      load();
+    } catch {
+      toast.error('Impossible de changer la visibilité du module.');
+    } finally {
+      setTogglingModuleId(null);
+    }
+  };
+
+  const toggleSerieActif = async (serie: SerieSupportCours) => {
+    setTogglingSerieId(serie.id);
+    try {
+      await serieSupportService.update(serie.id, { actif: !serie.actif });
+      toast.success(serie.actif ? 'Série dépubliée — masquée aux formateurs.' : 'Série publiée — visible par tous les centres.');
+      load();
+    } catch {
+      toast.error('Impossible de changer la visibilité de la série.');
+    } finally {
+      setTogglingSerieId(null);
+    }
   };
 
   const quickUploadToSerie = async (serieId: number, fileList: FileList | null) => {
@@ -441,6 +469,14 @@ export default function SupportsCoursPage() {
                     </div>
                     {isDirector && (
                       <div className="flex gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => toggleSerieActif(serie)}
+                          disabled={togglingSerieId === serie.id}
+                          className={`btn-ghost text-xs py-1 px-2 ${serie.actif ? 'text-amber-700' : 'text-primary-700'}`}
+                        >
+                          {togglingSerieId === serie.id ? '…' : serie.actif ? 'Dépublier' : 'Publier'}
+                        </button>
                         <button type="button" onClick={() => startEditSerie(serie)} className="btn-ghost text-xs py-1 px-2">
                           Modifier
                         </button>
@@ -622,13 +658,26 @@ export default function SupportsCoursPage() {
 
         <div className="grid md:grid-cols-2 gap-4">
           {visibleModules.map((module) => (
-            <article key={module.id} className="card border border-slate-200 text-sm">
+            <article
+              key={module.id}
+              className={`card border text-sm ${
+                module.actif ? 'border-slate-200' : 'border-amber-200 bg-amber-50/30'
+              }`}
+            >
               <div className="flex justify-between gap-2 mb-1">
                 <span className="text-xs font-bold text-primary-700 bg-primary-50 px-2 py-0.5 rounded">
                   #{module.numeroOrdre}
                 </span>
                 {isDirector && (
                   <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleModuleActif(module)}
+                      disabled={togglingModuleId === module.id}
+                      className={`btn-ghost text-xs py-0 px-2 ${module.actif ? 'text-amber-700' : 'text-primary-700'}`}
+                    >
+                      {togglingModuleId === module.id ? '…' : module.actif ? 'Dépublier' : 'Publier'}
+                    </button>
                     <button type="button" onClick={() => startEditModule(module)} className="btn-ghost text-xs py-0 px-2">
                       Modifier
                     </button>
@@ -638,6 +687,9 @@ export default function SupportsCoursPage() {
                   </div>
                 )}
               </div>
+              {!module.actif && isDirector && (
+                <span className="text-xs text-amber-700">Masqué</span>
+              )}
               <h4 className="font-semibold text-slate-900">{module.titre}</h4>
               {module.description && <p className="text-slate-600 mt-1 line-clamp-2">{module.description}</p>}
               {module.dureeRecommandeeHeures != null && (
