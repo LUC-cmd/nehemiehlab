@@ -38,7 +38,7 @@ public class FormateurEvaluation {
 
     private String scratchNom;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "analyse_pedagogique", columnDefinition = "TEXT")
     private String analyse;
 
     @Builder.Default
