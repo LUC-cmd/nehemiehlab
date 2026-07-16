@@ -13,4 +13,9 @@ if [ -d /data ]; then
   chown appuser:appuser /data /data/uploads
 fi
 
-exec su -s /bin/sh appuser -c "exec java -jar /app/app.jar"
+# Important : "su" reinitialise le PATH par defaut et ne trouve donc plus le
+# binaire java (installe hors des repertoires standards par l'image
+# eclipse-temurin). On propage explicitement le PATH courant (celui defini
+# par l'image, qui inclut le JDK) dans l'environnement de la commande executee
+# en tant qu'appuser.
+exec su -s /bin/sh appuser -c "PATH=\"$PATH\" exec java -jar /app/app.jar"
