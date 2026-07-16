@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS formateur_evaluations (
     quiz_reponses    TEXT,
     scratch_url      VARCHAR(500),
     scratch_nom      VARCHAR(255),
-    analyse          TEXT,
+    analyse_pedagogique TEXT,
     created_at       TIMESTAMP    NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMP    NOT NULL DEFAULT NOW()
 );
