@@ -71,6 +71,9 @@ public class User {
 
     private LocalDate dateNaissance;
 
+    /** Date de reference pour le calcul de l'anciennete (modifiable par le Directeur). Si vide, on utilise createdAt. */
+    private LocalDate dateEntree;
+
     private String lieuNaissance;
 
     private String adresse;
