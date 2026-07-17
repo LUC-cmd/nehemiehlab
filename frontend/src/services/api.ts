@@ -591,6 +591,14 @@ export const signalementService = {
 };
 
 export const rapportService = {
+  exporterFormateurs: () =>
+    api.get('/rapports/formateurs', { responseType: 'blob' }),
+  exporterFormateursPdf: () =>
+    api.get('/rapports/formateurs/pdf', { responseType: 'blob' }),
+  exporterUtilisateurs: () =>
+    api.get('/rapports/utilisateurs', { responseType: 'blob' }),
+  exporterUtilisateursPdf: () =>
+    api.get('/rapports/utilisateurs/pdf', { responseType: 'blob' }),
   exporterEleves: (params?: { centreId?: number; region?: string; cluster?: string; eleveId?: number }) =>
     api.get('/rapports/eleves', {
       params,
