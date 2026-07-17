@@ -68,6 +68,13 @@ export interface Centre {
   createdAt: string;
 }
 
+// --- Cluster ---
+export interface Cluster {
+  id: number;
+  nom: string;
+  createdAt?: string;
+}
+
 // --- Élève ---
 export interface Eleve {
   id: number;
@@ -83,6 +90,7 @@ export interface Eleve {
   dateDebutFormation: string;
   dateFinFormation?: string;
   totalHeures: number;
+  raisonSelection?: string;
   projet?: Projet;
   commentaires?: Commentaire[];
   signalements?: Signalement[];
