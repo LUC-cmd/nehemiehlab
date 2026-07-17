@@ -801,6 +801,18 @@ public class RapportController {
         return "Manquante";
     }
 
+    private String dateNaissanceLabel(User u) {
+        return u.getDateNaissance() != null ? u.getDateNaissance().format(REPORT_DATE) : "-";
+    }
+
+    private String lieuNaissanceLabel(User u) {
+        return u.getLieuNaissance() != null && !u.getLieuNaissance().isBlank() ? u.getLieuNaissance() : "-";
+    }
+
+    private String adresseLabel(User u) {
+        return u.getAdresse() != null && !u.getAdresse().isBlank() ? u.getAdresse() : "-";
+    }
+
     @GetMapping("/formateurs")
     @PreAuthorize("hasRole('DIRECTEUR')")
     public ResponseEntity<byte[]> exportFormateurs() throws IOException {
@@ -811,7 +823,7 @@ public class RapportController {
         CellStyle headerStyle = buildHeaderStyle(workbook);
 
         Row headerRow = sheet.createRow(0);
-        String[] columns = {"Nom", "Prenom", "Email", "Telephone", "Statut", "Centre(s)", "Date d'entree", "CNI"};
+        String[] columns = {"Nom", "Prenom", "Email", "Telephone", "Date de naissance", "Lieu de naissance", "Adresse", "Statut", "Centre(s)", "Date d'entree", "CNI"};
         for (int i = 0; i < columns.length; i++) {
             Cell cell = headerRow.createCell(i);
             cell.setCellValue(columns[i]);
@@ -825,10 +837,13 @@ public class RapportController {
             row.createCell(1).setCellValue(f.getPrenom());
             row.createCell(2).setCellValue(f.getEmail());
             row.createCell(3).setCellValue(f.getTelephone() != null ? f.getTelephone() : "-");
-            row.createCell(4).setCellValue(f.isActif() ? "Valide" : "En attente");
-            row.createCell(5).setCellValue(centresLabel(f));
-            row.createCell(6).setCellValue(ancienneteLabel(f));
-            row.createCell(7).setCellValue(cniLabel(f));
+            row.createCell(4).setCellValue(dateNaissanceLabel(f));
+            row.createCell(5).setCellValue(lieuNaissanceLabel(f));
+            row.createCell(6).setCellValue(adresseLabel(f));
+            row.createCell(7).setCellValue(f.isActif() ? "Valide" : "En attente");
+            row.createCell(8).setCellValue(centresLabel(f));
+            row.createCell(9).setCellValue(ancienneteLabel(f));
+            row.createCell(10).setCellValue(cniLabel(f));
         }
 
         finalizeExcelSheet(sheet, columns.length);
@@ -851,6 +866,9 @@ public class RapportController {
                 f.getPrenom() + " " + f.getNom(),
                 f.getEmail(),
                 f.getTelephone() != null ? f.getTelephone() : "-",
+                dateNaissanceLabel(f),
+                lieuNaissanceLabel(f),
+                adresseLabel(f),
                 f.isActif() ? "Valide" : "En attente",
                 centresLabel(f),
                 ancienneteLabel(f),
@@ -865,11 +883,11 @@ public class RapportController {
 
         byte[] pdf = buildPdfTableReport(
                 "Liste des formateurs",
-                List.of("Nom complet", "Email", "Telephone", "Statut", "Centre(s)", "Entree", "CNI"),
+                List.of("Nom complet", "Email", "Telephone", "Naissance", "Lieu naiss.", "Adresse", "Statut", "Centre(s)", "Entree", "CNI"),
                 rows,
                 meta,
                 ReportTemplate.ACTIVITES,
-                new float[]{90f, 110f, 60f, 55f, 110f, 55f, 55f}
+                new float[]{80f, 95f, 55f, 50f, 65f, 80f, 45f, 90f, 45f, 50f}
         );
 
         return ResponseEntity.ok()
