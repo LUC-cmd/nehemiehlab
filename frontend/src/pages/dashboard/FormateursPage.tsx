@@ -6,7 +6,7 @@ import type { Centre, User } from '../../types';
 import {
   Mail, Phone, Shield, Search, CheckCircle2,
   Building2, Clock, Calendar, MapPin, FileImage, Eye,
-  Trash2, Play, Filter, Pencil,
+  Trash2, Play, Filter, Pencil, Printer,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageLoadingSkeleton } from '../../components/ui/DashboardSkeletons';
@@ -314,12 +314,20 @@ export default function FormateursPage() {
     return true;
   }), [formateurs, search, regionFilter, clusterFilter, centreFilter]);
 
+  // Liste imprimable (Directeur uniquement) : reprend les mêmes filtres que la
+  // liste affichée à l'écran, mais dans un tableau clair pense pour l'impression
+  // (les cartes du tableau de bord, en thème sombre, n'imprimeraient pas bien).
+  const printableFormateurs = filtered.filter((f) => (isDir ? f.actif : true));
+
+  const handlePrint = () => window.print();
+
   if (skeletonLoading) {
     return <PageLoadingSkeleton cardCount={6} />;
   }
 
   return (
-    <div className="space-y-6">
+    <>
+    <div className="space-y-6 print:hidden">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Formateurs</h1>
@@ -328,6 +336,16 @@ export default function FormateursPage() {
             qu&apos;un seul formateur à la fois.
           </p>
         </div>
+        {isDir && (
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="print:hidden inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0"
+          >
+            <Printer className="w-4 h-4" />
+            Imprimer la liste
+          </button>
+        )}
       </div>
 
       {isDir && (
@@ -860,5 +878,50 @@ export default function FormateursPage() {
         onCancel={() => setConfirmDeleteFormateur(null)}
       />
     </div>
+
+    {isDir && (
+      <div className="hidden print:block">
+        <h1 className="text-xl font-bold text-black mb-1">Liste des formateurs</h1>
+        <p className="text-xs text-black mb-4">
+          {printableFormateurs.length} formateur{printableFormateurs.length > 1 ? 's' : ''} —
+          {' '}genere le {new Date().toLocaleDateString('fr-FR')}
+        </p>
+        <table className="w-full border-collapse text-black">
+          <thead>
+            <tr className="border-b-2 border-black text-left">
+              <th className="py-1.5 pr-2">Nom</th>
+              <th className="py-1.5 pr-2">Email</th>
+              <th className="py-1.5 pr-2">Telephone</th>
+              <th className="py-1.5 pr-2">Centre(s)</th>
+              <th className="py-1.5 pr-2">Anciennete</th>
+              <th className="py-1.5 pr-2">CNI</th>
+            </tr>
+          </thead>
+          <tbody>
+            {printableFormateurs.map((f) => {
+              const cniOk = Boolean(f.carteIdentiteRecto && f.carteIdentiteVerso);
+              const cniPartial = Boolean(f.carteIdentiteRecto || f.carteIdentiteVerso);
+              return (
+                <tr key={f.id} className="border-b border-slate-400">
+                  <td className="py-1.5 pr-2">{formatFullName(f.prenom, f.nom)}</td>
+                  <td className="py-1.5 pr-2">{f.email}</td>
+                  <td className="py-1.5 pr-2">{f.telephone || 'Non renseigne'}</td>
+                  <td className="py-1.5 pr-2">
+                    {f.centres && f.centres.length > 0
+                      ? f.centres.map((c) => centreLabel(c)).join(', ')
+                      : 'Aucun'}
+                  </td>
+                  <td className="py-1.5 pr-2">{formatAnciennete(ancienneteDate(f))}</td>
+                  <td className="py-1.5 pr-2">
+                    {cniOk ? 'Complete' : cniPartial ? 'Partielle' : 'Manquante'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    )}
+    </>
   );
 }
