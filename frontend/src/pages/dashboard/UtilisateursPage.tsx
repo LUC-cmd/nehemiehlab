@@ -5,7 +5,8 @@ import { userService, centreService } from '../../services/api';
 import { ROLE_LABELS, ROLES_CREABLES_PAR_DIRECTEUR, ROLE_ACCESS_SUMMARY } from '../../constants/roleAccess';
 import type { User, Centre, Role } from '../../types';
 import { centreLabel } from '../../utils/centreLabel';
-import { Plus, Search, Shield, UserCheck, UserX } from 'lucide-react';
+import { ancienneteDate, formatAnciennete } from '../../utils/anciennete';
+import { Plus, Search, Shield, UserCheck, UserX, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cleanNameInput, cleanPhoneInput, FIRSTNAME_EXAMPLE, NAME_EXAMPLE } from '../../utils/formInputs';
 import { PageLoadingSkeleton, TableSkeleton } from '../../components/ui/DashboardSkeletons';
@@ -24,6 +25,9 @@ export default function UtilisateursPage() {
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [confirmDesactiverId, setConfirmDesactiverId] = useState<number | null>(null);
+  const [editAncienneteUser, setEditAncienneteUser] = useState<User | null>(null);
+  const [ancienneteValue, setAncienneteValue] = useState('');
+  const [savingAnciennete, setSavingAnciennete] = useState(false);
   const skeletonLoading = useMinDelayLoading(loading, 220);
   
   // Form states
@@ -123,6 +127,26 @@ export default function UtilisateursPage() {
     }
   };
 
+  const openEditAnciennete = (u: User) => {
+    setEditAncienneteUser(u);
+    setAncienneteValue(u.dateEntree || '');
+  };
+
+  const saveAnciennete = async () => {
+    if (!editAncienneteUser) return;
+    setSavingAnciennete(true);
+    try {
+      await userService.updateProfile(editAncienneteUser.id, { dateEntree: ancienneteValue });
+      toast.success('Ancienneté mise à jour.');
+      setEditAncienneteUser(null);
+      fetchUsers();
+    } catch {
+      toast.error("Erreur lors de la mise à jour de l'ancienneté.");
+    } finally {
+      setSavingAnciennete(false);
+    }
+  };
+
   if (skeletonLoading && users.length === 0) {
     return <PageLoadingSkeleton showTable />;
   }
@@ -211,6 +235,7 @@ export default function UtilisateursPage() {
                 <th>Email</th>
                 <th>Rôle</th>
                 <th>Statut</th>
+                <th>Ancienneté</th>
                 {isDir && <th className="text-right">Actions</th>}
               </tr>
             </thead>
@@ -232,6 +257,21 @@ export default function UtilisateursPage() {
                       {u.actif ? 'Actif' : 'Désactivé'}
                     </span>
                   </td>
+                  <td>
+                    <span className="inline-flex items-center gap-1.5 text-xs text-dark-300">
+                      {formatAnciennete(ancienneteDate(u))}
+                      {isDir && (
+                        <button
+                          type="button"
+                          onClick={() => openEditAnciennete(u)}
+                          title="Modifier l'ancienneté"
+                          className="text-dark-500 hover:text-[#5ED9FF] transition-colors"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      )}
+                    </span>
+                  </td>
                   {isDir && (
                     <td className="text-right">
                       {u.actif && u.role !== 'DIRECTEUR' ? (
@@ -249,7 +289,7 @@ export default function UtilisateursPage() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={isDir ? 5 : 4} className="text-center py-8 text-dark-500">
+                  <td colSpan={isDir ? 6 : 5} className="text-center py-8 text-dark-500">
                     Aucun utilisateur trouvé.
                   </td>
                 </tr>
@@ -397,6 +437,46 @@ export default function UtilisateursPage() {
         onConfirm={confirmDesactiver}
         onCancel={() => setConfirmDesactiverId(null)}
       />
+
+      <Modal
+        open={editAncienneteUser != null}
+        title="Modifier l'ancienneté"
+        subtitle={editAncienneteUser ? `${editAncienneteUser.prenom} ${editAncienneteUser.nom}` : undefined}
+        size="sm"
+        onClose={() => setEditAncienneteUser(null)}
+        footer={
+          <>
+            <button type="button" onClick={() => setEditAncienneteUser(null)} className="btn-ghost w-full sm:w-auto justify-center">
+              Annuler
+            </button>
+            <button
+              type="button"
+              disabled={savingAnciennete}
+              onClick={saveAnciennete}
+              className="btn-primary w-full sm:w-auto justify-center disabled:opacity-60"
+            >
+              {savingAnciennete ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="label">Date d&apos;entrée</label>
+            <input
+              type="date"
+              className="input-field"
+              max={new Date().toISOString().split('T')[0]}
+              value={ancienneteValue}
+              onChange={(e) => setAncienneteValue(e.target.value)}
+            />
+            <p className="mt-1.5 text-xs text-slate-500">
+              Utilisée pour calculer l&apos;ancienneté affichée. Laissez vide pour revenir à la date de création
+              du compte ({editAncienneteUser?.createdAt ? new Date(editAncienneteUser.createdAt).toLocaleDateString('fr-FR') : '—'}).
+            </p>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
