@@ -1,5 +1,6 @@
 /** Préfixe API pour les fichiers uploadés */
 import { safeExternalUrl, safeYouTubeEmbedUrl } from './safeUrl';
+import { API_BASE } from '../services/api';
 
 export function mediaUrl(path?: string | null): string {
 
@@ -10,34 +11,41 @@ export function mediaUrl(path?: string | null): string {
   // Assets statiques du frontend (public/)
   if (path.startsWith('/assets/')) return path;
 
-  // Fichiers sensibles : passer par l'endpoint authentifié
+  // Fichiers sensibles : passer par l'endpoint authentifié.
+  // IMPORTANT : on utilise API_BASE (qui reflete VITE_API_URL) et non un
+  // prefixe relatif "/api" en dur. En production, le frontend et le backend
+  // sont deux services Railway distincts (VITE_API_URL pointe vers le domaine
+  // du backend) : un chemin relatif "/api/..." serait resolu contre le domaine
+  // du frontend (ska-management.com), qui ne sert que la SPA statique, et
+  // renverrait donc index.html au lieu de l'image (upload "reussi" mais photo
+  // jamais visible).
 
   if (path.startsWith('/uploads/avatars/')) {
-    return `/api/secure-files/avatars/${path.slice('/uploads/avatars/'.length)}`;
+    return `${API_BASE}/secure-files/avatars/${path.slice('/uploads/avatars/'.length)}`;
   }
 
   if (path.startsWith('/uploads/identite/')) {
 
-    return `/api/secure-files/identite/${path.slice('/uploads/identite/'.length)}`;
+    return `${API_BASE}/secure-files/identite/${path.slice('/uploads/identite/'.length)}`;
 
   }
 
   if (path.startsWith('/uploads/transactions/')) {
 
-    return `/api/secure-files/transactions/${path.slice('/uploads/transactions/'.length)}`;
+    return `${API_BASE}/secure-files/transactions/${path.slice('/uploads/transactions/'.length)}`;
 
   }
   if (path.startsWith('/uploads/enfants/')) {
-    return `/api/secure-files/enfants/${path.slice('/uploads/enfants/'.length)}`;
+    return `${API_BASE}/secure-files/enfants/${path.slice('/uploads/enfants/'.length)}`;
   }
   if (path.startsWith('/uploads/projets-enfants/')) {
-    return `/api/secure-files/projets-enfants/${path.slice('/uploads/projets-enfants/'.length)}`;
+    return `${API_BASE}/secure-files/projets-enfants/${path.slice('/uploads/projets-enfants/'.length)}`;
   }
   if (path.startsWith('/uploads/rapports/')) {
-    return `/api/secure-files/rapports/${path.slice('/uploads/rapports/'.length)}`;
+    return `${API_BASE}/secure-files/rapports/${path.slice('/uploads/rapports/'.length)}`;
   }
 
-  return `/api${path.startsWith('/') ? path : `/${path}`}`;
+  return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
 
 }
 
