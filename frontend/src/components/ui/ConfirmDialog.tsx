@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, X } from 'lucide-react';
@@ -13,6 +13,13 @@ interface ConfirmDialogProps {
   danger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /**
+   * Si renseigné, le bouton de confirmation reste désactivé tant que
+   * l'utilisateur n'a pas retapé exactement ce texte dans le champ prévu.
+   * Utile pour les actions irréversibles (suppression définitive, etc.).
+   */
+  requireTypedConfirmation?: string;
+  typedConfirmationLabel?: React.ReactNode;
 }
 
 /**
@@ -27,7 +34,11 @@ export default function ConfirmDialog({
   danger = false,
   onConfirm,
   onCancel,
+  requireTypedConfirmation,
+  typedConfirmationLabel,
 }: ConfirmDialogProps) {
+  const [typedValue, setTypedValue] = useState('');
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -41,6 +52,15 @@ export default function ConfirmDialog({
       document.body.style.overflow = prev;
     };
   }, [open, onCancel]);
+
+  useEffect(() => {
+    if (!open) setTypedValue('');
+  }, [open]);
+
+  const typedConfirmationOk = useMemo(
+    () => !requireTypedConfirmation || typedValue.trim() === requireTypedConfirmation,
+    [requireTypedConfirmation, typedValue],
+  );
 
   if (typeof document === 'undefined') return null;
 
@@ -85,10 +105,30 @@ export default function ConfirmDialog({
               </button>
             </div>
 
-            <div className="modal-body">
+            <div className="modal-body space-y-3">
               <p id="confirm-dialog-desc" className="text-sm text-slate-600 leading-relaxed">
                 {message}
               </p>
+              {requireTypedConfirmation && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    {typedConfirmationLabel || (
+                      <>
+                        Pour confirmer, tapez exactement :{' '}
+                        <span className="font-mono font-semibold text-slate-700">{requireTypedConfirmation}</span>
+                      </>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    autoFocus
+                    className="input-field w-full"
+                    value={typedValue}
+                    onChange={(e) => setTypedValue(e.target.value)}
+                    placeholder={requireTypedConfirmation}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="modal-footer">
@@ -99,6 +139,7 @@ export default function ConfirmDialog({
                 size="md"
                 variant={danger ? 'danger' : 'success'}
                 onClick={onConfirm}
+                disabled={!typedConfirmationOk}
               >
                 {confirmLabel}
               </ValidationActionButton>
