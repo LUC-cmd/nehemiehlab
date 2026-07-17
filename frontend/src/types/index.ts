@@ -35,6 +35,7 @@ export interface User {
   carteIdentiteRecto?: string;
   carteIdentiteVerso?: string;
   dateNaissance?: string;
+  dateEntree?: string;
   lieuNaissance?: string;
   adresse?: string;
   eleveId?: number;
