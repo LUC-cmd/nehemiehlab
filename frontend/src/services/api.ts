@@ -252,6 +252,7 @@ export const userService = {
   setInscriptionsFormateursStatut: (ouverte: boolean) =>
     api.put('/users/inscriptions-formateurs/statut', { ouverte }),
   validerFormateur: (id: number) => api.put(`/users/${id}/valider-formateur`),
+  supprimerCompteEnAttente: (id: number) => api.delete(`/users/${id}`),
 };
 
 // ============================================================
