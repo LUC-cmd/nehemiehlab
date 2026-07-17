@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { userService, centreService } from '../../services/api';
 import { ROLE_LABELS, ROLES_CREABLES_PAR_DIRECTEUR, ROLE_ACCESS_SUMMARY } from '../../constants/roleAccess';
 import type { User, Centre, Role } from '../../types';
+import { centreLabel } from '../../utils/centreLabel';
 import { Plus, Search, Shield, UserCheck, UserX } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cleanNameInput, cleanPhoneInput, FIRSTNAME_EXAMPLE, NAME_EXAMPLE } from '../../utils/formInputs';
@@ -362,7 +363,7 @@ export default function UtilisateursPage() {
               <select className="input-field" required value={newAccount.centreId} onChange={e => setNewAccount({ ...newAccount, centreId: e.target.value })}>
                 <option value="">Sélectionner le centre...</option>
                 {centres.filter(c => !c.coordinateur).map(c => (
-                  <option key={c.id} value={c.id}>{c.nom} — {c.cluster || c.ville}</option>
+                  <option key={c.id} value={c.id}>{centreLabel(c)} — {c.cluster || c.ville}</option>
                 ))}
               </select>
               <p className="mt-1 text-xs text-dark-500">Un coordinateur ne gère qu&apos;un seul centre.</p>

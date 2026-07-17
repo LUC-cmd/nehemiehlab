@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { centreService, eleveService, signalementService, notificationService } from '../../services/api';
 import type { Signalement } from '../../types';
 import type { Centre, Eleve } from '../../types';
+import { centreLabel } from '../../utils/centreLabel';
 import { ALERT_PRESETS, type AlertPresetId } from '../../constants/alertPresets';
 import ValidationActionButton from '../../components/ui/ValidationActionButton';
 import {
@@ -320,7 +321,7 @@ export default function SignalementsPage() {
                 <label className="label">Centre (pour cibler les formateurs)</label>
                 <select className="input-field" value={broadcastCentreId} onChange={(e) => setBroadcastCentreId(e.target.value)}>
                   <option value="">Tous les centres</option>
-                  {centres.map((c) => <option key={c.id} value={String(c.id)}>{c.nom}</option>)}
+                  {centres.map((c) => <option key={c.id} value={String(c.id)}>{centreLabel(c)}</option>)}
                 </select>
               </div>
               <div className="md:col-span-2">
@@ -374,7 +375,7 @@ export default function SignalementsPage() {
             <label className="label">Filtrer par centre</label>
             <select className="input-field" value={selectedCentreFilter} onChange={e => setSelectedCentreFilter(e.target.value)}>
               <option value="ALL">Tous les centres</option>
-              {centres.map(c => <option key={c.id} value={String(c.id)}>{c.nom}</option>)}
+              {centres.map(c => <option key={c.id} value={String(c.id)}>{centreLabel(c)}</option>)}
             </select>
           </div>
           <div>
@@ -413,7 +414,7 @@ export default function SignalementsPage() {
             <label className="label">Centre concerné</label>
             <select className="input-field" value={newCentreId} onChange={e => setNewCentreId(e.target.value)}>
               <option value="">Sélectionner...</option>
-              {centres.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+              {centres.map(c => <option key={c.id} value={c.id}>{centreLabel(c)}</option>)}
             </select>
           </div>
           {newType === 'ENFANT' && (

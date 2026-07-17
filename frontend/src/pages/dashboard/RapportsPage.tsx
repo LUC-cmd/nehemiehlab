@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { rapportService, centreService, eleveService } from '../../services/api';
 import type { Centre, Eleve } from '../../types';
+import { centreLabel } from '../../utils/centreLabel';
 import {
   FileSpreadsheet, Download, Calendar, Building2, Loader2, Filter, FileText,
   Users, Clock, Activity, Wallet, ClipboardList, RotateCcw, CheckCircle2,
@@ -292,7 +293,7 @@ export default function RapportsPage() {
             >
               <option value="">Tous les centres du filtre</option>
               {filteredCentres.map((c) => (
-                <option key={c.id} value={c.id}>{c.nom}</option>
+                <option key={c.id} value={c.id}>{centreLabel(c)}</option>
               ))}
             </select>
           </div>
@@ -309,7 +310,7 @@ export default function RapportsPage() {
                   {selectedCentreId ? 'Tous les enfants du centre' : 'Choisir un centre d’abord'}
                 </option>
                 {eleves.map((e) => (
-                  <option key={e.id} value={e.id}>{e.prenom} {e.nom}</option>
+                  <option key={e.id} value={e.id}>{e.prenom} {e.nom}{e.matricule ? ` — ${e.matricule}` : ''}</option>
                 ))}
               </select>
             </div>

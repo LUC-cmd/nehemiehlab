@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAccess } from '../../context/AccessContext';
-import { centreService, userService } from '../../services/api';
-import type { Centre, User } from '../../types';
+import { centreService, userService, clusterService } from '../../services/api';
+import type { Centre, Cluster, User } from '../../types';
+import { centreLabel } from '../../utils/centreLabel';
 import {
   Plus, X, Building2, UserPlus, Trash2, MapPin, Navigation, ExternalLink, Pencil,
   Download, Upload, Phone,
@@ -42,6 +43,8 @@ const emptyCentreForm = {
   region: '',
   cluster: '',
   telephoneResponsable: '',
+  coordinateurNom: '',
+  coordinateurPrenom: '',
   telephoneCoordinateur: '',
   telephoneFormateur: '',
   ...emptyLocation,
@@ -62,6 +65,9 @@ export default function CentresPage() {
   const [centres, setCentres] = useState<Centre[]>([]);
   const [formateurs, setFormateurs] = useState<User[]>([]);
   const [coordinateurs, setCoordinateurs] = useState<User[]>([]);
+  const [clusters, setClusters] = useState<Cluster[]>([]);
+  const [newClusterName, setNewClusterName] = useState('');
+  const [creatingCluster, setCreatingCluster] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -91,6 +97,12 @@ export default function CentresPage() {
   const [assignCoordinateurId, setAssignCoordinateurId] = useState('');
   const [contactsCentre, setContactsCentre] = useState<Centre | null>(null);
   const [contactsForm, setContactsForm] = useState({
+    nom: '',
+    codeCdej: '',
+    adresse: '',
+    ville: '',
+    region: '',
+    cluster: '',
     telephoneResponsable: '',
     coordinateurNom: '',
     coordinateurPrenom: '',
@@ -132,12 +144,14 @@ export default function CentresPage() {
       setCentres(centresRes.data);
 
       if (isDirecteur) {
-        const [formateursRes, coordRes] = await Promise.all([
+        const [formateursRes, coordRes, clustersRes] = await Promise.all([
           userService.getFormateurs(),
           userService.getCoordinateurs(),
+          clusterService.getAll(),
         ]);
         setFormateurs(formateursRes.data);
         setCoordinateurs(coordRes.data);
+        setClusters(clustersRes.data);
       }
     } catch {
       toast.error('Erreur lors du chargement des données.');
@@ -191,6 +205,8 @@ export default function CentresPage() {
         region: newCentre.region,
         cluster: newCentre.cluster || undefined,
         telephoneResponsable: cleanPhoneInput(newCentre.telephoneResponsable) || undefined,
+        coordinateurNom: newCentre.coordinateurNom.trim() || undefined,
+        coordinateurPrenom: newCentre.coordinateurPrenom.trim() || undefined,
         telephoneCoordinateur: cleanPhoneInput(newCentre.telephoneCoordinateur) || undefined,
         telephoneFormateur: cleanPhoneInput(newCentre.telephoneFormateur) || undefined,
         latitude: hasGps ? lat : undefined,
@@ -210,6 +226,25 @@ export default function CentresPage() {
       fetchData();
     } catch {
       toast.error('Erreur lors de la création du centre.');
+    }
+  };
+
+  const handleCreateCluster = async () => {
+    const nom = newClusterName.trim();
+    if (!nom) return;
+    setCreatingCluster(true);
+    try {
+      const { data } = await clusterService.create(nom);
+      setClusters((prev) => [...prev, data].sort((a, b) => a.nom.localeCompare(b.nom, 'fr')));
+      setNewCentre((p) => ({ ...p, cluster: data.nom }));
+      setContactsForm((p) => (contactsCentre ? { ...p, cluster: data.nom } : p));
+      setNewClusterName('');
+      toast.success('Cluster créé.');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || 'Impossible de créer ce cluster.');
+    } finally {
+      setCreatingCluster(false);
     }
   };
 
@@ -259,6 +294,12 @@ export default function CentresPage() {
   const openContactsModal = (centre: Centre) => {
     setContactsCentre(centre);
     setContactsForm({
+      nom: centre.nom || '',
+      codeCdej: centre.codeCdej || '',
+      adresse: centre.adresse || '',
+      ville: centre.ville || '',
+      region: centre.region || '',
+      cluster: centre.cluster || '',
       telephoneResponsable: centre.telephoneResponsable || '',
       coordinateurNom: centre.coordinateurNom || centre.coordinateur?.nom || '',
       coordinateurPrenom: centre.coordinateurPrenom || centre.coordinateur?.prenom || '',
@@ -273,11 +314,12 @@ export default function CentresPage() {
     setSavingContacts(true);
     try {
       await centreService.update(contactsCentre.id, {
-        nom: contactsCentre.nom,
-        adresse: contactsCentre.adresse,
-        ville: contactsCentre.ville,
-        region: contactsCentre.region,
-        cluster: contactsCentre.cluster,
+        nom: contactsForm.nom.trim() || contactsCentre.nom,
+        codeCdej: contactsForm.codeCdej.trim() || undefined,
+        adresse: contactsForm.adresse.trim() || contactsCentre.adresse,
+        ville: contactsForm.ville.trim() || contactsCentre.ville,
+        region: contactsForm.region || contactsCentre.region,
+        cluster: contactsForm.cluster || undefined,
         latitude: contactsCentre.latitude,
         longitude: contactsCentre.longitude,
         telephoneResponsable: cleanPhoneInput(contactsForm.telephoneResponsable),
@@ -286,11 +328,11 @@ export default function CentresPage() {
         telephoneCoordinateur: cleanPhoneInput(contactsForm.telephoneCoordinateur),
         telephoneFormateur: cleanPhoneInput(contactsForm.telephoneFormateur),
       });
-      toast.success('Contacts du centre enregistrés.');
+      toast.success('Centre mis à jour.');
       setContactsCentre(null);
       await fetchData();
     } catch {
-      toast.error('Impossible d’enregistrer les contacts.');
+      toast.error('Impossible d’enregistrer les modifications.');
     } finally {
       setSavingContacts(false);
     }
@@ -798,8 +840,8 @@ export default function CentresPage() {
                           className="btn-ghost px-2.5 py-1.5 text-xs"
                           onClick={() => openContactsModal(centre)}
                         >
-                          <Phone className="h-3.5 w-3.5" />
-                          Contacts
+                          <Pencil className="h-3.5 w-3.5" />
+                          Modifier
                         </button>
                         <button
                           type="button"
@@ -874,24 +916,34 @@ export default function CentresPage() {
                     <Building2 className="w-6 h-6" />
                   </div>
                   {isDir && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPendingConfirmation({
-                          type: 'delete-centre',
-                          centreId: centre.id,
-                          centreName: centre.nom,
-                        });
-                      }}
-                      className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => openContactsModal(centre)}
+                        className="text-slate-400 hover:text-primary-600 p-1.5 rounded-lg hover:bg-primary-50 transition-colors"
+                        aria-label={`Modifier ${centre.nom}`}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPendingConfirmation({
+                            type: 'delete-centre',
+                            centreId: centre.id,
+                            centreName: centre.nom,
+                          });
+                        }}
+                        className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                        aria-label={`Supprimer ${centre.nom}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
 
-                <h3 className="text-lg font-bold text-slate-900 mb-1">{centre.nom}{centre.codeCdej ? ` (${centre.codeCdej})` : ''}</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-1">{centreLabel(centre)}</h3>
                 {centre.region && (
                   <span className="inline-block px-2 py-0.5 mb-2 text-xs font-medium bg-slate-100 border border-slate-200 rounded-lg text-primary-700">
                     Région {centre.region}
@@ -1172,13 +1224,38 @@ export default function CentresPage() {
           </div>
           <div>
             <label className="label">Cluster (optionnel)</label>
-            <input
-              type="text"
-              placeholder="Ex: Cluster Lomé Ouest"
-              className="input-field"
-              value={newCentre.cluster}
-              onChange={(e) => setNewCentre({ ...newCentre, cluster: e.target.value })}
-            />
+            <div className="flex gap-2">
+              <select
+                className="input-field"
+                value={newCentre.cluster}
+                onChange={(e) => setNewCentre({ ...newCentre, cluster: e.target.value })}
+              >
+                <option value="">Aucun cluster</option>
+                {clusters.map((cl) => (
+                  <option key={cl.id} value={cl.nom}>{cl.nom}</option>
+                ))}
+              </select>
+            </div>
+            <div className="mt-2 flex gap-2">
+              <input
+                type="text"
+                placeholder="Créer un nouveau cluster…"
+                className="input-field"
+                value={newClusterName}
+                onChange={(e) => setNewClusterName(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={handleCreateCluster}
+                disabled={creatingCluster || !newClusterName.trim()}
+                className="btn-ghost whitespace-nowrap"
+              >
+                {creatingCluster ? '…' : '+ Ajouter'}
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              Sélectionnez un cluster existant dans la liste, ou créez-en un nouveau une seule fois pour éviter les doublons de saisie.
+            </p>
           </div>
           <div>
             <label className="label">Code centre (CDEJ)</label>
@@ -1204,9 +1281,46 @@ export default function CentresPage() {
                 telephoneResponsable: cleanPhoneInput(e.target.value),
               })}
             />
-            <p className="mt-1 text-xs text-slate-400">
-              Le numéro du formateur n'est pas demandé ici : il est renseigné à la création de son compte et suit
-              automatiquement le formateur affecté au centre.
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+            <p className="text-xs font-semibold text-slate-600">Coordinateur du centre (optionnel)</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="label">Prénom coordinateur</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={newCentre.coordinateurPrenom}
+                  onChange={(e) => setNewCentre({ ...newCentre, coordinateurPrenom: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label">Nom coordinateur</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={newCentre.coordinateurNom}
+                  onChange={(e) => setNewCentre({ ...newCentre, coordinateurNom: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="label">Téléphone du coordinateur</label>
+              <input
+                type="tel"
+                inputMode="numeric"
+                className="input-field"
+                placeholder="Numéro de téléphone"
+                value={newCentre.telephoneCoordinateur}
+                onChange={(e) => setNewCentre({
+                  ...newCentre,
+                  telephoneCoordinateur: cleanPhoneInput(e.target.value),
+                })}
+              />
+            </div>
+            <p className="text-xs text-slate-400">
+              Enregistré comme contact du centre (nom + téléphone), sans créer de compte utilisateur. Le numéro du
+              formateur n'est pas demandé ici : il suit automatiquement le formateur affecté au centre.
             </p>
           </div>
 
@@ -1283,7 +1397,7 @@ export default function CentresPage() {
 
       <Modal
         open={Boolean(contactsCentre)}
-        title={contactsCentre ? `Contacts — ${contactsCentre.nom}` : 'Contacts du centre'}
+        title={contactsCentre ? `Modifier — ${centreLabel(contactsCentre)}` : 'Modifier le centre'}
         size="md"
         onClose={() => setContactsCentre(null)}
         footer={
@@ -1308,6 +1422,73 @@ export default function CentresPage() {
         }
       >
         <form id="centre-contacts-form" onSubmit={handleSaveContacts} className="space-y-4">
+          <div>
+            <label className="label">Nom du centre</label>
+            <input
+              type="text"
+              className="input-field"
+              value={contactsForm.nom}
+              onChange={(e) => setContactsForm({ ...contactsForm, nom: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Adresse</label>
+            <input
+              type="text"
+              className="input-field"
+              value={contactsForm.adresse}
+              onChange={(e) => setContactsForm({ ...contactsForm, adresse: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="label">Ville</label>
+              <input
+                type="text"
+                className="input-field"
+                value={contactsForm.ville}
+                onChange={(e) => setContactsForm({ ...contactsForm, ville: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="label">Région du Togo</label>
+              <select
+                className="input-field"
+                value={contactsForm.region}
+                onChange={(e) => setContactsForm({ ...contactsForm, region: e.target.value })}
+              >
+                <option value="">Sélectionner une région...</option>
+                <option value="Maritime">Maritime</option>
+                <option value="Plateaux">Plateaux</option>
+                <option value="Centrale">Centrale</option>
+                <option value="Kara">Kara</option>
+                <option value="Savanes">Savanes</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="label">Cluster</label>
+            <select
+              className="input-field"
+              value={contactsForm.cluster}
+              onChange={(e) => setContactsForm({ ...contactsForm, cluster: e.target.value })}
+            >
+              <option value="">Aucun cluster</option>
+              {clusters.map((cl) => (
+                <option key={cl.id} value={cl.nom}>{cl.nom}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Code centre (CDEJ)</label>
+            <input
+              type="text"
+              placeholder="Ex: TG0815"
+              className="input-field"
+              value={contactsForm.codeCdej}
+              onChange={(e) => setContactsForm({ ...contactsForm, codeCdej: e.target.value })}
+            />
+          </div>
           <p className="text-xs text-slate-500 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
             Le coordinateur est enregistré comme contact du centre (nom + téléphone), sans créer de compte.
           </p>

@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAccess } from '../../context/AccessContext';
 import { eleveService, centreService } from '../../services/api';
 import type { Eleve, Centre, ChildSessionRow } from '../../types';
+import { centreLabel } from '../../utils/centreLabel';
 import { NIVEAUX_MAITRISE } from '../../types';
 import { Plus, Search, MessageSquare, AlertTriangle, Edit2, KeyRound, Copy, CalendarDays, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -127,6 +128,7 @@ export default function ElevesPage() {
         classe: ficheValues.classe,
         centreId: Number(ficheValues.centreId || selectedCentreId),
         dateDebutFormation: ficheValues.dateDebutFormation,
+        raisonSelection: ficheValues.raisonSelection || undefined,
       });
       const matricule = data?.matricule || data?.eleve?.matricule || data?.codeAccesParent;
       toast.success(
@@ -156,6 +158,7 @@ export default function ElevesPage() {
         sexe: ficheValues.sexe,
         classe: ficheValues.classe,
         dateDebutFormation: ficheValues.dateDebutFormation,
+        raisonSelection: ficheValues.raisonSelection || undefined,
       });
       toast.success('Fiche élève mise à jour.');
       setShowEditModal(false);
@@ -318,11 +321,11 @@ export default function ElevesPage() {
           {showCentrePicker ? (
             <select className="input-field py-2 text-sm" value={selectedCentreId} onChange={e => setSelectedCentreId(e.target.value)}>
               {centres.map(c => (
-                <option key={c.id} value={c.id}>{c.nom}</option>
+                <option key={c.id} value={c.id}>{centreLabel(c)}</option>
               ))}
             </select>
           ) : (
-            <span className="text-sm text-white font-medium">{centres[0]?.nom || '—'}</span>
+            <span className="text-sm text-white font-medium">{centres[0] ? centreLabel(centres[0]) : '—'}</span>
           )}
         </div>
 
@@ -367,6 +370,14 @@ export default function ElevesPage() {
                           <span className="mx-1">·</span>
                           <span className="text-primary-400/80">Voir les séances</span>
                         </div>
+                        {eleve.raisonSelection && (
+                          <p
+                            className="text-[11px] text-dark-500 italic mt-1 max-w-xs truncate"
+                            title={eleve.raisonSelection}
+                          >
+                            Raison de sélection : {eleve.raisonSelection}
+                          </p>
+                        )}
                       </button>
                     </td>
                     <td className="p-4">

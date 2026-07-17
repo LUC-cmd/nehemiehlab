@@ -34,7 +34,8 @@ type AssignPicker = { centreId: string };
 const emptyPicker = (): AssignPicker => ({ centreId: '' });
 
 function centreLabel(c: Centre): string {
-  const parts = [c.nom, c.ville];
+  const nomAvecCode = c.codeCdej ? `${c.nom} (${c.codeCdej})` : c.nom;
+  const parts = [nomAvecCode, c.ville];
   if (c.region) parts.push(c.region);
   if (c.cluster) parts.push(c.cluster);
   return parts.filter(Boolean).join(' · ');
@@ -526,7 +527,7 @@ export default function FormateursPage() {
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <div className="font-semibold text-white">{c.nom}</div>
+                                <div className="font-semibold text-white">{c.codeCdej ? `${c.nom} (${c.codeCdej})` : c.nom}</div>
                                 <div className="text-dark-400 mt-0.5">
                                   {c.ville}
                                   {c.region ? ` · ${c.region}` : ''}
@@ -541,7 +542,7 @@ export default function FormateursPage() {
                                       formateurId: formateur.id,
                                       centreId: c.id,
                                       formateurName: formatFullName(formateur.prenom, formateur.nom),
-                                      centreName: c.nom,
+                                      centreName: c.codeCdej ? `${c.nom} (${c.codeCdej})` : c.nom,
                                     })
                                   }
                                   disabled={removingKey === removeKey}
