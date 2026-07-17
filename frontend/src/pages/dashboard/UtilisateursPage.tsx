@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { userService, centreService } from '../../services/api';
+import { userService, centreService, rapportService } from '../../services/api';
 import { ROLE_LABELS, ROLES_CREABLES_PAR_DIRECTEUR, ROLE_ACCESS_SUMMARY } from '../../constants/roleAccess';
 import type { User, Centre, Role } from '../../types';
 import { centreLabel } from '../../utils/centreLabel';
 import { ancienneteDate, formatAnciennete } from '../../utils/anciennete';
-import { Plus, Search, Shield, UserCheck, UserX, Pencil } from 'lucide-react';
+import { Plus, Search, Shield, UserCheck, UserX, Pencil, FileSpreadsheet, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cleanNameInput, cleanPhoneInput, FIRSTNAME_EXAMPLE, NAME_EXAMPLE } from '../../utils/formInputs';
 import { PageLoadingSkeleton, TableSkeleton } from '../../components/ui/DashboardSkeletons';
@@ -28,6 +28,7 @@ export default function UtilisateursPage() {
   const [editAncienneteUser, setEditAncienneteUser] = useState<User | null>(null);
   const [ancienneteValue, setAncienneteValue] = useState('');
   const [savingAnciennete, setSavingAnciennete] = useState(false);
+  const [exportingUsers, setExportingUsers] = useState<'xlsx' | 'pdf' | null>(null);
   const skeletonLoading = useMinDelayLoading(loading, 220);
   
   // Form states
@@ -157,6 +158,38 @@ export default function UtilisateursPage() {
     u.email.toLowerCase().includes(search.toLowerCase())
   );
 
+  const downloadFile = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // Telechargement de la liste complete des utilisateurs (hors parents) au
+  // format Excel ou PDF, pour le Directeur.
+  const handleExportUsers = async (format: 'xlsx' | 'pdf') => {
+    setExportingUsers(format);
+    try {
+      const res = format === 'xlsx'
+        ? await rapportService.exporterUtilisateurs()
+        : await rapportService.exporterUtilisateursPdf();
+      if (!res.data || res.data.size === 0) {
+        toast.error('Aucune donnée à exporter.');
+        return;
+      }
+      downloadFile(res.data, format === 'xlsx' ? 'utilisateurs.xlsx' : 'utilisateurs.pdf');
+      toast.success('Liste des utilisateurs téléchargée.');
+    } catch {
+      toast.error("Erreur lors du téléchargement.");
+    } finally {
+      setExportingUsers(null);
+    }
+  };
+
   const getRoleBadge = (role: Role) => {
     const colors: Record<Role, string> = {
       DIRECTEUR: 'border-purple-500/30 bg-purple-500/10 text-purple-400',
@@ -187,10 +220,30 @@ export default function UtilisateursPage() {
           </p>
         </div>
         {isDir && (
-          <button onClick={() => setShowAddModal(true)} className="btn-primary">
-            <Plus className="w-4 h-4" />
-            Nouveau compte
-          </button>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              type="button"
+              onClick={() => handleExportUsers('xlsx')}
+              disabled={exportingUsers !== null}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-dark-600 bg-dark-800 text-dark-200 hover:bg-dark-700 disabled:opacity-60"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              {exportingUsers === 'xlsx' ? 'Téléchargement…' : 'Excel'}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExportUsers('pdf')}
+              disabled={exportingUsers !== null}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-dark-600 bg-dark-800 text-dark-200 hover:bg-dark-700 disabled:opacity-60"
+            >
+              <FileText className="w-4 h-4" />
+              {exportingUsers === 'pdf' ? 'Téléchargement…' : 'PDF'}
+            </button>
+            <button onClick={() => setShowAddModal(true)} className="btn-primary">
+              <Plus className="w-4 h-4" />
+              Nouveau compte
+            </button>
+          </div>
         )}
       </div>
 
