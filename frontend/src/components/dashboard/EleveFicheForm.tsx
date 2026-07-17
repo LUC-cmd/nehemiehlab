@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { User, GraduationCap, Building2, CheckCircle2 } from 'lucide-react';
 import type { Centre } from '../../types';
 import { cleanNameInput, FIRSTNAME_EXAMPLE, NAME_EXAMPLE } from '../../utils/formInputs';
+import { centreLabel } from '../../utils/centreLabel';
 import {
   AGE_MAX,
   AGE_MIN,
@@ -78,10 +79,10 @@ export default function EleveFicheForm({
               onClick={() => setStep(idx)}
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold border transition-all ${
                 active
-                  ? 'border-primary-500 bg-primary-500/15 text-primary-300'
+                  ? 'border-primary-500 bg-primary-50 text-primary-700'
                   : done
-                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-                    : 'border-dark-600 text-dark-500 hover:border-dark-500'
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-200 text-slate-400 hover:border-slate-300'
               }`}
             >
               {done && !active ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
@@ -92,8 +93,8 @@ export default function EleveFicheForm({
       </div>
 
       {step === 0 && (
-        <div className="space-y-4 rounded-2xl border border-dark-700 bg-dark-900/40 p-4">
-          <p className="text-sm text-dark-400">
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-sm text-slate-500">
             {mode === 'create'
               ? 'Saisissez le nom et le prénom tels qu’ils figurent sur les documents officiels.'
               : 'Corrigez l’identité de l’enfant si besoin.'}
@@ -133,8 +134,8 @@ export default function EleveFicheForm({
                   onClick={() => patch({ sexe: s })}
                   className={`py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
                     values.sexe === s
-                      ? 'border-primary-500 bg-primary-500/20 text-primary-200'
-                      : 'border-dark-600 text-dark-400 hover:border-dark-500'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-slate-200 text-slate-500 hover:border-slate-300'
                   }`}
                 >
                   {s === 'M' ? 'Garçon' : 'Fille'}
@@ -146,7 +147,7 @@ export default function EleveFicheForm({
       )}
 
       {step === 1 && (
-        <div className="space-y-4 rounded-2xl border border-dark-700 bg-dark-900/40 p-4">
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="label">Date de naissance *</label>
@@ -163,7 +164,7 @@ export default function EleveFicheForm({
                 }}
               />
               {values.dateNaissance !== '' && (
-                <p className={`mt-1 text-xs font-semibold ${ageOk ? 'text-primary-300' : 'text-red-400'}`}>
+                <p className={`mt-1 text-xs font-semibold ${ageOk ? 'text-primary-600' : 'text-red-500'}`}>
                   {ageFromDate !== null
                     ? `Âge : ${ageFromDate} an${ageFromDate > 1 ? 's' : ''}${ageOk ? '' : ` (doit être entre ${AGE_MIN} et ${AGE_MAX} ans)`}`
                     : 'Date invalide'}
@@ -199,8 +200,8 @@ export default function EleveFicheForm({
                   onClick={() => patch({ classe: c })}
                   className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
                     values.classe === c
-                      ? 'border-primary-500 bg-primary-500/20 text-primary-200'
-                      : 'border-dark-600 text-dark-500 hover:border-dark-500'
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-slate-200 text-slate-400 hover:border-slate-300'
                   }`}
                 >
                   {c}
@@ -208,11 +209,20 @@ export default function EleveFicheForm({
               ))}
             </div>
           </div>
+          <div>
+            <label className="label">Raison de sélection</label>
+            <textarea
+              className="input-field min-h-[80px]"
+              placeholder="Pourquoi cet enfant a-t-il été sélectionné pour suivre la formation ? (ex: recommandation école, situation familiale, motivation, dossier social…)"
+              value={values.raisonSelection}
+              onChange={(e) => patch({ raisonSelection: e.target.value })}
+            />
+          </div>
         </div>
       )}
 
       {step === 2 && showCentreSelect && centres.length > 1 && (
-        <div className="space-y-4 rounded-2xl border border-dark-700 bg-dark-900/40 p-4">
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <div>
             <label className="label">Centre de formation *</label>
             <select
@@ -223,7 +233,7 @@ export default function EleveFicheForm({
             >
               <option value="">Choisir un centre…</option>
               {centres.map((c) => (
-                <option key={c.id} value={c.id}>{c.nom}</option>
+                <option key={c.id} value={c.id}>{centreLabel(c)}</option>
               ))}
             </select>
           </div>
@@ -248,7 +258,7 @@ export default function EleveFicheForm({
             Continuer
           </button>
         ) : (
-          <p className="text-xs text-dark-500 self-center">
+          <p className="text-xs text-slate-500 self-center">
             Cliquez sur {mode === 'create' ? 'Inscrire' : 'Enregistrer'} pour valider.
           </p>
         )}

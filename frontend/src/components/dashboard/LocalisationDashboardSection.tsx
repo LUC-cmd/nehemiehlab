@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Centre, SessionCours } from '../../types';
+import { centreLabel } from '../../utils/centreLabel';
 import { useAuth } from '../../context/AuthContext';
 import { useAccess } from '../../context/AccessContext';
 import { centreService } from '../../services/api';
@@ -365,7 +366,7 @@ export default function LocalisationDashboardSection({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-white truncate">{centre.nom}</p>
+                        <p className="text-sm font-medium text-white truncate">{centreLabel(centre)}</p>
                         <p className="text-xs text-dark-400 truncate mt-0.5">
                           {[centre.ville, centre.region].filter(Boolean).join(' · ')}
                         </p>

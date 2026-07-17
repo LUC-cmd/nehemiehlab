@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowUpRight, Filter, Sparkles, UserCircle2 } from 'lucide-react';
 import { centreService, contentManagementService } from '../../services/api';
 import type { Centre, EnfantProfilePublic } from '../../types';
+import { centreLabel } from '../../utils/centreLabel';
 import { mediaUrl } from '../../utils/media';
 import { useAuth } from '../../context/AuthContext';
 
@@ -163,7 +164,7 @@ export default function EnfantsProfilesShowcase({
           >
             <option value="">Tous les centres</option>
             {filteredCentres.map((c) => (
-              <option key={c.id} value={c.id}>{c.nom}</option>
+              <option key={c.id} value={c.id}>{centreLabel(c)}</option>
             ))}
           </select>
         </div>
