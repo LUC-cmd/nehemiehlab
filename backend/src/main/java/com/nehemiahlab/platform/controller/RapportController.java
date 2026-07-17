@@ -763,6 +763,201 @@ public class RapportController {
                 .body(pdf);
     }
 
+    private static final Map<Role, String> ROLE_LABELS_FR = Map.ofEntries(
+            Map.entry(Role.DIRECTEUR, "Directeur"),
+            Map.entry(Role.FORMATEUR, "Formateur"),
+            Map.entry(Role.COORDINATEUR, "Coordinateur"),
+            Map.entry(Role.RESPONSABLE_CLUSTER, "Responsable cluster"),
+            Map.entry(Role.COMPTABLE, "Comptable"),
+            Map.entry(Role.STAFF_NEHEMIAH, "Staff Nehemiah"),
+            Map.entry(Role.ANIMATEUR, "Animateur CDEJ"),
+            Map.entry(Role.PARENT, "Parent"),
+            Map.entry(Role.BENEVOLE, "Benevole CDEJ"),
+            Map.entry(Role.PARTICIPANT, "Participant CDEJ")
+    );
+
+    private String centresLabel(User u) {
+        if (u.getCentres() == null || u.getCentres().isEmpty()) return "-";
+        return u.getCentres().stream()
+                .map(c -> c.getCodeCdej() != null && !c.getCodeCdej().isBlank()
+                        ? c.getNom() + " (" + c.getCodeCdej() + ")"
+                        : c.getNom())
+                .sorted()
+                .collect(Collectors.joining(", "));
+    }
+
+    private String ancienneteLabel(User u) {
+        LocalDate ref = u.getDateEntree() != null
+                ? u.getDateEntree()
+                : (u.getCreatedAt() != null ? u.getCreatedAt().toLocalDate() : null);
+        return ref != null ? ref.format(REPORT_DATE) : "-";
+    }
+
+    private String cniLabel(User u) {
+        boolean recto = u.getCarteIdentiteRecto() != null && !u.getCarteIdentiteRecto().isBlank();
+        boolean verso = u.getCarteIdentiteVerso() != null && !u.getCarteIdentiteVerso().isBlank();
+        if (recto && verso) return "Complete";
+        if (recto || verso) return "Partielle";
+        return "Manquante";
+    }
+
+    @GetMapping("/formateurs")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<byte[]> exportFormateurs() throws IOException {
+        List<User> formateurs = userRepository.findByRoleOrderByCreatedAtDesc(Role.FORMATEUR);
+
+        Workbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("Formateurs");
+        CellStyle headerStyle = buildHeaderStyle(workbook);
+
+        Row headerRow = sheet.createRow(0);
+        String[] columns = {"Nom", "Prenom", "Email", "Telephone", "Statut", "Centre(s)", "Date d'entree", "CNI"};
+        for (int i = 0; i < columns.length; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(columns[i]);
+            cell.setCellStyle(headerStyle);
+        }
+
+        int rowNum = 1;
+        for (User f : formateurs) {
+            Row row = sheet.createRow(rowNum++);
+            row.createCell(0).setCellValue(f.getNom());
+            row.createCell(1).setCellValue(f.getPrenom());
+            row.createCell(2).setCellValue(f.getEmail());
+            row.createCell(3).setCellValue(f.getTelephone() != null ? f.getTelephone() : "-");
+            row.createCell(4).setCellValue(f.isActif() ? "Valide" : "En attente");
+            row.createCell(5).setCellValue(centresLabel(f));
+            row.createCell(6).setCellValue(ancienneteLabel(f));
+            row.createCell(7).setCellValue(cniLabel(f));
+        }
+
+        finalizeExcelSheet(sheet, columns.length);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        workbook.close();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=formateurs.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(out.toByteArray());
+    }
+
+    @GetMapping("/formateurs/pdf")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<byte[]> exportFormateursPdf() throws IOException {
+        List<User> formateurs = userRepository.findByRoleOrderByCreatedAtDesc(Role.FORMATEUR);
+
+        List<List<String>> rows = formateurs.stream().map(f -> List.of(
+                f.getPrenom() + " " + f.getNom(),
+                f.getEmail(),
+                f.getTelephone() != null ? f.getTelephone() : "-",
+                f.isActif() ? "Valide" : "En attente",
+                centresLabel(f),
+                ancienneteLabel(f),
+                cniLabel(f)
+        )).toList();
+
+        Map<String, String> meta = new LinkedHashMap<>();
+        meta.put("Total formateurs", String.valueOf(rows.size()));
+        long valides = formateurs.stream().filter(User::isActif).count();
+        meta.put("Valides", String.valueOf(valides));
+        meta.put("En attente", String.valueOf(rows.size() - valides));
+
+        byte[] pdf = buildPdfTableReport(
+                "Liste des formateurs",
+                List.of("Nom complet", "Email", "Telephone", "Statut", "Centre(s)", "Entree", "CNI"),
+                rows,
+                meta,
+                ReportTemplate.ACTIVITES,
+                new float[]{90f, 110f, 60f, 55f, 110f, 55f, 55f}
+        );
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=formateurs.pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    @GetMapping("/utilisateurs")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<byte[]> exportUtilisateurs() throws IOException {
+        List<User> utilisateurs = userRepository.findAll().stream()
+                .filter(u -> u.getRole() != Role.PARENT)
+                .sorted(Comparator.comparing(User::getNom, Comparator.nullsLast(String::compareTo)))
+                .toList();
+
+        Workbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("Utilisateurs");
+        CellStyle headerStyle = buildHeaderStyle(workbook);
+
+        Row headerRow = sheet.createRow(0);
+        String[] columns = {"Nom", "Prenom", "Email", "Role", "Telephone", "Statut", "Centre(s)", "Date d'entree"};
+        for (int i = 0; i < columns.length; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(columns[i]);
+            cell.setCellStyle(headerStyle);
+        }
+
+        int rowNum = 1;
+        for (User u : utilisateurs) {
+            Row row = sheet.createRow(rowNum++);
+            row.createCell(0).setCellValue(u.getNom());
+            row.createCell(1).setCellValue(u.getPrenom());
+            row.createCell(2).setCellValue(u.getEmail());
+            row.createCell(3).setCellValue(ROLE_LABELS_FR.getOrDefault(u.getRole(), u.getRole().name()));
+            row.createCell(4).setCellValue(u.getTelephone() != null ? u.getTelephone() : "-");
+            row.createCell(5).setCellValue(u.isActif() ? "Actif" : "Inactif");
+            row.createCell(6).setCellValue(centresLabel(u));
+            row.createCell(7).setCellValue(ancienneteLabel(u));
+        }
+
+        finalizeExcelSheet(sheet, columns.length);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        workbook.close();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=utilisateurs.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(out.toByteArray());
+    }
+
+    @GetMapping("/utilisateurs/pdf")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<byte[]> exportUtilisateursPdf() throws IOException {
+        List<User> utilisateurs = userRepository.findAll().stream()
+                .filter(u -> u.getRole() != Role.PARENT)
+                .sorted(Comparator.comparing(User::getNom, Comparator.nullsLast(String::compareTo)))
+                .toList();
+
+        List<List<String>> rows = utilisateurs.stream().map(u -> List.of(
+                u.getPrenom() + " " + u.getNom(),
+                u.getEmail(),
+                ROLE_LABELS_FR.getOrDefault(u.getRole(), u.getRole().name()),
+                u.getTelephone() != null ? u.getTelephone() : "-",
+                u.isActif() ? "Actif" : "Inactif",
+                centresLabel(u),
+                ancienneteLabel(u)
+        )).toList();
+
+        Map<String, String> meta = new LinkedHashMap<>();
+        meta.put("Total utilisateurs", String.valueOf(rows.size()));
+
+        byte[] pdf = buildPdfTableReport(
+                "Liste des utilisateurs",
+                List.of("Nom complet", "Email", "Role", "Telephone", "Statut", "Centre(s)", "Entree"),
+                rows,
+                meta,
+                ReportTemplate.ACTIVITES,
+                new float[]{85f, 105f, 70f, 55f, 45f, 90f, 55f}
+        );
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=utilisateurs.pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
     @GetMapping("/eleve/{id}/pdf")
     public ResponseEntity<byte[]> exportSingleElevePdf(@PathVariable Long id, Authentication auth) throws IOException {
         return exportEleveFichePdf(id, auth);
