@@ -27,6 +27,7 @@ export type EleveFicheValues = {
   classe: string;
   centreId: string;
   dateDebutFormation: string;
+  raisonSelection: string;
 };
 
 export const emptyEleveFiche = (centreId = ''): EleveFicheValues => ({
@@ -38,6 +39,7 @@ export const emptyEleveFiche = (centreId = ''): EleveFicheValues => ({
   classe: '',
   centreId,
   dateDebutFormation: new Date().toISOString().split('T')[0],
+  raisonSelection: '',
 });
 
 export function eleveToFicheValues(eleve: {
@@ -49,6 +51,7 @@ export function eleveToFicheValues(eleve: {
   classe: string;
   centre?: { id: number };
   dateDebutFormation: string;
+  raisonSelection?: string;
 }): EleveFicheValues {
   return {
     nom: eleve.nom,
@@ -59,5 +62,6 @@ export function eleveToFicheValues(eleve: {
     classe: eleve.classe,
     centreId: eleve.centre?.id ? String(eleve.centre.id) : '',
     dateDebutFormation: eleve.dateDebutFormation?.split('T')[0] || new Date().toISOString().split('T')[0],
+    raisonSelection: eleve.raisonSelection || '',
   };
 }
