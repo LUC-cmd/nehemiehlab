@@ -89,6 +89,8 @@ export default function FormateursPage() {
     centreName: string;
   } | null>(null);
   const [detailFormateur, setDetailFormateur] = useState<User | null>(null);
+  const [confirmDeleteFormateur, setConfirmDeleteFormateur] = useState<User | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const assignSectionRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const skeletonLoading = useMinDelayLoading(loading, 220);
 
@@ -173,6 +175,27 @@ export default function FormateursPage() {
       toast.error('Impossible de retirer ce centre.');
     } finally {
       setRemovingKey(null);
+    }
+  };
+
+  const handleSupprimerCompteEnAttente = async () => {
+    if (!confirmDeleteFormateur) return;
+    const id = confirmDeleteFormateur.id;
+    setConfirmDeleteFormateur(null);
+    setDeletingId(id);
+    try {
+      await userService.supprimerCompteEnAttente(id);
+      toast.success('Compte en attente supprimé définitivement.');
+      setDetailFormateur((prev) => (prev?.id === id ? null : prev));
+      await fetchAll();
+    } catch (err: unknown) {
+      const data = (err as { response?: { data?: { message?: string } | string } })?.response?.data;
+      const message =
+        (typeof data === 'string' ? data : data?.message) ||
+        'Impossible de supprimer ce compte.';
+      toast.error(message);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -440,6 +463,16 @@ export default function FormateursPage() {
                       onClick={() => handleValider(formateur.id)}
                     >
                       {validatingId === formateur.id ? 'Validation…' : 'Valider le compte'}
+                    </ValidationActionButton>
+                    <ValidationActionButton
+                      fullWidth
+                      size="sm"
+                      variant="danger"
+                      icon={Trash2}
+                      loading={deletingId === formateur.id}
+                      onClick={() => setConfirmDeleteFormateur(formateur)}
+                    >
+                      {deletingId === formateur.id ? 'Suppression…' : 'Supprimer définitivement'}
                     </ValidationActionButton>
                   </div>
                 </div>
@@ -730,6 +763,29 @@ export default function FormateursPage() {
         danger
         onConfirm={handleRetirer}
         onCancel={() => setConfirmRemoveCentre(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteFormateur != null}
+        title="Supprimer définitivement ce compte ?"
+        message={
+          confirmDeleteFormateur
+            ? `Cette action est irréversible : le compte de ${formatFullName(confirmDeleteFormateur.prenom, confirmDeleteFormateur.nom)} (${confirmDeleteFormateur.email}) et toutes ses données (documents fournis, informations personnelles) seront supprimés définitivement. Cette suppression n’est possible que pour les comptes en attente de validation.`
+            : ''
+        }
+        confirmLabel="Supprimer définitivement"
+        danger
+        requireTypedConfirmation={confirmDeleteFormateur?.email}
+        typedConfirmationLabel={
+          confirmDeleteFormateur ? (
+            <>
+              Pour confirmer, retapez l’email du compte :{' '}
+              <span className="font-mono font-semibold text-slate-700">{confirmDeleteFormateur.email}</span>
+            </>
+          ) : undefined
+        }
+        onConfirm={handleSupprimerCompteEnAttente}
+        onCancel={() => setConfirmDeleteFormateur(null)}
       />
     </div>
   );

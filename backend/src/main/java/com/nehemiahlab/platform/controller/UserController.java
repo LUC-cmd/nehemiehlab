@@ -400,4 +400,33 @@ public class UserController {
         userRepository.save(user);
         return ResponseEntity.ok(Map.of("message", "Compte désactivé."));
     }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<?> supprimerCompteEnAttente(@PathVariable Long id) {
+        Optional<User> userOpt = userRepository.findById(id);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        User user = userOpt.get();
+        if (user.getRole() == Role.DIRECTEUR) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Impossible de supprimer un compte Directeur."));
+        }
+        if (user.isActif()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Seuls les comptes en attente (non validés) peuvent être supprimés définitivement."
+            ));
+        }
+
+        List<Centre> centresLies = centreRepository.findByCoordinateur(user);
+        if (!centresLies.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Ce compte est lié à un centre en tant que coordinateur. Retirez ce lien avant de le supprimer."
+            ));
+        }
+
+        userRepository.delete(user);
+        return ResponseEntity.ok(Map.of("message", "Compte supprimé définitivement."));
+    }
 }
