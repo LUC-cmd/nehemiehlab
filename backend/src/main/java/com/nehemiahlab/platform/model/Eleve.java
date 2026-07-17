@@ -39,6 +39,10 @@ public class Eleve {
     @Column(nullable = false)
     private String classe;
 
+    /** Raison pour laquelle l'enfant a ete selectionne pour suivre la formation SKA */
+    @Column(name = "raison_selection", columnDefinition = "TEXT")
+    private String raisonSelection;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "centre_id", nullable = false)
     private Centre centre;
