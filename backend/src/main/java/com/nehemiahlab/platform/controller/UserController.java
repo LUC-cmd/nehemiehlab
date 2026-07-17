@@ -280,6 +280,25 @@ public class UserController {
             } catch (Exception ignored) {
             }
         }
+        if (body.containsKey("dateEntree")) {
+            if (current.getRole() != Role.DIRECTEUR) {
+                return ResponseEntity.status(403).body(Map.of("message", "Seul le Directeur peut modifier la date d'anciennete."));
+            }
+            String raw = body.get("dateEntree");
+            if (raw == null || raw.isBlank()) {
+                user.setDateEntree(null);
+            } else {
+                try {
+                    LocalDate entree = LocalDate.parse(raw);
+                    if (entree.isAfter(LocalDate.now())) {
+                        return ResponseEntity.badRequest().body(Map.of("message", "La date d'anciennete ne peut pas être dans le futur."));
+                    }
+                    user.setDateEntree(entree);
+                } catch (Exception ignored) {
+                    return ResponseEntity.badRequest().body(Map.of("message", "Date d'anciennete invalide."));
+                }
+            }
+        }
         if (body.containsKey("motDePasse") && body.get("motDePasse") != null && !body.get("motDePasse").isEmpty()) {
             String ancien = body.get("ancienMotDePasse");
             if (ancien == null || ancien.isBlank()) {
