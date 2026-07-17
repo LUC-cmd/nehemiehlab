@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { User as UserIcon } from 'lucide-react';
 import { mediaUrl } from '../../utils/media';
 import type { User } from '../../types';
@@ -54,6 +54,14 @@ export default function UserAvatar({
   const p = prenom ?? user?.prenom;
   const n = nom ?? user?.nom;
   const src = mediaUrl(avatar ?? user?.avatar);
+  // Reinitialise l'etat "image cassee" a chaque changement de photo (ex: apres
+  // un nouvel upload) : sans cela, une seule erreur de chargement (reseau,
+  // cache) bloquait definitivement l'affichage de la photo dans cette session,
+  // meme apres un upload reussi ulterieur, tant que le composant n'etait pas
+  // demonte (listes d'utilisateurs, dossier formateur...).
+  useEffect(() => {
+    setBroken(false);
+  }, [src]);
   const showImage = Boolean(src) && !broken;
   const letters = initials(p, n);
   const radius =
