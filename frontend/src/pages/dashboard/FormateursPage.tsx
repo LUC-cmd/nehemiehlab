@@ -6,7 +6,7 @@ import type { Centre, User } from '../../types';
 import {
   Mail, Phone, Shield, Search, CheckCircle2,
   Building2, Clock, Calendar, MapPin, FileImage, Eye,
-  Trash2, Play, Filter,
+  Trash2, Play, Filter, Pencil,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageLoadingSkeleton } from '../../components/ui/DashboardSkeletons';
@@ -19,6 +19,7 @@ import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import SecureImage from '../../components/ui/SecureImage';
 import ValidationActionButton from '../../components/ui/ValidationActionButton';
+import { ancienneteDate, formatAnciennete } from '../../utils/anciennete';
 
 function formatDate(value?: string) {
   if (!value) return 'Non renseigné';
@@ -91,12 +92,20 @@ export default function FormateursPage() {
   const [detailFormateur, setDetailFormateur] = useState<User | null>(null);
   const [confirmDeleteFormateur, setConfirmDeleteFormateur] = useState<User | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [editingAnciennete, setEditingAnciennete] = useState(false);
+  const [ancienneteDraft, setAncienneteDraft] = useState('');
+  const [savingAnciennete, setSavingAnciennete] = useState(false);
   const assignSectionRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const skeletonLoading = useMinDelayLoading(loading, 220);
 
   useEffect(() => {
     fetchAll();
   }, []);
+
+  useEffect(() => {
+    setEditingAnciennete(false);
+    setAncienneteDraft(detailFormateur?.dateEntree || '');
+  }, [detailFormateur]);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -196,6 +205,26 @@ export default function FormateursPage() {
       toast.error(message);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const saveAncienneteFormateur = async () => {
+    if (!detailFormateur) return;
+    setSavingAnciennete(true);
+    try {
+      const { data } = await userService.updateProfile(detailFormateur.id, { dateEntree: ancienneteDraft });
+      toast.success('Ancienneté mise à jour.');
+      setDetailFormateur(data);
+      setEditingAnciennete(false);
+      await fetchAll();
+    } catch (err: unknown) {
+      const data = (err as { response?: { data?: { message?: string } | string } })?.response?.data;
+      const message =
+        (typeof data === 'string' ? data : data?.message) ||
+        "Impossible de mettre à jour l'ancienneté.";
+      toast.error(message);
+    } finally {
+      setSavingAnciennete(false);
     }
   };
 
@@ -717,6 +746,49 @@ export default function FormateursPage() {
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                 <p className="text-xs text-slate-500 flex items-center gap-1"><MapPin className="w-3 h-3" /> Adresse</p>
                 <p className="font-medium text-slate-800 mt-0.5">{detailFormateur.adresse || '—'}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:col-span-2">
+                <p className="text-xs text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" /> Ancienneté</p>
+                {editingAnciennete ? (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <input
+                      type="date"
+                      className="input-field text-sm py-1.5"
+                      max={new Date().toISOString().split('T')[0]}
+                      value={ancienneteDraft}
+                      onChange={(e) => setAncienneteDraft(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      disabled={savingAnciennete}
+                      onClick={saveAncienneteFormateur}
+                      className="btn-primary text-xs px-3 py-1.5 disabled:opacity-60"
+                    >
+                      {savingAnciennete ? 'Enregistrement…' : 'Enregistrer'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingAnciennete(false)}
+                      className="btn-ghost text-xs px-3 py-1.5"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                ) : (
+                  <p className="font-medium text-slate-800 mt-0.5 flex items-center gap-2">
+                    {formatAnciennete(ancienneteDate(detailFormateur))}
+                    {isDir && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingAnciennete(true)}
+                        title="Modifier l'ancienneté"
+                        className="text-slate-400 hover:text-[#004b57] transition-colors"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </p>
+                )}
               </div>
             </div>
 
