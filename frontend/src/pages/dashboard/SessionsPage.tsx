@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAccess } from '../../context/AccessContext';
 import { centreService, eleveService, sessionService, syncOfflineQueue, moduleCoursService, rapportService } from '../../services/api';
 import type { Centre, Eleve, SessionCours, EvaluationSession, User, ModuleCours } from '../../types';
+import { centreLabel } from '../../utils/centreLabel';
 import { fetchWithOfflineCache, readCache, writeCache } from '../../utils/offlineCache';
 import {
   getOfflineSessionDraft,
@@ -888,7 +889,7 @@ export default function SessionsPage() {
               <option value="">Sélectionner un centre...</option>
               {formateurCentres.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.nom}
+                  {centreLabel(c)}
                 </option>
               ))}
             </select>
@@ -1038,7 +1039,7 @@ export default function SessionsPage() {
                         </div>
                         <div>
                           <h3 className="font-bold text-slate-900">{s.titre}</h3>
-                          <p className="text-xs text-slate-500">{s.centre.nom}</p>
+                          <p className="text-xs text-slate-500">{centreLabel(s.centre)}</p>
                         </div>
                       </div>
                       <span
@@ -1157,7 +1158,7 @@ export default function SessionsPage() {
                         </div>
                         <div>
                           <h3 className="font-bold text-slate-900">{s.titre}</h3>
-                          <p className="text-xs text-slate-500">{s.centre.nom}</p>
+                          <p className="text-xs text-slate-500">{centreLabel(s.centre)}</p>
                         </div>
                       </div>
                       <span
@@ -1212,7 +1213,7 @@ export default function SessionsPage() {
               }}
             >
               <option value="">Sélectionner...</option>
-              {centres.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+              {centres.map(c => <option key={c.id} value={c.id}>{centreLabel(c)}</option>)}
             </select>
           </div>
           <div>
@@ -1322,7 +1323,7 @@ export default function SessionsPage() {
                 </h2>
                 {selectedSession && (
                   <p className="text-sm text-dark-400">
-                    {selectedSession.centre.nom}
+                    {centreLabel(selectedSession.centre)}
                     {' · '}
                     {evaluations.filter((e) => e.present).length}/{evaluations.length} présents
                   </p>

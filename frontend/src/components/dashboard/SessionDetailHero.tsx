@@ -3,6 +3,7 @@ import {
   BookOpen, Building2, Calendar, Clock, MapPin, Timer, Wrench, AlertTriangle,
 } from 'lucide-react';
 import type { SessionCours } from '../../types';
+import { centreLabel } from '../../utils/centreLabel';
 import { formatCoords } from '../../utils/geo';
 
 type Props = {
@@ -58,7 +59,7 @@ export default function SessionDetailHero({
             <h3 className="text-xl sm:text-2xl font-bold text-white leading-snug">{session.titre}</h3>
             <p className="text-sm text-dark-400 flex items-center gap-1.5">
               <Building2 className="w-4 h-4 shrink-0 text-primary-400" />
-              {session.centre.nom}
+              {centreLabel(session.centre)}
             </p>
           </div>
 

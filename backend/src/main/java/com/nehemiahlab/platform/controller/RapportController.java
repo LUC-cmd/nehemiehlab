@@ -676,7 +676,7 @@ public class RapportController {
         CellStyle headerStyle = buildHeaderStyle(workbook);
 
         Row headerRow = sheet.createRow(0);
-        String[] columns = {"ID", "Nom", "Prénom", "Âge", "Sexe", "Classe", "Centre", "Région", "Cluster", "Total Heures", "Projet"};
+        String[] columns = {"ID", "Matricule", "Nom", "Prénom", "Âge", "Sexe", "Classe", "Centre", "Région", "Cluster", "Total Heures", "Projet"};
         for (int i = 0; i < columns.length; i++) {
             Cell cell = headerRow.createCell(i);
             cell.setCellValue(columns[i]);
@@ -687,16 +687,17 @@ public class RapportController {
         for (Eleve eleve : eleves) {
             Row row = sheet.createRow(rowNum++);
             row.createCell(0).setCellValue(eleve.getId());
-            row.createCell(1).setCellValue(eleve.getNom());
-            row.createCell(2).setCellValue(eleve.getPrenom());
-            row.createCell(3).setCellValue(eleve.getAge());
-            row.createCell(4).setCellValue(eleve.getSexe());
-            row.createCell(5).setCellValue(eleve.getClasse());
-            row.createCell(6).setCellValue(eleve.getCentre() != null ? eleve.getCentre().getNom() : "-");
-            row.createCell(7).setCellValue(eleve.getCentre() != null && eleve.getCentre().getRegion() != null ? eleve.getCentre().getRegion() : "-");
-            row.createCell(8).setCellValue(eleve.getCentre() != null && eleve.getCentre().getCluster() != null ? eleve.getCentre().getCluster() : "-");
-            row.createCell(9).setCellValue(eleve.getTotalHeures() != null ? eleve.getTotalHeures() : 0.0);
-            row.createCell(10).setCellValue(eleve.getProjet() != null ? eleve.getProjet().getNom() : "Aucun");
+            row.createCell(1).setCellValue(eleve.getMatricule() != null ? eleve.getMatricule() : "-");
+            row.createCell(2).setCellValue(eleve.getNom());
+            row.createCell(3).setCellValue(eleve.getPrenom());
+            row.createCell(4).setCellValue(eleve.getAge());
+            row.createCell(5).setCellValue(eleve.getSexe());
+            row.createCell(6).setCellValue(eleve.getClasse());
+            row.createCell(7).setCellValue(eleve.getCentre() != null ? eleve.getCentre().getNom() : "-");
+            row.createCell(8).setCellValue(eleve.getCentre() != null && eleve.getCentre().getRegion() != null ? eleve.getCentre().getRegion() : "-");
+            row.createCell(9).setCellValue(eleve.getCentre() != null && eleve.getCentre().getCluster() != null ? eleve.getCentre().getCluster() : "-");
+            row.createCell(10).setCellValue(eleve.getTotalHeures() != null ? eleve.getTotalHeures() : 0.0);
+            row.createCell(11).setCellValue(eleve.getProjet() != null ? eleve.getProjet().getNom() : "Aucun");
         }
 
         finalizeExcelSheet(sheet, columns.length);
@@ -731,7 +732,7 @@ public class RapportController {
         List<Eleve> eleves = loadEleves(eleveId, centreIds);
 
         List<List<String>> rows = eleves.stream().map(e -> List.of(
-                String.valueOf(e.getId()),
+                e.getMatricule() != null ? e.getMatricule() : "-",
                 e.getPrenom() + " " + e.getNom(),
                 String.valueOf(e.getAge()),
                 e.getSexe() != null ? e.getSexe() : "-",
@@ -749,11 +750,11 @@ public class RapportController {
 
         byte[] pdf = buildPdfTableReport(
                 "Rapport apprenants",
-                List.of("ID", "Nom complet", "Age", "Sexe", "Classe", "Centre", "Heures", "Projet"),
+                List.of("Matricule", "Nom complet", "Age", "Sexe", "Classe", "Centre", "Heures", "Projet"),
                 rows,
                 meta,
                 ReportTemplate.APPRENANTS,
-                new float[]{35f, 110f, 35f, 35f, 55f, 95f, 55f, 95f}
+                new float[]{60f, 100f, 30f, 30f, 50f, 90f, 50f, 90f}
         );
 
         return ResponseEntity.ok()

@@ -8,6 +8,7 @@ import {
 import toast from 'react-hot-toast';
 import { centreService, contentManagementService, eleveService } from '../../services/api';
 import type { Centre, Eleve, EnfantProfilePublic, EnfantProject, ProjectMediaType } from '../../types';
+import { centreLabel } from '../../utils/centreLabel';
 import { useAuth } from '../../context/AuthContext';
 import { mediaUrl } from '../../utils/media';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -579,7 +580,7 @@ export default function ProfilsEnfantsPage() {
             onChange={(e) => setCentreFilter(e.target.value)}
           >
             <option value="">Tous les centres</option>
-            {filteredCentres.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
+            {filteredCentres.map((c) => <option key={c.id} value={c.id}>{centreLabel(c)}</option>)}
           </select>
         </div>
       </div>
@@ -851,7 +852,7 @@ export default function ProfilsEnfantsPage() {
                   >
                     <option value="">Choisir un centre</option>
                     {pickerCentres.map((c) => (
-                      <option key={c.id} value={c.id}>{c.nom}</option>
+                      <option key={c.id} value={c.id}>{centreLabel(c)}</option>
                     ))}
                   </select>
                 </div>

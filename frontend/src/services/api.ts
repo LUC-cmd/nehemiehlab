@@ -305,6 +305,15 @@ export const centreService = {
 };
 
 // ============================================================
+//  Services Clusters
+// ============================================================
+export const clusterService = {
+  getAll: () => api.get('/clusters'),
+  create: (nom: string) => api.post('/clusters', { nom }),
+  delete: (id: number) => api.delete(`/clusters/${id}`),
+};
+
+// ============================================================
 //  Services Élèves
 // ============================================================
 export const eleveService = {
@@ -313,11 +322,11 @@ export const eleveService = {
   getSeances: (id: number) => api.get<ChildSessionRow[]>(`/eleves/${id}/seances`),
   create: (data: {
     nom: string; prenom: string; dateNaissance?: string; age: number; sexe: string;
-    classe: string; centreId: number; dateDebutFormation: string;
+    classe: string; centreId: number; dateDebutFormation: string; raisonSelection?: string;
   }) => api.post('/eleves', data),
   update: (id: number, data: {
     nom?: string; prenom?: string; dateNaissance?: string; age?: number; sexe?: string;
-    classe?: string; dateDebutFormation?: string;
+    classe?: string; dateDebutFormation?: string; raisonSelection?: string;
   }) => api.put(`/eleves/${id}`, data),
   issueParentActivationCode: (eleveId: number) =>
     api.post(`/eleves/${eleveId}/parent-activation-code`),

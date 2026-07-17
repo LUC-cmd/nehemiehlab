@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { formationService, centreService, eleveService, userService, moduleCoursService } from '../../services/api';
 import type { ModuleFormation, Centre, Eleve, User as UserType, ModuleCours } from '../../types';
+import { centreLabel } from '../../utils/centreLabel';
 import { formatFullName } from '../../utils/displayName';
 import { Plus, BookOpen, Calendar, Clock, User, Check, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -346,7 +347,7 @@ export default function FormationsPage() {
               onChange={(e) => handleCentreChange(e.target.value)}
             >
               {centres.map((c) => (
-                <option key={c.id} value={c.id}>{c.nom}</option>
+                <option key={c.id} value={c.id}>{centreLabel(c)}</option>
               ))}
             </select>
           </div>
@@ -483,7 +484,7 @@ export default function FormationsPage() {
             >
               <option value="">Sélectionner le centre...</option>
               {centres.map((c) => (
-                <option key={c.id} value={c.id}>{c.nom}</option>
+                <option key={c.id} value={c.id}>{centreLabel(c)}</option>
               ))}
             </select>
           </div>

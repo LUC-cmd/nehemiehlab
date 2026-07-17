@@ -2,6 +2,7 @@ import React from 'react';
 import { MapPin, Navigation, Route } from 'lucide-react';
 import Modal from './Modal';
 import type { Centre } from '../../types';
+import { centreLabel } from '../../utils/centreLabel';
 
 interface LocationReminderModalProps {
   open: boolean;
@@ -89,7 +90,7 @@ export function LocationReminderModal({
                 className="flex items-center justify-between gap-3 rounded-lg border border-amber-100 bg-amber-50/80 px-3 py-2.5"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-900 truncate">{c.nom}</p>
+                  <p className="text-sm font-semibold text-slate-900 truncate">{centreLabel(c)}</p>
                   <p className="text-xs text-slate-500 truncate">
                     {c.adresse}, {c.ville}
                   </p>

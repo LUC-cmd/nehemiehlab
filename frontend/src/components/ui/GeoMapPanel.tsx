@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Circle, useMap } from 'react-leaflet';
 import L, { LatLngExpression } from 'leaflet';
 import type { Centre, SessionCours } from '../../types';
+import { centreLabel } from '../../utils/centreLabel';
 
 const DEFAULT_CENTER: LatLngExpression = [8.6, 1.0]; // centre approximatif du Togo
 const DEFAULT_ZOOM = 7;
@@ -180,7 +181,7 @@ export default function GeoMapPanel({
                   icon={isFocus ? focusCentreIcon : centreIcon}
                 >
                   <Popup>
-                    <strong>{c.nom}</strong>
+                    <strong>{centreLabel(c)}</strong>
                     <br />
                     {c.adresse}, {c.ville}
                     {c.region ? (

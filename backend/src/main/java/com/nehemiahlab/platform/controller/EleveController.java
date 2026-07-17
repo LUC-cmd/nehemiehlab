@@ -190,6 +190,11 @@ public class EleveController {
                     "Doublon détecté : un élève avec le même nom et prénom existe déjà dans ce centre."));
         }
 
+        Object rawRaison = body.get("raisonSelection");
+        String raisonSelection = rawRaison != null
+                ? com.nehemiahlab.platform.security.InputSanitizer.cleanNullable(rawRaison.toString())
+                : null;
+
         Eleve eleve = Eleve.builder()
                 .nom(nomClean)
                 .prenom(prenomClean)
@@ -198,6 +203,7 @@ public class EleveController {
                 .dateNaissance(dateNaissance)
                 .sexe(body.get("sexe").toString())
                 .classe(body.get("classe").toString())
+                .raisonSelection(raisonSelection)
                 .centre(centre)
                 .formateur(formateur)
                 .dateDebutFormation(LocalDate.parse(body.get("dateDebutFormation").toString()))
@@ -266,6 +272,10 @@ public class EleveController {
         }
         if (body.containsKey("dateDebutFormation")) {
             eleve.setDateDebutFormation(LocalDate.parse(body.get("dateDebutFormation").toString()));
+        }
+        if (body.containsKey("raisonSelection")) {
+            Object v = body.get("raisonSelection");
+            eleve.setRaisonSelection(v == null ? null : InputSanitizer.cleanNullable(v.toString()));
         }
 
         Eleve saved = eleveRepository.save(eleve);
