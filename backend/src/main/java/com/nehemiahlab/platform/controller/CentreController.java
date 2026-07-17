@@ -85,6 +85,9 @@ public class CentreController {
                     centre.setCluster(updateData.getCluster());
                     centre.setLatitude(updateData.getLatitude());
                     centre.setLongitude(updateData.getLongitude());
+                    if (updateData.getCodeCdej() != null) {
+                        centre.setCodeCdej(updateData.getCodeCdej().isBlank() ? null : updateData.getCodeCdej().trim());
+                    }
                     if (updateData.getTelephoneResponsable() != null) {
                         centre.setTelephoneResponsable(cleanPhone(updateData.getTelephoneResponsable()));
                     }
