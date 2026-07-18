@@ -7,9 +7,9 @@ public final class RapportAnnuelUtil {
 
     private RapportAnnuelUtil() {}
 
-    public static final String SKA_FOOTER_LEFT = "Un Programme de";
-    public static final String SKA_FOOTER_PHONE = "+228 97 25 53 53";
-    public static final String SKA_FOOTER_WEB = "SKA.NEHEMIAHLAB.COM";
+    public static final String SKA_FOOTER_LEFT = "Un Programme de Nehemiah Lab";
+    public static final String SKA_FOOTER_PHONE = "contact +228 97 25 53 53";
+    public static final String SKA_FOOTER_WEB = "site https://ska-management.com/";
 
     public static String niveauFromNote(Double note) {
         if (note == null) return "—";
