@@ -6,6 +6,7 @@ import com.nehemiahlab.platform.model.User;
 import com.nehemiahlab.platform.repository.MessageGroupeRepository;
 import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.service.NotificationDispatchService;
+import com.nehemiahlab.platform.service.ThreadLectureService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,6 +36,9 @@ public class DiscussionController {
 
     @Autowired
     private NotificationDispatchService notificationDispatchService;
+
+    @Autowired
+    private ThreadLectureService threadLectureService;
 
     /** Liste des canaux auxquels l'utilisateur connecte a accès, avec le nombre de messages. */
     @GetMapping("/canaux")
@@ -113,6 +117,35 @@ public class DiscussionController {
                 + (auteur.getNom() != null ? auteur.getNom() : "") + " : " + apercu;
         // Groupes de discussion internes : temps reel uniquement (pas d'email par message).
         notificationDispatchService.notifyManyInApp(destinataires, titre, messageNotif.trim(), "DISCUSSION", null);
+    }
+
+    /** Marque le canal comme lu par l'utilisateur connecte (a chaque consultation). */
+    @PostMapping("/{canal}/lu")
+    public ResponseEntity<?> marquerLu(@PathVariable String canal, Authentication auth) {
+        User user = (User) auth.getPrincipal();
+        CanalDiscussion c = parseCanal(canal);
+        if (c == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!c.accessiblePar(user.getRole())) {
+            return ResponseEntity.status(403).body(Map.of("message", "Vous n'avez pas accès à ce groupe de discussion."));
+        }
+        threadLectureService.marquerLu("CANAL", canal, user);
+        return ResponseEntity.ok().build();
+    }
+
+    /** Qui a deja consulte ce canal et quand (sert a calculer, cote client, qui a lu chaque message). */
+    @GetMapping("/{canal}/lecteurs")
+    public ResponseEntity<?> getLecteurs(@PathVariable String canal, Authentication auth) {
+        User user = (User) auth.getPrincipal();
+        CanalDiscussion c = parseCanal(canal);
+        if (c == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!c.accessiblePar(user.getRole())) {
+            return ResponseEntity.status(403).body(Map.of("message", "Vous n'avez pas accès à ce groupe de discussion."));
+        }
+        return ResponseEntity.ok(threadLectureService.getLecteurs("CANAL", canal));
     }
 
     private CanalDiscussion parseCanal(String raw) {
