@@ -400,7 +400,7 @@ export interface Notification {
   id: number;
   titre: string;
   message: string;
-  type: 'SIGNALEMENT' | 'TRANSACTION' | 'INFO';
+  type: 'SIGNALEMENT' | 'TRANSACTION' | 'INFO' | 'DISCUSSION';
   lu: boolean;
   createdAt: string;
   lienId?: number;

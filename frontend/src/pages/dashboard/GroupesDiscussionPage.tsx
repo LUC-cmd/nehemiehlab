@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageSquare, Send, Users, Plus, Building2, Network, Wallet, MessageCircle, ArrowLeft, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { discussionService, centreService, clusterService } from '../../services/api';
+import { connectNotificationsSocket } from '../../services/notificationsSocket';
 import type {
   CanalDiscussion,
   CanalDiscussionInfo,
@@ -133,6 +134,25 @@ export default function GroupesDiscussionPage() {
     const interval = setInterval(() => fetchThreads(), POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchThreads]);
+
+  // Temps réel : dès qu'une notification de type DISCUSSION arrive (WebSocket), on
+  // rafraîchit immédiatement la liste des fils et, si c'est le fil ouvert, les messages
+  // — au lieu d'attendre le prochain polling (jusqu'à 8s). Le polling reste le filet de
+  // sécurité si la connexion WebSocket est indisponible.
+  const activeThreadRef = useRef<Thread | null>(null);
+  useEffect(() => {
+    activeThreadRef.current = activeThread;
+  }, [activeThread]);
+
+  useEffect(() => {
+    const disconnect = connectNotificationsSocket((notif) => {
+      if (notif.type !== 'DISCUSSION') return;
+      fetchThreads();
+      const current = activeThreadRef.current;
+      if (current) fetchMessages(current, true);
+    });
+    return disconnect;
+  }, [fetchThreads, fetchMessages]);
 
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: 'smooth' });

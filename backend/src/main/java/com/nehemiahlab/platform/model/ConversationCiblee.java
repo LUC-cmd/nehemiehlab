@@ -48,7 +48,7 @@ public class ConversationCiblee {
      * centre/cluster/comptable. Quand ce set n'est pas vide, l'acces est strictement limite
      * a ces personnes (le Directeur n'a pas d'acces automatique).
      */
-    @ElementCollection(fetch = FetchType.LAZY)
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "conversation_ciblee_participants", joinColumns = @JoinColumn(name = "conversation_id"))
     @Column(name = "user_id")
     @Builder.Default
