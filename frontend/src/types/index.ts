@@ -227,6 +227,7 @@ export interface ConversationCiblee {
   createdBy?: User;
   createdAt: string;
   nbMessages: number;
+  peutRepondre: boolean;
   participants?: ConversationContact[];
 }
 
