@@ -34,4 +34,14 @@ public enum CanalDiscussion {
             case COMPTABLE_FORMATEURS -> role == Role.COMPTABLE || role == Role.FORMATEUR;
         };
     }
+
+    /** Roles concernes par ce canal (pour notifier les destinataires d'un nouveau message). */
+    public java.util.List<Role> roles() {
+        return switch (this) {
+            case FORMATEURS -> java.util.List.of(Role.FORMATEUR);
+            case FORMATEURS_DIRECTEUR -> java.util.List.of(Role.FORMATEUR, Role.DIRECTEUR);
+            case DIRECTION -> java.util.List.of(Role.DIRECTEUR, Role.FORMATEUR, Role.COMPTABLE);
+            case COMPTABLE_FORMATEURS -> java.util.List.of(Role.COMPTABLE, Role.FORMATEUR);
+        };
+    }
 }
