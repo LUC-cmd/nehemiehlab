@@ -96,12 +96,14 @@ function NotificationsPanel({ onClose }: { onClose: () => void }) {
     onClose();
     if (n.type === 'SIGNALEMENT') navigate('/dashboard/signalements');
     else if (n.type === 'TRANSACTION') navigate('/dashboard/transactions');
+    else if (n.type === 'DISCUSSION') navigate('/dashboard/discussion');
     else navigate('/dashboard');
   };
 
   const typeIcon: Record<string, React.ReactNode> = {
     SIGNALEMENT: <AlertTriangle className="w-4 h-4 text-red-400" />,
     TRANSACTION: <CreditCard className="w-4 h-4 text-amber-400" />,
+    DISCUSSION: <MessageSquare className="w-4 h-4 text-primary-500" />,
     INFO: <Bell className="w-4 h-4 text-blue-400" />,
   };
 
@@ -171,6 +173,7 @@ export default function DashboardLayout() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadDiscussionCount, setUnreadDiscussionCount] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [desktopNotifPermission, setDesktopNotifPermission] = useState(
     () => getBrowserNotificationPermission(),
@@ -198,6 +201,7 @@ export default function DashboardLayout() {
         prevNotifsRef.current = data;
         const unread = data.filter((n) => !n.lu).length;
         setUnreadCount(unread);
+        setUnreadDiscussionCount(data.filter((n) => !n.lu && n.type === 'DISCUSSION').length);
         syncDocumentTitleAlert(unread);
       })
       .catch(() => {});
@@ -274,20 +278,33 @@ export default function DashboardLayout() {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
-          <NavLink key={item.to} to={item.to}
-            end={item.exact}
-            className={({ isActive }) =>
-              `sidebar-link ${isActive ? 'active' : ''}`
-            }
-            onClick={() => setMobileSidebar(false)}
-          >
-            <span className="shrink-0">{item.icon}</span>
-            {(sidebarOpen || mobileSidebar) && (
-              <span className="truncate">{item.label}</span>
-            )}
-          </NavLink>
-        ))}
+        {navItems.map((item) => {
+          const discussionUnread = item.to === '/dashboard/discussion' ? unreadDiscussionCount : 0;
+          return (
+            <NavLink key={item.to} to={item.to}
+              end={item.exact}
+              className={({ isActive }) =>
+                `sidebar-link ${isActive ? 'active' : ''}`
+              }
+              onClick={() => setMobileSidebar(false)}
+            >
+              <span className="shrink-0 relative">
+                {item.icon}
+                {discussionUnread > 0 && !(sidebarOpen || mobileSidebar) && (
+                  <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 rounded-full bg-orange-500 ring-2 ring-[#004b57]" />
+                )}
+              </span>
+              {(sidebarOpen || mobileSidebar) && (
+                <span className="truncate flex-1">{item.label}</span>
+              )}
+              {discussionUnread > 0 && (sidebarOpen || mobileSidebar) && (
+                <span className="ml-auto shrink-0 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-orange-500 text-white text-[11px] font-bold flex items-center justify-center">
+                  {discussionUnread > 9 ? '9+' : discussionUnread}
+                </span>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Pied de sidebar — fond bleu marque */}
@@ -373,6 +390,19 @@ export default function DashboardLayout() {
             <div className="flex items-center gap-2 sm:gap-3">
               {/* Directeur : ouvrir / fermer inscriptions (toujours visible) */}
               {role === 'DIRECTEUR' && <InscriptionsToggle variant="topbar" />}
+
+              {/* Discussion : accès rapide, badge messages non lus */}
+              <button
+                onClick={() => navigate('/dashboard/discussion')}
+                title="Discussion"
+                className="p-2 relative rounded-lg text-white/90 hover:text-white hover:bg-white/10 transition-colors">
+                <MessageSquare className="w-5 h-5" />
+                {unreadDiscussionCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-orange-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                    {unreadDiscussionCount > 9 ? '9+' : unreadDiscussionCount}
+                  </span>
+                )}
+              </button>
 
               {/* Notifications */}
               <div className="relative flex items-center gap-1">
