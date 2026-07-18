@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -15,32 +15,37 @@ import LoginPage from './pages/LoginPage';
 import InscriptionFormateurPage from './pages/InscriptionFormateurPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { PAGE_ROLES } from './constants/roleAccess';
+import { PageLoadingSkeleton } from './components/ui/DashboardSkeletons';
 
-// Dashboard layout & pages
+// Dashboard layout — chargé immédiatement (structure commune à toutes les pages)
 import DashboardLayout from './pages/dashboard/DashboardLayout';
 import DashboardIndex from './pages/dashboard/DashboardIndex';
-import CentresPage from './pages/dashboard/CentresPage';
-import FormateursPage from './pages/dashboard/FormateursPage';
-import ElevesPage from './pages/dashboard/ElevesPage';
-import SessionsPage from './pages/dashboard/SessionsPage';
-import FormationsPage from './pages/dashboard/FormationsPage';
-import JournalActivitePage from './pages/dashboard/JournalActivitePage';
-import EvaluationFormateurPage from './pages/dashboard/EvaluationFormateurPage';
-import TransactionsPage from './pages/dashboard/TransactionsPage';
-import RapportsPage from './pages/dashboard/RapportsPage';
-import UtilisateursPage from './pages/dashboard/UtilisateursPage';
-import ProfilPage from './pages/dashboard/ProfilPage';
-import SignalementsPage from './pages/dashboard/SignalementsPage';
-import PublicationsPage from './pages/dashboard/PublicationsPage';
-import ActualitesPage from './pages/dashboard/ActualitesPage';
-import RessourcesPage from './pages/dashboard/RessourcesPage';
-import CommunautePage from './pages/dashboard/CommunautePage';
-import GroupesDiscussionPage from './pages/dashboard/GroupesDiscussionPage';
-import ProfilsEnfantsPage from './pages/dashboard/ProfilsEnfantsPage';
-import ControleGestionPage from './pages/dashboard/ControleGestionPage';
-import PermissionsPage from './pages/dashboard/PermissionsPage';
-import GaleriePage from './pages/dashboard/GaleriePage';
-import SupportsCoursPage from './pages/dashboard/SupportsCoursPage';
+
+// Pages du dashboard — chargées à la demande (code-splitting) : chaque
+// utilisateur ne télécharge que le JS des pages de son propre rôle, au lieu
+// de tout le dashboard (30+ pages) dès le premier chargement.
+const CentresPage = lazy(() => import('./pages/dashboard/CentresPage'));
+const FormateursPage = lazy(() => import('./pages/dashboard/FormateursPage'));
+const ElevesPage = lazy(() => import('./pages/dashboard/ElevesPage'));
+const SessionsPage = lazy(() => import('./pages/dashboard/SessionsPage'));
+const FormationsPage = lazy(() => import('./pages/dashboard/FormationsPage'));
+const JournalActivitePage = lazy(() => import('./pages/dashboard/JournalActivitePage'));
+const EvaluationFormateurPage = lazy(() => import('./pages/dashboard/EvaluationFormateurPage'));
+const TransactionsPage = lazy(() => import('./pages/dashboard/TransactionsPage'));
+const RapportsPage = lazy(() => import('./pages/dashboard/RapportsPage'));
+const UtilisateursPage = lazy(() => import('./pages/dashboard/UtilisateursPage'));
+const ProfilPage = lazy(() => import('./pages/dashboard/ProfilPage'));
+const SignalementsPage = lazy(() => import('./pages/dashboard/SignalementsPage'));
+const PublicationsPage = lazy(() => import('./pages/dashboard/PublicationsPage'));
+const ActualitesPage = lazy(() => import('./pages/dashboard/ActualitesPage'));
+const RessourcesPage = lazy(() => import('./pages/dashboard/RessourcesPage'));
+const CommunautePage = lazy(() => import('./pages/dashboard/CommunautePage'));
+const GroupesDiscussionPage = lazy(() => import('./pages/dashboard/GroupesDiscussionPage'));
+const ProfilsEnfantsPage = lazy(() => import('./pages/dashboard/ProfilsEnfantsPage'));
+const ControleGestionPage = lazy(() => import('./pages/dashboard/ControleGestionPage'));
+const PermissionsPage = lazy(() => import('./pages/dashboard/PermissionsPage'));
+const GaleriePage = lazy(() => import('./pages/dashboard/GaleriePage'));
+const SupportsCoursPage = lazy(() => import('./pages/dashboard/SupportsCoursPage'));
 
 function PageTransition({ children }: { children: React.ReactNode }) {
   return (
@@ -64,6 +69,7 @@ function AppRoutes() {
 
   return (
     <AnimatePresence mode="wait">
+      <Suspense fallback={<PageLoadingSkeleton />}>
       <Routes location={location} key={routeKey}>
         {/* Site Public */}
         <Route path="/" element={<PageTransition><HomePage /></PageTransition>} />
@@ -228,6 +234,7 @@ function AppRoutes() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </AnimatePresence>
   );
 }
