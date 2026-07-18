@@ -30,12 +30,15 @@ import java.util.Set;
  * Conversations ciblees : deux modes possibles.
  *  - "Cible" (reserve au Directeur) : audience calculee par centre, cluster et/ou comptable
  *    (voir NotificationDispatchService.resolveRecipients) -- pas de gestion manuelle des membres,
- *    et le Directeur a toujours acces (supervision).
+ *    et le Directeur a toujours acces (supervision). C'est une alerte a sens unique : les
+ *    destinataires la consultent et sont notifies en temps reel, mais seul le Directeur peut y
+ *    ecrire (repondre). Le Directeur choisit, message par message, s'il veut aussi l'envoyer par
+ *    email en plus de la notification temps reel (voir parametre "envoyerEmail").
  *  - "Libre" (style WhatsApp, ouvert a tous les roles du module discussion) : le createur
  *    choisit explicitement une ou plusieurs personnes precises. L'acces est alors strictement
  *    limite a cette liste de participants -- pas d'acces automatique pour le Directeur.
- * Dans les deux cas, une fois la conversation creee, tous les participants peuvent lire et
- * repondre (ce n'est pas une diffusion a sens unique).
+ *    Conversation a deux sens (tout participant peut repondre), toujours temps reel uniquement
+ *    (jamais d'email automatique).
  */
 @RestController
 @RequestMapping("/discussion/conversations")
@@ -173,6 +176,9 @@ public class ConversationCibleeController {
             builder.centreId(centreId).centreNom(centreNom).cluster(cluster).inclureComptable(inclureComptable);
         }
 
+        boolean envoyerEmail = Boolean.TRUE.equals(body.get("envoyerEmail"))
+                || "true".equalsIgnoreCase(String.valueOf(body.get("envoyerEmail")));
+
         ConversationCiblee conv = conversationRepository.save(builder.build());
 
         MessageCible message = messageRepository.save(MessageCible.builder()
@@ -181,7 +187,7 @@ public class ConversationCibleeController {
                 .contenu(contenu)
                 .build());
 
-        notifierNouveauMessage(conv, createur, contenu);
+        notifierNouveauMessage(conv, createur, contenu, envoyerEmail);
 
         Map<String, Object> reponse = toDto(conv, createur);
         reponse.put("premierMessage", message);
@@ -202,20 +208,26 @@ public class ConversationCibleeController {
     }
 
     @PostMapping("/{id}/messages")
-    public ResponseEntity<?> postMessage(@PathVariable Long id, @RequestBody Map<String, String> body, Authentication auth) {
+    public ResponseEntity<?> postMessage(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
         User user = (User) auth.getPrincipal();
         ConversationCiblee conv = conversationRepository.findById(id).orElse(null);
         if (conv == null) return ResponseEntity.notFound().build();
         if (!aAcces(conv, user)) {
             return ResponseEntity.status(403).body(Map.of("message", "Vous n'avez pas accès à cette conversation."));
         }
-        String contenu = InputSanitizer.clean(body.get("contenu"));
+        if (!estLibre(conv) && user.getRole() != Role.DIRECTEUR) {
+            return ResponseEntity.status(403).body(Map.of("message",
+                    "Cette diffusion est une alerte du Directeur : vous pouvez la consulter mais pas y répondre."));
+        }
+        String contenu = InputSanitizer.clean((String) body.get("contenu"));
         if (contenu == null || contenu.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Le message ne peut pas être vide."));
         }
         if (contenu.length() > 4000) {
             return ResponseEntity.badRequest().body(Map.of("message", "Le message est trop long (4000 caractères max)."));
         }
+        boolean envoyerEmail = Boolean.TRUE.equals(body.get("envoyerEmail"))
+                || "true".equalsIgnoreCase(String.valueOf(body.get("envoyerEmail")));
 
         MessageCible message = messageRepository.save(MessageCible.builder()
                 .conversationId(id)
@@ -223,7 +235,7 @@ public class ConversationCibleeController {
                 .contenu(contenu)
                 .build());
 
-        notifierNouveauMessage(conv, user, contenu);
+        notifierNouveauMessage(conv, user, contenu, envoyerEmail);
 
         return ResponseEntity.ok(message);
     }
@@ -256,7 +268,7 @@ public class ConversationCibleeController {
                 .anyMatch(u -> u.getId() != null && u.getId().equals(user.getId()));
     }
 
-    private void notifierNouveauMessage(ConversationCiblee conv, User auteur, String contenu) {
+    private void notifierNouveauMessage(ConversationCiblee conv, User auteur, String contenu, boolean envoyerEmail) {
         List<User> destinataires = resoudreParticipants(conv).stream()
                 .filter(u -> u.getId() != null && !u.getId().equals(auteur.getId()))
                 .toList();
@@ -266,10 +278,10 @@ public class ConversationCibleeController {
         String titre = "Nouveau message" + (estLibre(conv) ? "" : " ciblé") + " — " + labelGenerique(conv);
         String messageNotif = (auteur.getPrenom() != null ? auteur.getPrenom() : "") + " "
                 + (auteur.getNom() != null ? auteur.getNom() : "") + " : " + apercu;
-        // Discussion libre (individuelle/petit groupe) : temps reel uniquement, pas d'email par message.
-        // Diffusion ciblee par le directeur (centre/cluster/comptable) : email conserve (respecte
-        // la preference email de chaque destinataire) car c'est une alerte, pas une simple discussion.
-        if (estLibre(conv)) {
+        // Discussion libre (individuelle/petit groupe) : temps reel uniquement, jamais d'email
+        // automatique. Diffusion ciblee (centre/cluster/comptable) : alerte a sens unique --
+        // email seulement si le Directeur a coche "envoyer aussi par email" pour ce message.
+        if (estLibre(conv) || !envoyerEmail) {
             notificationDispatchService.notifyManyInApp(destinataires, titre, messageNotif.trim(), "DISCUSSION", conv.getId());
         } else {
             notificationDispatchService.notifyMany(destinataires, titre, messageNotif.trim(), "DISCUSSION", conv.getId());
@@ -290,6 +302,7 @@ public class ConversationCibleeController {
         m.put("createdBy", conv.getCreatedBy());
         m.put("createdAt", conv.getCreatedAt());
         m.put("nbMessages", messageRepository.countByConversationId(conv.getId()));
+        m.put("peutRepondre", libre || viewer.getRole() == Role.DIRECTEUR);
         if (libre) {
             List<Map<String, Object>> autres = resoudreParticipants(conv).stream()
                     .filter(u -> u.getId() != null && !u.getId().equals(viewer.getId()))
