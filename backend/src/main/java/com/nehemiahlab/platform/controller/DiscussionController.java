@@ -83,7 +83,7 @@ public class DiscussionController {
     }
 
     @PostMapping("/{canal}/messages")
-    public ResponseEntity<?> postMessage(@PathVariable String canal, @RequestBody Map<String, String> body, Authentication auth) {
+    public ResponseEntity<?> postMessage(@PathVariable String canal, @RequestBody Map<String, Object> body, Authentication auth) {
         User user = (User) auth.getPrincipal();
         CanalDiscussion c = parseCanal(canal);
         if (c == null) {
@@ -92,7 +92,7 @@ public class DiscussionController {
         if (!c.accessiblePar(user.getRole())) {
             return ResponseEntity.status(403).body(Map.of("message", "Vous n'avez pas accès à ce groupe de discussion."));
         }
-        String contenu = InputSanitizer.clean(body.get("contenu"));
+        String contenu = InputSanitizer.clean((String) body.get("contenu"));
         if (contenu == null || contenu.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Le message ne peut pas être vide."));
         }
@@ -100,10 +100,22 @@ public class DiscussionController {
             return ResponseEntity.badRequest().body(Map.of("message", "Le message est trop long (4000 caractères max)."));
         }
 
+        // Reponse a un message precis (citation) : on ne garde la reference que si le
+        // message vise existe reellement et appartient bien a ce meme canal — sinon on
+        // l'ignore silencieusement plutot que de rejeter l'envoi.
+        Long reponseAId = extractId(body.get("reponseAId"));
+        if (reponseAId != null) {
+            MessageGroupe original = messageGroupeRepository.findById(reponseAId).orElse(null);
+            if (original == null || original.getCanal() != c) {
+                reponseAId = null;
+            }
+        }
+
         MessageGroupe message = MessageGroupe.builder()
                 .canal(c)
                 .auteur(user)
                 .contenu(contenu)
+                .reponseAId(reponseAId)
                 .build();
         MessageGroupe saved = messageGroupeRepository.save(message);
 
@@ -162,5 +174,20 @@ public class DiscussionController {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** Extrait un id (Long) depuis une valeur JSON deserialisee en Object (Number ou String). */
+    private Long extractId(Object raw) {
+        if (raw instanceof Number n) {
+            return n.longValue();
+        }
+        if (raw instanceof String s && !s.isBlank()) {
+            try {
+                return Long.parseLong(s.trim());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 }

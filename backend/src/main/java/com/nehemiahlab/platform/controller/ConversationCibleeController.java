@@ -234,10 +234,22 @@ public class ConversationCibleeController {
         boolean envoyerEmail = Boolean.TRUE.equals(body.get("envoyerEmail"))
                 || "true".equalsIgnoreCase(String.valueOf(body.get("envoyerEmail")));
 
+        // Reponse a un message precis (citation) : on ne garde la reference que si le
+        // message vise existe reellement et appartient bien a cette meme conversation —
+        // sinon on l'ignore silencieusement plutot que de rejeter l'envoi.
+        Long reponseAId = extractId(body.get("reponseAId"));
+        if (reponseAId != null) {
+            MessageCible original = messageRepository.findById(reponseAId).orElse(null);
+            if (original == null || !original.getConversationId().equals(id)) {
+                reponseAId = null;
+            }
+        }
+
         MessageCible message = messageRepository.save(MessageCible.builder()
                 .conversationId(id)
                 .auteur(user)
                 .contenu(contenu)
+                .reponseAId(reponseAId)
                 .build());
 
         notifierNouveauMessage(conv, user, contenu, envoyerEmail);
@@ -387,6 +399,21 @@ public class ConversationCibleeController {
             return nomsCourts(resoudreParticipants(conv));
         }
         return label(conv, conv.getCreatedBy());
+    }
+
+    /** Extrait un id (Long) depuis une valeur JSON deserialisee en Object (Number ou String). */
+    private Long extractId(Object raw) {
+        if (raw instanceof Number n) {
+            return n.longValue();
+        }
+        if (raw instanceof String s && !s.isBlank()) {
+            try {
+                return Long.parseLong(s.trim());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private String nomsCourts(List<User> utilisateurs) {
