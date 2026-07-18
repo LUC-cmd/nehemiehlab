@@ -63,6 +63,8 @@ export interface Centre {
   telephoneFormateur?: string;
   codeCdej?: string;
   lieuFormation?: string;
+  emails?: string[];
+  telephones?: string[];
   coordinateur?: User;
   formateurs: User[];
   nombreEleves: number;
