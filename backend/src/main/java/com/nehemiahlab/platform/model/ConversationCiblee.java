@@ -42,6 +42,18 @@ public class ConversationCiblee {
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
 
+    /**
+     * Conversation "libre" (style WhatsApp) : liste explicite de participants choisis par
+     * le createur (formateur, directeur ou comptable), au lieu d'une audience calculee par
+     * centre/cluster/comptable. Quand ce set n'est pas vide, l'acces est strictement limite
+     * a ces personnes (le Directeur n'a pas d'acces automatique).
+     */
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "conversation_ciblee_participants", joinColumns = @JoinColumn(name = "conversation_id"))
+    @Column(name = "user_id")
+    @Builder.Default
+    private java.util.Set<Long> participantIds = new java.util.HashSet<>();
+
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 }
