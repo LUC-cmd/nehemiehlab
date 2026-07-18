@@ -363,7 +363,7 @@ public class RapportExecutionSeancePdfBuilder {
                 footer.showText(PdfTextUtil.sanitize(
                         RapportAnnuelUtil.SKA_FOOTER_LEFT + "  " + RapportAnnuelUtil.SKA_FOOTER_PHONE
                                 + "  " + RapportAnnuelUtil.SKA_FOOTER_WEB
-                                + "  ·  Page " + (i + 1) + "/" + total
+                                + "  ·  Rapport exécution séance  ·  Page " + (i + 1) + "/" + total
                 ));
                 footer.endText();
             }
