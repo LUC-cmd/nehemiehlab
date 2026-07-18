@@ -155,7 +155,20 @@ public class RapportController {
         for (int i = 0; i < columnCount; i++) {
             sheet.autoSizeColumn(i);
             int current = sheet.getColumnWidth(i);
-            sheet.setColumnWidth(i, Math.min(Math.max(current + 512, 12 * 256), 45 * 256));
+            sheet.setColumnWidth(i, Math.min(Math.max(current + 768, 12 * 256), 70 * 256));
+        }
+        // Retour a la ligne dans la cellule plutot que troncature visuelle : chaque
+        // valeur (nom, adresse, email...) reste entierement visible dans sa case.
+        CellStyle wrapStyle = sheet.getWorkbook().createCellStyle();
+        wrapStyle.setWrapText(true);
+        wrapStyle.setVerticalAlignment(VerticalAlignment.TOP);
+        for (int r = 1; r <= sheet.getLastRowNum(); r++) {
+            Row dataRow = sheet.getRow(r);
+            if (dataRow == null) continue;
+            for (int c = 0; c < columnCount; c++) {
+                Cell cell = dataRow.getCell(c);
+                if (cell != null) cell.setCellStyle(wrapStyle);
+            }
         }
         sheet.setDisplayGridlines(false);
         sheet.getPrintSetup().setLandscape(columnCount > 7);
@@ -262,8 +275,8 @@ public class RapportController {
                 int maxLines = 1;
                 for (int i = 0; i < headers.size(); i++) {
                     String cell = i < row.size() ? row.get(i) : "-";
-                    int maxChars = Math.max(10, (int) (columnWidths[i] / 4.6f));
-                    List<String> wrappedCell = splitLine(cell, maxChars);
+                    float maxTextWidth = Math.max(20f, columnWidths[i] - 8f);
+                    List<String> wrappedCell = wrapCell(cell, bodyFont, 8.4f, maxTextWidth);
                     wrapped.add(wrappedCell);
                     maxLines = Math.max(maxLines, wrappedCell.size());
                 }
@@ -627,22 +640,57 @@ public class RapportController {
         content.endText();
     }
 
-    private List<String> splitLine(String input, int maxLength) {
+    /**
+     * Decoupe une valeur de cellule en lignes qui tiennent reellement dans maxWidth,
+     * en mesurant la largeur du texte avec la police utilisee (au lieu d'estimer un
+     * nombre de caracteres) afin qu'aucun contenu (nom, email...) ne deborde ou ne
+     * soit coupe visuellement dans le tableau PDF.
+     */
+    private List<String> wrapCell(String input, PDType1Font font, float fontSize, float maxWidth) throws IOException {
+        String text = PdfTextUtil.sanitize((input == null || input.isBlank()) ? "-" : input.trim());
         List<String> lines = new ArrayList<>();
-        if (input == null) {
-            lines.add("-");
-            return lines;
+        StringBuilder current = new StringBuilder();
+        for (String rawWord : text.split("\\s+")) {
+            String word = rawWord;
+            // Un seul "mot" (ex: email ou URL sans espace) peut a lui seul depasser
+            // la largeur de la cellule : on le decoupe alors caractere par caractere.
+            while (font.getStringWidth(word) / 1000f * fontSize > maxWidth && word.length() > 1) {
+                int cut = word.length();
+                while (cut > 1 && font.getStringWidth(word.substring(0, cut)) / 1000f * fontSize > maxWidth) {
+                    cut--;
+                }
+                if (current.length() > 0) {
+                    lines.add(current.toString());
+                    current.setLength(0);
+                }
+                lines.add(word.substring(0, cut));
+                word = word.substring(cut);
+            }
+            String candidate = current.isEmpty() ? word : current + " " + word;
+            if (current.isEmpty() || font.getStringWidth(candidate) / 1000f * fontSize <= maxWidth) {
+                current.setLength(0);
+                current.append(candidate);
+            } else {
+                lines.add(current.toString());
+                current.setLength(0);
+                current.append(word);
+            }
         }
-        String remaining = input;
-        while (remaining.length() > maxLength) {
-            int splitAt = remaining.lastIndexOf(' ', maxLength);
-            if (splitAt <= 0) splitAt = maxLength;
-            lines.add(remaining.substring(0, splitAt));
-            remaining = remaining.substring(splitAt).trim();
+        if (current.length() > 0) lines.add(current.toString());
+        return lines.isEmpty() ? List.of("-") : lines;
+    }
+
+    /** Ajoute une colonne "N°" (1..N) en tete de chaque ligne d'un tableau de rapport. */
+    private List<List<String>> withRowNumbers(List<List<String>> rows) {
+        List<List<String>> numbered = new ArrayList<>();
+        int n = 1;
+        for (List<String> row : rows) {
+            List<String> line = new ArrayList<>();
+            line.add(String.valueOf(n++));
+            line.addAll(row);
+            numbered.add(line);
         }
-        if (!remaining.isBlank()) lines.add(remaining);
-        if (lines.isEmpty()) lines.add("-");
-        return lines;
+        return numbered;
     }
 
     private List<Eleve> loadEleves(Long eleveId, List<Long> centreIds) {
@@ -703,28 +751,30 @@ public class RapportController {
         CellStyle headerStyle = buildHeaderStyle(workbook);
 
         Row headerRow = sheet.createRow(0);
-        String[] columns = {"ID", "Matricule", "Nom", "Prénom", "Âge", "Sexe", "Classe", "Centre", "Région", "Cluster", "Total Heures", "Projet"};
+        String[] columns = {"N°", "ID", "Matricule", "Nom", "Prénom", "Âge", "Sexe", "Classe", "Centre", "Région", "Cluster", "Total Heures", "Projet"};
         for (int i = 0; i < columns.length; i++) {
             Cell cell = headerRow.createCell(i);
             cell.setCellValue(columns[i]);
             cell.setCellStyle(headerStyle);
         }
 
-        int rowNum = 1;
+        int n = 1;
         for (Eleve eleve : eleves) {
-            Row row = sheet.createRow(rowNum++);
-            row.createCell(0).setCellValue(eleve.getId());
-            row.createCell(1).setCellValue(eleve.getMatricule() != null ? eleve.getMatricule() : "-");
-            row.createCell(2).setCellValue(eleve.getNom());
-            row.createCell(3).setCellValue(eleve.getPrenom());
-            row.createCell(4).setCellValue(eleve.getAge());
-            row.createCell(5).setCellValue(eleve.getSexe());
-            row.createCell(6).setCellValue(eleve.getClasse());
-            row.createCell(7).setCellValue(eleve.getCentre() != null ? eleve.getCentre().getNom() : "-");
-            row.createCell(8).setCellValue(eleve.getCentre() != null && eleve.getCentre().getRegion() != null ? eleve.getCentre().getRegion() : "-");
-            row.createCell(9).setCellValue(eleve.getCentre() != null && eleve.getCentre().getCluster() != null ? eleve.getCentre().getCluster() : "-");
-            row.createCell(10).setCellValue(eleve.getTotalHeures() != null ? eleve.getTotalHeures() : 0.0);
-            row.createCell(11).setCellValue(eleve.getProjet() != null ? eleve.getProjet().getNom() : "Aucun");
+            Row row = sheet.createRow(n);
+            row.createCell(0).setCellValue(n);
+            row.createCell(1).setCellValue(eleve.getId());
+            row.createCell(2).setCellValue(eleve.getMatricule() != null ? eleve.getMatricule() : "-");
+            row.createCell(3).setCellValue(eleve.getNom());
+            row.createCell(4).setCellValue(eleve.getPrenom());
+            row.createCell(5).setCellValue(eleve.getAge());
+            row.createCell(6).setCellValue(eleve.getSexe());
+            row.createCell(7).setCellValue(eleve.getClasse());
+            row.createCell(8).setCellValue(eleve.getCentre() != null ? eleve.getCentre().getNom() : "-");
+            row.createCell(9).setCellValue(eleve.getCentre() != null && eleve.getCentre().getRegion() != null ? eleve.getCentre().getRegion() : "-");
+            row.createCell(10).setCellValue(eleve.getCentre() != null && eleve.getCentre().getCluster() != null ? eleve.getCentre().getCluster() : "-");
+            row.createCell(11).setCellValue(eleve.getTotalHeures() != null ? eleve.getTotalHeures() : 0.0);
+            row.createCell(12).setCellValue(eleve.getProjet() != null ? eleve.getProjet().getNom() : "Aucun");
+            n++;
         }
 
         addLogoToSheet(workbook, sheet, columns.length - 1);
@@ -779,11 +829,11 @@ public class RapportController {
 
         byte[] pdf = buildPdfTableReport(
                 "Rapport apprenants",
-                List.of("Matricule", "Nom", "Prénom", "Age", "Sexe", "Classe", "Centre", "Heures", "Projet"),
-                rows,
+                List.of("N°", "Matricule", "Nom", "Prénom", "Age", "Sexe", "Classe", "Centre", "Heures", "Projet"),
+                withRowNumbers(rows),
                 meta,
                 ReportTemplate.APPRENANTS,
-                new float[]{55f, 70f, 70f, 30f, 30f, 50f, 90f, 50f, 80f}
+                new float[]{24f, 55f, 70f, 70f, 30f, 30f, 50f, 90f, 50f, 80f}
         );
 
         return ResponseEntity.ok()
@@ -852,27 +902,29 @@ public class RapportController {
         CellStyle headerStyle = buildHeaderStyle(workbook);
 
         Row headerRow = sheet.createRow(0);
-        String[] columns = {"Nom", "Prenom", "Email", "Telephone", "Date de naissance", "Lieu de naissance", "Adresse", "Statut", "Centre(s)", "Date d'entree", "CNI"};
+        String[] columns = {"N°", "Nom", "Prenom", "Email", "Telephone", "Date de naissance", "Lieu de naissance", "Adresse", "Statut", "Centre(s)", "Date d'entree", "CNI"};
         for (int i = 0; i < columns.length; i++) {
             Cell cell = headerRow.createCell(i);
             cell.setCellValue(columns[i]);
             cell.setCellStyle(headerStyle);
         }
 
-        int rowNum = 1;
+        int n = 1;
         for (User f : formateurs) {
-            Row row = sheet.createRow(rowNum++);
-            row.createCell(0).setCellValue(f.getNom());
-            row.createCell(1).setCellValue(f.getPrenom());
-            row.createCell(2).setCellValue(f.getEmail());
-            row.createCell(3).setCellValue(f.getTelephone() != null ? f.getTelephone() : "-");
-            row.createCell(4).setCellValue(dateNaissanceLabel(f));
-            row.createCell(5).setCellValue(lieuNaissanceLabel(f));
-            row.createCell(6).setCellValue(adresseLabel(f));
-            row.createCell(7).setCellValue(f.isActif() ? "Valide" : "En attente");
-            row.createCell(8).setCellValue(centresLabel(f));
-            row.createCell(9).setCellValue(ancienneteLabel(f));
-            row.createCell(10).setCellValue(cniLabel(f));
+            Row row = sheet.createRow(n);
+            row.createCell(0).setCellValue(n);
+            row.createCell(1).setCellValue(f.getNom());
+            row.createCell(2).setCellValue(f.getPrenom());
+            row.createCell(3).setCellValue(f.getEmail());
+            row.createCell(4).setCellValue(f.getTelephone() != null ? f.getTelephone() : "-");
+            row.createCell(5).setCellValue(dateNaissanceLabel(f));
+            row.createCell(6).setCellValue(lieuNaissanceLabel(f));
+            row.createCell(7).setCellValue(adresseLabel(f));
+            row.createCell(8).setCellValue(f.isActif() ? "Valide" : "En attente");
+            row.createCell(9).setCellValue(centresLabel(f));
+            row.createCell(10).setCellValue(ancienneteLabel(f));
+            row.createCell(11).setCellValue(cniLabel(f));
+            n++;
         }
 
         addLogoToSheet(workbook, sheet, columns.length - 1);
@@ -914,11 +966,11 @@ public class RapportController {
 
         byte[] pdf = buildPdfTableReport(
                 "Liste des formateurs",
-                List.of("Nom", "Prénom", "Email", "Telephone", "Naissance", "Lieu naiss.", "Adresse", "Statut", "Centre(s)", "Entree", "CNI"),
-                rows,
+                List.of("N°", "Nom", "Prénom", "Email", "Telephone", "Naissance", "Lieu naiss.", "Adresse", "Statut", "Centre(s)", "Entree", "CNI"),
+                withRowNumbers(rows),
                 meta,
                 ReportTemplate.ACTIVITES,
-                new float[]{55f, 55f, 90f, 55f, 50f, 60f, 75f, 40f, 85f, 42f, 48f}
+                new float[]{24f, 62f, 60f, 95f, 55f, 50f, 60f, 75f, 40f, 85f, 42f, 48f}
         );
 
         return ResponseEntity.ok()
@@ -940,24 +992,26 @@ public class RapportController {
         CellStyle headerStyle = buildHeaderStyle(workbook);
 
         Row headerRow = sheet.createRow(0);
-        String[] columns = {"Nom", "Prenom", "Email", "Role", "Telephone", "Statut", "Centre(s)", "Date d'entree"};
+        String[] columns = {"N°", "Nom", "Prenom", "Email", "Role", "Telephone", "Statut", "Centre(s)", "Date d'entree"};
         for (int i = 0; i < columns.length; i++) {
             Cell cell = headerRow.createCell(i);
             cell.setCellValue(columns[i]);
             cell.setCellStyle(headerStyle);
         }
 
-        int rowNum = 1;
+        int n = 1;
         for (User u : utilisateurs) {
-            Row row = sheet.createRow(rowNum++);
-            row.createCell(0).setCellValue(u.getNom());
-            row.createCell(1).setCellValue(u.getPrenom());
-            row.createCell(2).setCellValue(u.getEmail());
-            row.createCell(3).setCellValue(ROLE_LABELS_FR.getOrDefault(u.getRole(), u.getRole().name()));
-            row.createCell(4).setCellValue(u.getTelephone() != null ? u.getTelephone() : "-");
-            row.createCell(5).setCellValue(u.isActif() ? "Actif" : "Inactif");
-            row.createCell(6).setCellValue(centresLabel(u));
-            row.createCell(7).setCellValue(ancienneteLabel(u));
+            Row row = sheet.createRow(n);
+            row.createCell(0).setCellValue(n);
+            row.createCell(1).setCellValue(u.getNom());
+            row.createCell(2).setCellValue(u.getPrenom());
+            row.createCell(3).setCellValue(u.getEmail());
+            row.createCell(4).setCellValue(ROLE_LABELS_FR.getOrDefault(u.getRole(), u.getRole().name()));
+            row.createCell(5).setCellValue(u.getTelephone() != null ? u.getTelephone() : "-");
+            row.createCell(6).setCellValue(u.isActif() ? "Actif" : "Inactif");
+            row.createCell(7).setCellValue(centresLabel(u));
+            row.createCell(8).setCellValue(ancienneteLabel(u));
+            n++;
         }
 
         addLogoToSheet(workbook, sheet, columns.length - 1);
@@ -996,11 +1050,11 @@ public class RapportController {
 
         byte[] pdf = buildPdfTableReport(
                 "Liste des utilisateurs",
-                List.of("Nom", "Prénom", "Email", "Role", "Telephone", "Statut", "Centre(s)", "Entree"),
-                rows,
+                List.of("N°", "Nom", "Prénom", "Email", "Role", "Telephone", "Statut", "Centre(s)", "Entree"),
+                withRowNumbers(rows),
                 meta,
                 ReportTemplate.ACTIVITES,
-                new float[]{60f, 60f, 95f, 65f, 50f, 42f, 80f, 50f}
+                new float[]{24f, 65f, 65f, 100f, 65f, 50f, 42f, 80f, 50f}
         );
 
         return ResponseEntity.ok()
@@ -1688,11 +1742,11 @@ public class RapportController {
 
         byte[] pdf = buildPdfTableReport(
                 "Rapport heures de formation",
-                List.of("Nom", "Prenom", "Centre", "Heures", "Sessions", "Debut formation"),
-                rows,
+                List.of("N°", "Nom", "Prenom", "Centre", "Heures", "Sessions", "Debut formation"),
+                withRowNumbers(rows),
                 meta,
                 ReportTemplate.HEURES,
-                new float[]{90f, 90f, 110f, 55f, 55f, 90f}
+                new float[]{24f, 90f, 90f, 110f, 55f, 55f, 90f}
         );
 
         return ResponseEntity.ok()
@@ -1938,11 +1992,11 @@ public class RapportController {
 
         byte[] pdf = buildPdfTableReport(
                 "Rapport activites",
-                List.of("Date", "Centre", "Formateur", "Titre", "Duree", "Presents"),
-                rows,
+                List.of("N°", "Date", "Centre", "Formateur", "Titre", "Duree", "Presents"),
+                withRowNumbers(rows),
                 meta,
                 ReportTemplate.ACTIVITES,
-                new float[]{68f, 62f, 62f, 190f, 60f, 60f}
+                new float[]{24f, 68f, 62f, 62f, 190f, 60f, 60f}
         );
 
         return ResponseEntity.ok()
@@ -1975,24 +2029,26 @@ public class RapportController {
         Sheet sheet = workbook.createSheet("Transactions");
         CellStyle headerStyle = buildHeaderStyle(workbook);
         Row headerRow = sheet.createRow(0);
-        String[] columns = {"ID", "Bénéficiaire", "Montant (FCFA)", "Type", "Description", "Justificatif", "Statut", "Date de création"};
+        String[] columns = {"N°", "ID", "Bénéficiaire", "Montant (FCFA)", "Type", "Description", "Justificatif", "Statut", "Date de création"};
         for (int i = 0; i < columns.length; i++) {
             Cell cell = headerRow.createCell(i);
             cell.setCellValue(columns[i]);
             cell.setCellStyle(headerStyle);
         }
 
-        int rowNum = 1;
+        int n = 1;
         for (Transaction tx : transactions) {
-            Row row = sheet.createRow(rowNum++);
-            row.createCell(0).setCellValue(tx.getId());
-            row.createCell(1).setCellValue(tx.getFormateur().getPrenom() + " " + tx.getFormateur().getNom());
-            row.createCell(2).setCellValue(tx.getMontant());
-            row.createCell(3).setCellValue(tx.getType());
-            row.createCell(4).setCellValue(tx.getDescription());
-            row.createCell(5).setCellValue(tx.getJustificatifNom() != null ? tx.getJustificatifNom() : (tx.getJustificatifUrl() != null ? "Oui" : "Non"));
-            row.createCell(6).setCellValue(tx.getStatut());
-            row.createCell(7).setCellValue(tx.getCreatedAt().toString());
+            Row row = sheet.createRow(n);
+            row.createCell(0).setCellValue(n);
+            row.createCell(1).setCellValue(tx.getId());
+            row.createCell(2).setCellValue(tx.getFormateur().getPrenom() + " " + tx.getFormateur().getNom());
+            row.createCell(3).setCellValue(tx.getMontant());
+            row.createCell(4).setCellValue(tx.getType());
+            row.createCell(5).setCellValue(tx.getDescription());
+            row.createCell(6).setCellValue(tx.getJustificatifNom() != null ? tx.getJustificatifNom() : (tx.getJustificatifUrl() != null ? "Oui" : "Non"));
+            row.createCell(7).setCellValue(tx.getStatut());
+            row.createCell(8).setCellValue(tx.getCreatedAt().toString());
+            n++;
         }
 
         addLogoToSheet(workbook, sheet, columns.length - 1);
@@ -2045,11 +2101,11 @@ public class RapportController {
 
         byte[] pdf = buildPdfTableReport(
                 "Rapport financier",
-                List.of("ID", "Bénéficiaire", "Montant", "Type", "Description", "Justif.", "Statut", "Date"),
-                rows,
+                List.of("N°", "ID", "Bénéficiaire", "Montant", "Type", "Description", "Justif.", "Statut", "Date"),
+                withRowNumbers(rows),
                 meta,
                 ReportTemplate.FINANCIER,
-                new float[]{30f, 100f, 68f, 65f, 150f, 45f, 58f, 90f}
+                new float[]{24f, 30f, 100f, 68f, 65f, 150f, 45f, 58f, 90f}
         );
 
         return ResponseEntity.ok()
