@@ -177,6 +177,7 @@ private static final Logger log = LoggerFactory.getLogger(NotificationDispatchSe
         return switch (type != null ? type : "") {
             case "SIGNALEMENT" -> base + "/dashboard/signalements";
             case "TRANSACTION" -> base + "/dashboard/transactions";
+            case "DISCUSSION" -> base + "/dashboard/discussion";
             default -> base + "/dashboard";
         };
     }
