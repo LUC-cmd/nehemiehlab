@@ -64,6 +64,21 @@ export default function GroupesDiscussionPage() {
   const [lecteurs, setLecteurs] = useState<LectureInfo[]>([]);
   const skeletonLoading = useMinDelayLoading(loadingThreads, 220);
   const listEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  // Fil actuellement ouvert (ref, pas state) : utilisable dans des callbacks sans
+  // recreer fetchThreads/fetchMessages a chaque changement de fil actif.
+  const activeThreadRef = useRef<Thread | null>(null);
+  useEffect(() => {
+    activeThreadRef.current = activeThread;
+  }, [activeThread]);
+  // Nombre de messages non lus au moment de l'ouverture de chaque fil (cle = threadKey),
+  // pour savoir ou placer le scroll initial (premier message non lu) sans re-demander
+  // cette info au serveur.
+  const unreadAtOpenRef = useRef<Map<string, number>>(new Map());
+  // Cle du dernier fil pour lequel on a deja positionne le scroll : sert a distinguer
+  // "on vient d'ouvrir ce fil" (scroll vers le premier non lu) de "ce fil recoit une
+  // mise a jour de polling" (ne pas interrompre une lecture en cours plus haut).
+  const lastScrolledThreadKeyRef = useRef<string | null>(null);
 
   // --- Nouvelle discussion libre (tous les rôles, style WhatsApp) ---
   const [contactPickerOpen, setContactPickerOpen] = useState(false);
@@ -91,12 +106,30 @@ export default function GroupesDiscussionPage() {
         discussionService.getCanaux(),
         discussionService.getConversations(),
       ]);
-      setCanaux(resCanaux.data);
-      setConversations(resConv.data);
+      // Le fil actuellement ouvert est considere lu en direct (on le marque lu a chaque
+      // cycle de polling, voir markAndLoadLecteurs) : on force son badge a 0 localement
+      // plutot que d'attendre que le serveur le confirme, pour eviter qu'il clignote.
+      const active = activeThreadRef.current;
+      setCanaux(
+        resCanaux.data.map((c) =>
+          active?.type === 'canal' && active.canal === c.canal ? { ...c, nbNonLus: 0 } : c
+        )
+      );
+      setConversations(
+        resConv.data.map((c) =>
+          active?.type === 'conversation' && active.id === c.id ? { ...c, nbNonLus: 0 } : c
+        )
+      );
       setActiveThread((prev) => {
         if (prev) return prev;
-        if (resCanaux.data[0]) return { type: 'canal', canal: resCanaux.data[0].canal };
-        if (resConv.data[0]) return { type: 'conversation', id: resConv.data[0].id };
+        if (resCanaux.data[0]) {
+          unreadAtOpenRef.current.set(`canal:${resCanaux.data[0].canal}`, resCanaux.data[0].nbNonLus);
+          return { type: 'canal', canal: resCanaux.data[0].canal };
+        }
+        if (resConv.data[0]) {
+          unreadAtOpenRef.current.set(`conv:${resConv.data[0].id}`, resConv.data[0].nbNonLus);
+          return { type: 'conversation', id: resConv.data[0].id };
+        }
         return null;
       });
     } catch {
@@ -104,6 +137,26 @@ export default function GroupesDiscussionPage() {
     } finally {
       setLoadingThreads(false);
     }
+  }, []);
+
+  /** Ouvre un fil : capture son nombre de non-lus (pour le scroll initial) puis vide
+   * son badge immediatement (au lieu d'attendre le prochain polling). */
+  const openThread = useCallback((thread: Thread) => {
+    const key = threadKey(thread);
+    if (thread.type === 'canal') {
+      setCanaux((prev) => {
+        const found = prev.find((c) => c.canal === thread.canal);
+        unreadAtOpenRef.current.set(key, found?.nbNonLus ?? 0);
+        return prev.map((c) => (c.canal === thread.canal ? { ...c, nbNonLus: 0 } : c));
+      });
+    } else {
+      setConversations((prev) => {
+        const found = prev.find((c) => c.id === thread.id);
+        unreadAtOpenRef.current.set(key, found?.nbNonLus ?? 0);
+        return prev.map((c) => (c.id === thread.id ? { ...c, nbNonLus: 0 } : c));
+      });
+    }
+    setActiveThread(thread);
   }, []);
 
   const fetchMessages = useCallback(async (thread: Thread, silent = false) => {
@@ -165,11 +218,6 @@ export default function GroupesDiscussionPage() {
   // rafraîchit immédiatement la liste des fils et, si c'est le fil ouvert, les messages
   // — au lieu d'attendre le prochain polling (jusqu'à 8s). Le polling reste le filet de
   // sécurité si la connexion WebSocket est indisponible.
-  const activeThreadRef = useRef<Thread | null>(null);
-  useEffect(() => {
-    activeThreadRef.current = activeThread;
-  }, [activeThread]);
-
   useEffect(() => {
     const disconnect = connectNotificationsSocket((notif) => {
       if (notif.type !== 'DISCUSSION') return;
@@ -180,9 +228,36 @@ export default function GroupesDiscussionPage() {
     return disconnect;
   }, [fetchThreads, fetchMessages]);
 
+  // Positionnement du scroll dans les messages :
+  //  - a l'ouverture d'un fil (ou changement de fil) : on va directement au premier
+  //    message non lu (calcule a partir du nombre de non-lus capture a l'ouverture),
+  //    pour reprendre la lecture la ou l'utilisateur s'etait arrete, jusqu'au dernier
+  //    message envoye plus bas ; s'il n'y a aucun non-lu, on va tout en bas comme avant.
+  //  - lors d'une mise a jour de polling du meme fil : on ne force le scroll vers le bas
+  //    que si l'utilisateur etait deja proche du bas, pour ne jamais interrompre une
+  //    lecture en cours plus haut dans l'historique (c'etait le bug : le scroll forcait
+  //    systematiquement le retour en bas toutes les 8s, empechant de remonter lire).
   useEffect(() => {
-    listEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!activeThread || messages.length === 0) return;
+    const key = threadKey(activeThread);
+    const isFreshOpen = lastScrolledThreadKeyRef.current !== key;
+    if (isFreshOpen) {
+      lastScrolledThreadKeyRef.current = key;
+      const marker = messagesContainerRef.current?.querySelector<HTMLElement>('[data-first-unread="true"]');
+      if (marker) {
+        marker.scrollIntoView({ behavior: 'auto', block: 'start' });
+      } else {
+        listEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      }
+      return;
+    }
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (distanceFromBottom < 150) {
+      listEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, activeThread]);
 
   useEffect(() => {
     if (!composeOpen || !isDirecteur) return;
@@ -344,6 +419,16 @@ export default function GroupesDiscussionPage() {
   const canReply = activeThread?.type === 'canal' || !activeConv || activeConv.peutRepondre;
   const isCibleThread = activeThread?.type === 'conversation' && activeConv && !activeConv.libre;
 
+  // Index (dans la fenetre de messages chargee) du premier message non lu, calcule a
+  // partir du nombre de non-lus capture a l'ouverture du fil (voir openThread/fetchThreads).
+  const unreadCountAtOpen = activeThread ? unreadAtOpenRef.current.get(threadKey(activeThread)) ?? 0 : 0;
+  const firstUnreadIndex =
+    unreadCountAtOpen <= 0
+      ? null
+      : unreadCountAtOpen >= messages.length
+      ? 0
+      : messages.length - unreadCountAtOpen;
+
   if (skeletonLoading) {
     return <PageLoadingSkeleton />;
   }
@@ -407,7 +492,7 @@ export default function GroupesDiscussionPage() {
                   <button
                     key={`canal:${c.canal}`}
                     type="button"
-                    onClick={() => setActiveThread({ type: 'canal', canal: c.canal })}
+                    onClick={() => openThread({ type: 'canal', canal: c.canal })}
                     className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-all ${
                       active
                         ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
@@ -416,7 +501,11 @@ export default function GroupesDiscussionPage() {
                   >
                     <Users className="w-4 h-4 flex-shrink-0" />
                     <span className="flex-1 truncate">{c.label}</span>
-                    <span className="text-[10px] opacity-70">{c.nbMessages}</span>
+                    {c.nbNonLus > 0 && (
+                      <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-primary-500 text-white text-[10px] font-semibold">
+                        {c.nbNonLus > 99 ? '99+' : c.nbNonLus}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -444,7 +533,7 @@ export default function GroupesDiscussionPage() {
                     <button
                       key={`conv:${c.id}`}
                       type="button"
-                      onClick={() => setActiveThread({ type: 'conversation', id: c.id })}
+                      onClick={() => openThread({ type: 'conversation', id: c.id })}
                       className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-all ${
                         active
                           ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
@@ -453,7 +542,11 @@ export default function GroupesDiscussionPage() {
                     >
                       <Icon className="w-4 h-4 flex-shrink-0" />
                       <span className="flex-1 truncate">{c.label}</span>
-                      <span className="text-[10px] opacity-70">{c.nbMessages}</span>
+                      {c.nbNonLus > 0 && (
+                        <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-primary-500 text-white text-[10px] font-semibold">
+                          {c.nbNonLus > 99 ? '99+' : c.nbNonLus}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -480,13 +573,13 @@ export default function GroupesDiscussionPage() {
                   Retour
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
                 {loadingMessages ? (
                   <div className="text-dark-400 text-sm">Chargement des messages…</div>
                 ) : messages.length === 0 ? (
                   <div className="text-dark-400 text-sm">Aucun message pour l'instant. Soyez le premier à écrire.</div>
                 ) : (
-                  messages.map((m) => {
+                  messages.map((m, idx) => {
                     const isMine = m.auteur.id === user?.id;
                     // Accuse de lecture : visible uniquement par l'auteur du message. Un
                     // lecteur "a lu" ce message si son dernier acces au fil est posterieur
@@ -496,8 +589,19 @@ export default function GroupesDiscussionPage() {
                           (l) => l.userId !== m.auteur.id && new Date(l.dernierAcces) >= new Date(m.createdAt)
                         )
                       : [];
+                    const isFirstUnread = idx === firstUnreadIndex;
                     return (
-                      <div key={m.id} className={`flex gap-3 ${isMine ? 'flex-row-reverse text-right' : ''}`}>
+                      <React.Fragment key={m.id}>
+                        {isFirstUnread && (
+                          <div className="flex items-center gap-3 my-2" data-first-unread="true">
+                            <div className="flex-1 h-px bg-primary-500/40" />
+                            <span className="text-[10px] uppercase tracking-wide text-primary-400 font-semibold">
+                              Nouveaux messages
+                            </span>
+                            <div className="flex-1 h-px bg-primary-500/40" />
+                          </div>
+                        )}
+                        <div className={`flex gap-3 ${isMine ? 'flex-row-reverse text-right' : ''}`}>
                         <UserAvatar
                           user={{ prenom: m.auteur.prenom, nom: m.auteur.nom, avatar: m.auteur.avatar }}
                           size="md"
@@ -541,7 +645,8 @@ export default function GroupesDiscussionPage() {
                             </div>
                           )}
                         </div>
-                      </div>
+                        </div>
+                      </React.Fragment>
                     );
                   })
                 )}
