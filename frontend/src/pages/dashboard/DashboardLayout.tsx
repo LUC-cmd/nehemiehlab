@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Building2, Users, BookOpen, CreditCard,
   BarChart3, Bell, LogOut, Menu, X, ChevronDown, User,
-  AlertTriangle, Settings, GraduationCap, Timer, Megaphone, Sparkles, Image as ImageIcon, Library, UsersRound, ClipboardCheck, Shield, History, BookOpenCheck
+  AlertTriangle, Settings, GraduationCap, Timer, Megaphone, Sparkles, Image as ImageIcon, Library, UsersRound, ClipboardCheck, Shield, History, BookOpenCheck, MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAccess } from '../../context/AccessContext';
@@ -46,6 +46,7 @@ const pageIcons: Record<DashboardPage, React.ReactNode> = {
   galerie: <ImageIcon className="w-5 h-5" />,
   ressources: <Library className="w-5 h-5" />,
   communaute: <UsersRound className="w-5 h-5" />,
+  discussion: <MessageSquare className="w-5 h-5" />,
   'profils-enfants': <Users className="w-5 h-5" />,
   'controle-gestion': <ClipboardCheck className="w-5 h-5" />,
   utilisateurs: <Settings className="w-5 h-5" />,

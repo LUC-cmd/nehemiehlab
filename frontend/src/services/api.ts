@@ -827,4 +827,15 @@ export const banqueService = {
   delete: (id: number) => api.delete(`/banques/${id}`),
 };
 
+// ============================================================
+//  Groupes de discussion (formateurs / directeur / comptable)
+// ============================================================
+export const discussionService = {
+  getCanaux: () => api.get<import('../types').CanalDiscussionInfo[]>('/discussion/canaux'),
+  getMessages: (canal: string) =>
+    api.get<import('../types').MessageGroupe[]>(`/discussion/${canal}/messages`),
+  postMessage: (canal: string, contenu: string) =>
+    api.post<import('../types').MessageGroupe>(`/discussion/${canal}/messages`, { contenu }),
+};
+
 export default api;

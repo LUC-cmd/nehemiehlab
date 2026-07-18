@@ -35,6 +35,7 @@ import PublicationsPage from './pages/dashboard/PublicationsPage';
 import ActualitesPage from './pages/dashboard/ActualitesPage';
 import RessourcesPage from './pages/dashboard/RessourcesPage';
 import CommunautePage from './pages/dashboard/CommunautePage';
+import GroupesDiscussionPage from './pages/dashboard/GroupesDiscussionPage';
 import ProfilsEnfantsPage from './pages/dashboard/ProfilsEnfantsPage';
 import ControleGestionPage from './pages/dashboard/ControleGestionPage';
 import PermissionsPage from './pages/dashboard/PermissionsPage';
@@ -198,6 +199,11 @@ function AppRoutes() {
           <Route path="communaute" element={
             <ProtectedRoute roles={PAGE_ROLES.communaute} feature="communaute">
               <PageTransition><CommunautePage /></PageTransition>
+            </ProtectedRoute>
+          } />
+          <Route path="discussion" element={
+            <ProtectedRoute roles={PAGE_ROLES.discussion} feature="discussion">
+              <PageTransition><GroupesDiscussionPage /></PageTransition>
             </ProtectedRoute>
           } />
           <Route path="profils-enfants" element={
