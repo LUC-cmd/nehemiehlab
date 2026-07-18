@@ -371,7 +371,7 @@ export default function RessourcesPage() {
         message="Cette ressource et tous ses documents seront définitivement supprimés."
         confirmLabel="Supprimer"
         danger
-        onConfirm={() => deleteId != null && removeResource(deleteId)}
+        onConfirm={() => { if (deleteId != null) return removeResource(deleteId); }}
         onCancel={() => setDeleteId(null)}
       />
 
@@ -385,7 +385,7 @@ export default function RessourcesPage() {
         }
         confirmLabel="Retirer"
         danger
-        onConfirm={() => confirmRemoveFile && void removeExistingFile(confirmRemoveFile)}
+        onConfirm={() => { if (confirmRemoveFile) return removeExistingFile(confirmRemoveFile); }}
         onCancel={() => setConfirmRemoveFile(null)}
       />
     </div>
