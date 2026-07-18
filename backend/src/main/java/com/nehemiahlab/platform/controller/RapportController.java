@@ -142,6 +142,10 @@ public class RapportController {
     }
 
     private void finalizeExcelSheet(Sheet sheet, int columnCount) {
+        finalizeExcelSheet(sheet, columnCount, null);
+    }
+
+    private void finalizeExcelSheet(Sheet sheet, int columnCount, String documentLabel) {
         sheet.createFreezePane(0, 1);
         if (sheet.getLastRowNum() >= 0) {
             sheet.setAutoFilter(new CellRangeAddress(0, Math.max(0, sheet.getLastRowNum()), 0, columnCount - 1));
@@ -161,8 +165,11 @@ public class RapportController {
         sheet.setAutobreaks(true);
         sheet.getHeader().setCenter("&BSMART KIDS ACADEMY&\"Arial,Regular\"\nRapport officiel");
         sheet.getHeader().setRight("Généré le " + LocalDateTime.now().format(REPORT_DATE_TIME));
-        sheet.getFooter().setLeft("Nehemiah Lab · Document confidentiel");
-        sheet.getFooter().setRight("Page &P / &N");
+        String footerText = RapportAnnuelUtil.SKA_FOOTER_LEFT + "   " + RapportAnnuelUtil.SKA_FOOTER_PHONE
+                + "   " + RapportAnnuelUtil.SKA_FOOTER_WEB
+                + (documentLabel != null ? "   ·   " + documentLabel : "")
+                + "   ·   Page &P/&N";
+        sheet.getFooter().setCenter(footerText);
         sheet.setMargin(Sheet.LeftMargin, 0.35);
         sheet.setMargin(Sheet.RightMargin, 0.35);
         sheet.setMargin(Sheet.TopMargin, 0.7);
@@ -721,7 +728,7 @@ public class RapportController {
         }
 
         addLogoToSheet(workbook, sheet, columns.length - 1);
-        finalizeExcelSheet(sheet, columns.length);
+        finalizeExcelSheet(sheet, columns.length, "Liste des apprenants");
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
         workbook.close();
@@ -869,7 +876,7 @@ public class RapportController {
         }
 
         addLogoToSheet(workbook, sheet, columns.length - 1);
-        finalizeExcelSheet(sheet, columns.length);
+        finalizeExcelSheet(sheet, columns.length, "Liste des formateurs");
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
         workbook.close();
@@ -954,7 +961,7 @@ public class RapportController {
         }
 
         addLogoToSheet(workbook, sheet, columns.length - 1);
-        finalizeExcelSheet(sheet, columns.length);
+        finalizeExcelSheet(sheet, columns.length, "Liste des utilisateurs");
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
         workbook.close();
@@ -1341,7 +1348,7 @@ public class RapportController {
             row.createCell(6).setCellValue(eleve.getDateDebutFormation() != null ? eleve.getDateDebutFormation().toString() : "-");
         }
 
-        finalizeExcelSheet(sheet, columns.length);
+        finalizeExcelSheet(sheet, columns.length, "Liste des présences et heures");
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
         workbook.close();
@@ -1394,7 +1401,7 @@ public class RapportController {
             row.createCell(4).setCellValue(f.getDureeHeures() != null ? f.getDureeHeures() : 0.0);
             row.createCell(5).setCellValue(f.getElevesPresents() != null ? f.getElevesPresents().size() : 0);
         }
-        finalizeExcelSheet(sheet, columns.length);
+        finalizeExcelSheet(sheet, columns.length, "Liste des activités");
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
         workbook.close();
@@ -1558,7 +1565,7 @@ public class RapportController {
             }
         }
 
-        finalizeExcelSheet(sheet, columns.length);
+        finalizeExcelSheet(sheet, columns.length, "Liste des séances");
 
         for (Map.Entry<Long, CentreMetrics> entry : metricsByCentre.entrySet()) {
             CentreMetrics m = entry.getValue();
@@ -1629,7 +1636,7 @@ public class RapportController {
             }
         }
 
-        finalizeExcelSheet(summary, summaryCols.length);
+        finalizeExcelSheet(summary, summaryCols.length, "Résumé des indicateurs par centre");
         summary.createFreezePane(0, 1);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -1989,7 +1996,7 @@ public class RapportController {
         }
 
         addLogoToSheet(workbook, sheet, columns.length - 1);
-        finalizeExcelSheet(sheet, columns.length);
+        finalizeExcelSheet(sheet, columns.length, "Liste des transactions");
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
         workbook.close();
