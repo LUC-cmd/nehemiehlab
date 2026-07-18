@@ -28,6 +28,13 @@ public class ThreadLectureService {
     @Autowired
     private UserRepository userRepository;
 
+    /** Dernier acces de l'utilisateur a ce fil, ou null s'il ne l'a jamais ouvert. */
+    public java.time.LocalDateTime getDernierAcces(String threadType, String threadKey, Long userId) {
+        return threadLectureRepository.findByThreadTypeAndThreadKeyAndUserId(threadType, threadKey, userId)
+                .map(ThreadLecture::getDernierAcces)
+                .orElse(null);
+    }
+
     @Transactional
     public void marquerLu(String threadType, String threadKey, User user) {
         ThreadLecture lecture = threadLectureRepository
