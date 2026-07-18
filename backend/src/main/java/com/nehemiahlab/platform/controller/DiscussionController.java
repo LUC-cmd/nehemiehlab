@@ -111,7 +111,8 @@ public class DiscussionController {
         String titre = "Nouveau message — " + c.label();
         String messageNotif = (auteur.getPrenom() != null ? auteur.getPrenom() : "") + " "
                 + (auteur.getNom() != null ? auteur.getNom() : "") + " : " + apercu;
-        notificationDispatchService.notifyMany(destinataires, titre, messageNotif.trim(), "DISCUSSION", null);
+        // Groupes de discussion internes : temps reel uniquement (pas d'email par message).
+        notificationDispatchService.notifyManyInApp(destinataires, titre, messageNotif.trim(), "DISCUSSION", null);
     }
 
     private CanalDiscussion parseCanal(String raw) {

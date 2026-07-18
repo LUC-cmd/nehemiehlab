@@ -266,7 +266,14 @@ public class ConversationCibleeController {
         String titre = "Nouveau message" + (estLibre(conv) ? "" : " ciblé") + " — " + labelGenerique(conv);
         String messageNotif = (auteur.getPrenom() != null ? auteur.getPrenom() : "") + " "
                 + (auteur.getNom() != null ? auteur.getNom() : "") + " : " + apercu;
-        notificationDispatchService.notifyMany(destinataires, titre, messageNotif.trim(), "DISCUSSION", conv.getId());
+        // Discussion libre (individuelle/petit groupe) : temps reel uniquement, pas d'email par message.
+        // Diffusion ciblee par le directeur (centre/cluster/comptable) : email conserve (respecte
+        // la preference email de chaque destinataire) car c'est une alerte, pas une simple discussion.
+        if (estLibre(conv)) {
+            notificationDispatchService.notifyManyInApp(destinataires, titre, messageNotif.trim(), "DISCUSSION", conv.getId());
+        } else {
+            notificationDispatchService.notifyMany(destinataires, titre, messageNotif.trim(), "DISCUSSION", conv.getId());
+        }
     }
 
     /** DTO renvoye au frontend, avec un libelle et une liste "autres participants" propres au point de vue de l'utilisateur connecte. */
