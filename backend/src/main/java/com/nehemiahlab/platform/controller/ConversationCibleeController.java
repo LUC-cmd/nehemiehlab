@@ -18,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -330,7 +331,15 @@ public class ConversationCibleeController {
         m.put("inclureComptable", conv.isInclureComptable());
         m.put("createdBy", conv.getCreatedBy());
         m.put("createdAt", conv.getCreatedAt());
-        m.put("nbMessages", messageRepository.countByConversationId(conv.getId()));
+        long totalMessages = messageRepository.countByConversationId(conv.getId());
+        m.put("nbMessages", totalMessages);
+        // Nombre de messages non lus par le viewer : tous les messages si jamais ouverte,
+        // sinon ceux arrives depuis son dernier acces a cette conversation.
+        LocalDateTime dernierAcces = threadLectureService.getDernierAcces("CONVERSATION", conv.getId().toString(), viewer.getId());
+        long nbNonLus = dernierAcces == null
+                ? totalMessages
+                : messageRepository.countByConversationIdAndCreatedAtAfter(conv.getId(), dernierAcces);
+        m.put("nbNonLus", nbNonLus);
         m.put("peutRepondre", libre || viewer.getRole() == Role.DIRECTEUR);
         if (libre) {
             List<Map<String, Object>> autres = resoudreParticipants(conv).stream()

@@ -198,6 +198,7 @@ export interface CanalDiscussionInfo {
   canal: CanalDiscussion;
   label: string;
   nbMessages: number;
+  nbNonLus: number;
 }
 
 export interface MessageGroupe {
@@ -229,6 +230,7 @@ export interface ConversationCiblee {
   createdBy?: User;
   createdAt: string;
   nbMessages: number;
+  nbNonLus: number;
   peutRepondre: boolean;
   participants?: ConversationContact[];
 }

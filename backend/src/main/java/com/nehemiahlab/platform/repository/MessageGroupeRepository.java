@@ -4,6 +4,7 @@ import com.nehemiahlab.platform.model.CanalDiscussion;
 import com.nehemiahlab.platform.model.MessageGroupe;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -18,4 +19,7 @@ public interface MessageGroupeRepository extends JpaRepository<MessageGroupe, Lo
     List<MessageGroupe> findTop200ByCanalOrderByCreatedAtDesc(CanalDiscussion canal);
 
     long countByCanal(CanalDiscussion canal);
+
+    /** Nombre de messages arrives apres le dernier acces de l'utilisateur (messages non lus). */
+    long countByCanalAndCreatedAtAfter(CanalDiscussion canal, LocalDateTime after);
 }

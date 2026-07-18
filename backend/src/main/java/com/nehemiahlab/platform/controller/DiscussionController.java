@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -51,6 +52,13 @@ public class DiscussionController {
                     m.put("canal", c.name());
                     m.put("label", c.label());
                     m.put("nbMessages", messageGroupeRepository.countByCanal(c));
+                    // Nombre de messages non lus : tous les messages si l'utilisateur n'a
+                    // jamais ouvert ce canal, sinon ceux arrives depuis son dernier acces.
+                    LocalDateTime dernierAcces = threadLectureService.getDernierAcces("CANAL", c.name(), user.getId());
+                    long nbNonLus = dernierAcces == null
+                            ? messageGroupeRepository.countByCanal(c)
+                            : messageGroupeRepository.countByCanalAndCreatedAtAfter(c, dernierAcces);
+                    m.put("nbNonLus", nbNonLus);
                     return m;
                 })
                 .collect(Collectors.toList());
