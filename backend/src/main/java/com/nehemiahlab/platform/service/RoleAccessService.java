@@ -38,6 +38,7 @@ public class RoleAccessService {
             "galerie",
             "ressources",
             "communaute",
+            "discussion",
             "profils-enfants",
             "controle-gestion",
             "utilisateurs",
@@ -64,14 +65,14 @@ public class RoleAccessService {
                 "home", "centres", "formateurs", "eleves", "sessions", "formations", "supports-cours",
                 "journal-activite", "evaluation-formateur",
                 "transactions", "rapports", "publications", "actualites", "galerie", "ressources",
-                "communaute", "profils-enfants", "controle-gestion", "utilisateurs",
+                "communaute", "discussion", "profils-enfants", "controle-gestion", "utilisateurs",
                 "permissions", "profil",
                 "edit_centre_location", "create_eleve", "manage_sessions",
                 "manage_signalements"
         ));
         m.put(Role.FORMATEUR.name(), set(
                 "home", "mes-centres", "eleves", "sessions", "formations", "supports-cours", "evaluation-formateur", "ressources",
-                "communaute", "profils-enfants", "transactions", "rapports", "profil",
+                "communaute", "discussion", "profils-enfants", "transactions", "rapports", "profil",
                 "edit_centre_location", "create_eleve", "manage_sessions", "validate_transactions"
         ));
         m.put(Role.COORDINATEUR.name(), set(
@@ -85,7 +86,7 @@ public class RoleAccessService {
                 "edit_centre_location", "create_eleve", "manage_signalements"
         ));
         m.put(Role.COMPTABLE.name(), set(
-                "home", "transactions", "rapports", "communaute", "controle-gestion", "profil",
+                "home", "transactions", "rapports", "communaute", "discussion", "controle-gestion", "profil",
                 "validate_transactions"
         ));
         m.put(Role.STAFF_NEHEMIAH.name(), set("home", "ressources", "communaute", "profil"));
