@@ -839,8 +839,8 @@ export const discussionService = {
   getCanaux: () => api.get<import('../types').CanalDiscussionInfo[]>('/discussion/canaux'),
   getMessages: (canal: string) =>
     api.get<import('../types').MessageGroupe[]>(`/discussion/${canal}/messages`),
-  postMessage: (canal: string, contenu: string) =>
-    api.post<import('../types').MessageGroupe>(`/discussion/${canal}/messages`, { contenu }),
+  postMessage: (canal: string, contenu: string, reponseAId?: number | null) =>
+    api.post<import('../types').MessageGroupe>(`/discussion/${canal}/messages`, { contenu, reponseAId }),
   getConversations: () => api.get<import('../types').ConversationCiblee[]>('/discussion/conversations'),
   getContacts: () => api.get<import('../types').ConversationContact[]>('/discussion/conversations/contacts'),
   creerConversation: (data: {
@@ -853,8 +853,12 @@ export const discussionService = {
   }) => api.post<import('../types').ConversationCiblee>('/discussion/conversations', data),
   getMessagesConversation: (id: number) =>
     api.get<import('../types').MessageCible[]>(`/discussion/conversations/${id}/messages`),
-  postMessageConversation: (id: number, contenu: string, envoyerEmail?: boolean) =>
-    api.post<import('../types').MessageCible>(`/discussion/conversations/${id}/messages`, { contenu, envoyerEmail }),
+  postMessageConversation: (id: number, contenu: string, envoyerEmail?: boolean, reponseAId?: number | null) =>
+    api.post<import('../types').MessageCible>(`/discussion/conversations/${id}/messages`, {
+      contenu,
+      envoyerEmail,
+      reponseAId,
+    }),
   marquerLu: (canal: string) => api.post(`/discussion/${canal}/lu`),
   getLecteurs: (canal: string) => api.get<import('../types').LectureInfo[]>(`/discussion/${canal}/lecteurs`),
   marquerLuConversation: (id: number) => api.post(`/discussion/conversations/${id}/lu`),
