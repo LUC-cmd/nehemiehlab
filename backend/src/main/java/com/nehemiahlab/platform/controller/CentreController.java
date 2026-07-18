@@ -70,6 +70,8 @@ public class CentreController {
         if (centre.getCoordinateurPrenom() != null) {
             centre.setCoordinateurPrenom(centre.getCoordinateurPrenom().trim());
         }
+        centre.setEmails(cleanList(centre.getEmails()));
+        centre.setTelephones(cleanPhoneList(centre.getTelephones()));
         return ResponseEntity.ok(centreRepository.save(centre));
     }
 
@@ -103,6 +105,12 @@ public class CentreController {
                     if (updateData.getCoordinateurPrenom() != null) {
                         centre.setCoordinateurPrenom(updateData.getCoordinateurPrenom().trim());
                     }
+                    if (updateData.getEmails() != null) {
+                        centre.setEmails(cleanList(updateData.getEmails()));
+                    }
+                    if (updateData.getTelephones() != null) {
+                        centre.setTelephones(cleanPhoneList(updateData.getTelephones()));
+                    }
                     return ResponseEntity.ok(centreRepository.save(centre));
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -112,6 +120,24 @@ public class CentreController {
         if (raw == null) return null;
         String digits = raw.replaceAll("\\D", "");
         return digits.isBlank() ? null : digits;
+    }
+
+    private static List<String> cleanList(List<String> raw) {
+        if (raw == null) return new java.util.ArrayList<>();
+        return raw.stream()
+                .filter(v -> v != null && !v.isBlank())
+                .map(String::trim)
+                .distinct()
+                .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+    }
+
+    private static List<String> cleanPhoneList(List<String> raw) {
+        if (raw == null) return new java.util.ArrayList<>();
+        return raw.stream()
+                .map(CentreController::cleanPhone)
+                .filter(v -> v != null && !v.isBlank())
+                .distinct()
+                .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
     }
 
     @DeleteMapping("/{id}")

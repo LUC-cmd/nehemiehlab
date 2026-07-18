@@ -277,12 +277,14 @@ export const centreService = {
     latitude?: number; longitude?: number;
     telephoneResponsable?: string; telephoneCoordinateur?: string; telephoneFormateur?: string;
     coordinateurNom?: string; coordinateurPrenom?: string;
+    emails?: string[]; telephones?: string[];
   }) => api.post('/centres', data),
   update: (id: number, data: {
     nom?: string; codeCdej?: string; adresse?: string; ville?: string; region?: string; cluster?: string;
     latitude?: number; longitude?: number;
     telephoneResponsable?: string; telephoneCoordinateur?: string; telephoneFormateur?: string;
     coordinateurNom?: string; coordinateurPrenom?: string;
+    emails?: string[]; telephones?: string[];
   }) => api.put(`/centres/${id}`, data),
   delete: (id: number) => api.delete(`/centres/${id}`),
   assignerFormateur: (centreId: number, formateurId: number) =>

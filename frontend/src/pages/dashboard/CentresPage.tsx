@@ -34,6 +34,74 @@ import {
 } from '../../utils/geo';
 import { cleanPhoneInput } from '../../utils/formInputs';
 
+function MultiValueField({
+  label,
+  values,
+  onChange,
+  placeholder,
+  type = 'text',
+  icon,
+}: {
+  label: string;
+  values: string[];
+  onChange: (values: string[]) => void;
+  placeholder?: string;
+  type?: string;
+  icon?: React.ReactNode;
+}) {
+  const list = values.length > 0 ? values : [''];
+  const update = (idx: number, value: string) => {
+    const next = [...list];
+    next[idx] = value;
+    onChange(next);
+  };
+  const remove = (idx: number) => {
+    const next = list.filter((_, i) => i !== idx);
+    onChange(next.length > 0 ? next : ['']);
+  };
+  return (
+    <div>
+      <label className="label">{label}</label>
+      <div className="space-y-2">
+        {list.map((value, idx) => (
+          <div key={idx} className="flex items-center gap-2">
+            <div className="relative flex-1">
+              {icon && (
+                <span className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400">{icon}</span>
+              )}
+              <input
+                type={type}
+                inputMode={type === 'tel' ? 'numeric' : undefined}
+                className={`input-field${icon ? ' pl-10' : ''}`}
+                placeholder={placeholder}
+                value={value}
+                onChange={(e) => update(idx, type === 'tel' ? cleanPhoneInput(e.target.value) : e.target.value)}
+              />
+            </div>
+            {list.length > 1 && (
+              <button
+                type="button"
+                onClick={() => remove(idx)}
+                className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                aria-label="Retirer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => onChange([...list, ''])}
+          className="text-xs font-semibold text-primary-600 hover:text-primary-700"
+        >
+          + Ajouter {label.toLowerCase()}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const emptyLocation = { latitude: '', longitude: '', mapsLink: '' };
 const emptyCentreForm = {
   nom: '',
@@ -47,6 +115,8 @@ const emptyCentreForm = {
   coordinateurPrenom: '',
   telephoneCoordinateur: '',
   telephoneFormateur: '',
+  emails: [''] as string[],
+  telephones: [''] as string[],
   ...emptyLocation,
 };
 
@@ -108,6 +178,8 @@ export default function CentresPage() {
     coordinateurPrenom: '',
     telephoneCoordinateur: '',
     telephoneFormateur: '',
+    emails: [''] as string[],
+    telephones: [''] as string[],
   });
   const [savingContacts, setSavingContacts] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
@@ -209,6 +281,8 @@ export default function CentresPage() {
         coordinateurPrenom: newCentre.coordinateurPrenom.trim() || undefined,
         telephoneCoordinateur: cleanPhoneInput(newCentre.telephoneCoordinateur) || undefined,
         telephoneFormateur: cleanPhoneInput(newCentre.telephoneFormateur) || undefined,
+        emails: newCentre.emails.map((v) => v.trim()).filter(Boolean),
+        telephones: newCentre.telephones.map((v) => cleanPhoneInput(v)).filter(Boolean),
         latitude: hasGps ? lat : undefined,
         longitude: hasGps ? lng : undefined,
       });
@@ -305,6 +379,8 @@ export default function CentresPage() {
       coordinateurPrenom: centre.coordinateurPrenom || centre.coordinateur?.prenom || '',
       telephoneCoordinateur: centre.telephoneCoordinateur || centre.coordinateur?.telephone || '',
       telephoneFormateur: centre.telephoneFormateur || centre.formateurs?.[0]?.telephone || '',
+      emails: centre.emails && centre.emails.length > 0 ? centre.emails : [''],
+      telephones: centre.telephones && centre.telephones.length > 0 ? centre.telephones : [''],
     });
   };
 
@@ -327,6 +403,8 @@ export default function CentresPage() {
         coordinateurPrenom: contactsForm.coordinateurPrenom.trim(),
         telephoneCoordinateur: cleanPhoneInput(contactsForm.telephoneCoordinateur),
         telephoneFormateur: cleanPhoneInput(contactsForm.telephoneFormateur),
+        emails: contactsForm.emails.map((v) => v.trim()).filter(Boolean),
+        telephones: contactsForm.telephones.map((v) => cleanPhoneInput(v)).filter(Boolean),
       });
       toast.success('Centre mis à jour.');
       setContactsCentre(null);
@@ -1324,6 +1402,25 @@ export default function CentresPage() {
             </p>
           </div>
 
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+            <p className="text-xs font-semibold text-slate-600">Contacts du centre (optionnel)</p>
+            <MultiValueField
+              label="Email du centre"
+              values={newCentre.emails}
+              onChange={(emails) => setNewCentre({ ...newCentre, emails })}
+              placeholder="contact@centre.tg"
+              type="email"
+            />
+            <MultiValueField
+              label="Téléphone du centre"
+              values={newCentre.telephones}
+              onChange={(telephones) => setNewCentre({ ...newCentre, telephones })}
+              placeholder="Numéro de téléphone"
+              type="tel"
+              icon={<Phone className="w-4 h-4" />}
+            />
+          </div>
+
           <CentreLocationFields
             value={{
               latitude: newCentre.latitude,
@@ -1533,6 +1630,21 @@ export default function CentresPage() {
               </div>
             </div>
           ))}
+          <MultiValueField
+            label="Email du centre"
+            values={contactsForm.emails}
+            onChange={(emails) => setContactsForm({ ...contactsForm, emails })}
+            placeholder="contact@centre.tg"
+            type="email"
+          />
+          <MultiValueField
+            label="Téléphone du centre"
+            values={contactsForm.telephones}
+            onChange={(telephones) => setContactsForm({ ...contactsForm, telephones })}
+            placeholder="Numéro de téléphone"
+            type="tel"
+            icon={<Phone className="w-4 h-4" />}
+          />
         </form>
       </Modal>
 

@@ -169,6 +169,26 @@ public class RapportController {
         sheet.setMargin(Sheet.BottomMargin, 0.6);
     }
 
+    /** Logo SKA en filigrane discret dans l'en-tete du classeur (colonne apres les donnees). */
+    private void addLogoToSheet(Workbook workbook, Sheet sheet, int afterColumn) {
+        try {
+            ClassPathResource resource = new ClassPathResource("branding/ska-logo.png");
+            if (!resource.exists()) return;
+            byte[] bytes = resource.getInputStream().readAllBytes();
+            int pictureIdx = workbook.addPicture(bytes, Workbook.PICTURE_TYPE_PNG);
+            Drawing<?> drawing = sheet.createDrawingPatriarch();
+            ClientAnchor anchor = workbook.getCreationHelper().createClientAnchor();
+            anchor.setCol1(afterColumn + 1);
+            anchor.setRow1(0);
+            anchor.setCol2(afterColumn + 3);
+            anchor.setRow2(3);
+            anchor.setAnchorType(ClientAnchor.AnchorType.MOVE_DONT_RESIZE);
+            drawing.createPicture(anchor, pictureIdx);
+        } catch (Exception ignored) {
+            // Logo optionnel : on ignore silencieusement si la ressource est indisponible.
+        }
+    }
+
     private LocalDate parseDateOrDefault(String value, LocalDate fallback) {
         if (value == null || value.isBlank()) return fallback;
         try {
@@ -700,6 +720,7 @@ public class RapportController {
             row.createCell(11).setCellValue(eleve.getProjet() != null ? eleve.getProjet().getNom() : "Aucun");
         }
 
+        addLogoToSheet(workbook, sheet, columns.length - 1);
         finalizeExcelSheet(sheet, columns.length);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
@@ -733,7 +754,8 @@ public class RapportController {
 
         List<List<String>> rows = eleves.stream().map(e -> List.of(
                 e.getMatricule() != null ? e.getMatricule() : "-",
-                e.getPrenom() + " " + e.getNom(),
+                e.getNom() != null ? e.getNom() : "-",
+                e.getPrenom() != null ? e.getPrenom() : "-",
                 String.valueOf(e.getAge()),
                 e.getSexe() != null ? e.getSexe() : "-",
                 e.getClasse() != null ? e.getClasse() : "-",
@@ -750,11 +772,11 @@ public class RapportController {
 
         byte[] pdf = buildPdfTableReport(
                 "Rapport apprenants",
-                List.of("Matricule", "Nom complet", "Age", "Sexe", "Classe", "Centre", "Heures", "Projet"),
+                List.of("Matricule", "Nom", "Prénom", "Age", "Sexe", "Classe", "Centre", "Heures", "Projet"),
                 rows,
                 meta,
                 ReportTemplate.APPRENANTS,
-                new float[]{60f, 100f, 30f, 30f, 50f, 90f, 50f, 90f}
+                new float[]{55f, 70f, 70f, 30f, 30f, 50f, 90f, 50f, 80f}
         );
 
         return ResponseEntity.ok()
@@ -846,6 +868,7 @@ public class RapportController {
             row.createCell(10).setCellValue(cniLabel(f));
         }
 
+        addLogoToSheet(workbook, sheet, columns.length - 1);
         finalizeExcelSheet(sheet, columns.length);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
@@ -863,7 +886,8 @@ public class RapportController {
         List<User> formateurs = userRepository.findByRoleOrderByCreatedAtDesc(Role.FORMATEUR);
 
         List<List<String>> rows = formateurs.stream().map(f -> List.of(
-                f.getPrenom() + " " + f.getNom(),
+                f.getNom() != null ? f.getNom() : "-",
+                f.getPrenom() != null ? f.getPrenom() : "-",
                 f.getEmail(),
                 f.getTelephone() != null ? f.getTelephone() : "-",
                 dateNaissanceLabel(f),
@@ -883,11 +907,11 @@ public class RapportController {
 
         byte[] pdf = buildPdfTableReport(
                 "Liste des formateurs",
-                List.of("Nom complet", "Email", "Telephone", "Naissance", "Lieu naiss.", "Adresse", "Statut", "Centre(s)", "Entree", "CNI"),
+                List.of("Nom", "Prénom", "Email", "Telephone", "Naissance", "Lieu naiss.", "Adresse", "Statut", "Centre(s)", "Entree", "CNI"),
                 rows,
                 meta,
                 ReportTemplate.ACTIVITES,
-                new float[]{80f, 95f, 55f, 50f, 65f, 80f, 45f, 90f, 45f, 50f}
+                new float[]{55f, 55f, 90f, 55f, 50f, 60f, 75f, 40f, 85f, 42f, 48f}
         );
 
         return ResponseEntity.ok()
@@ -929,6 +953,7 @@ public class RapportController {
             row.createCell(7).setCellValue(ancienneteLabel(u));
         }
 
+        addLogoToSheet(workbook, sheet, columns.length - 1);
         finalizeExcelSheet(sheet, columns.length);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
@@ -949,7 +974,8 @@ public class RapportController {
                 .toList();
 
         List<List<String>> rows = utilisateurs.stream().map(u -> List.of(
-                u.getPrenom() + " " + u.getNom(),
+                u.getNom() != null ? u.getNom() : "-",
+                u.getPrenom() != null ? u.getPrenom() : "-",
                 u.getEmail(),
                 ROLE_LABELS_FR.getOrDefault(u.getRole(), u.getRole().name()),
                 u.getTelephone() != null ? u.getTelephone() : "-",
@@ -963,11 +989,11 @@ public class RapportController {
 
         byte[] pdf = buildPdfTableReport(
                 "Liste des utilisateurs",
-                List.of("Nom complet", "Email", "Role", "Telephone", "Statut", "Centre(s)", "Entree"),
+                List.of("Nom", "Prénom", "Email", "Role", "Telephone", "Statut", "Centre(s)", "Entree"),
                 rows,
                 meta,
                 ReportTemplate.ACTIVITES,
-                new float[]{85f, 105f, 70f, 55f, 45f, 90f, 55f}
+                new float[]{60f, 60f, 95f, 65f, 50f, 42f, 80f, 50f}
         );
 
         return ResponseEntity.ok()
@@ -1962,6 +1988,7 @@ public class RapportController {
             row.createCell(7).setCellValue(tx.getCreatedAt().toString());
         }
 
+        addLogoToSheet(workbook, sheet, columns.length - 1);
         finalizeExcelSheet(sheet, columns.length);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);

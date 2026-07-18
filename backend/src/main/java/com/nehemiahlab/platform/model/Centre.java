@@ -5,6 +5,8 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.List;
+import java.util.ArrayList;
 
 @Entity
 @Table(name = "centres")
@@ -54,6 +56,22 @@ public class Centre {
     /** Code CDEJ (ex. TG0908) pour les rapports formateurs */
     @Column(name = "code_cdej", length = 32)
     private String codeCdej;
+
+    /** Emails du centre (un ou plusieurs) */
+    @Builder.Default
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "centre_emails", joinColumns = @JoinColumn(name = "centre_id"))
+    @Column(name = "email")
+    @OrderColumn(name = "position")
+    private List<String> emails = new ArrayList<>();
+
+    /** Numeros de telephone generaux du centre (un ou plusieurs) */
+    @Builder.Default
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "centre_telephones", joinColumns = @JoinColumn(name = "centre_id"))
+    @Column(name = "telephone")
+    @OrderColumn(name = "position")
+    private List<String> telephones = new ArrayList<>();
 
     /** Lieu précis de la formation SKA (village/quartier) */
     @Column(name = "lieu_formation")
