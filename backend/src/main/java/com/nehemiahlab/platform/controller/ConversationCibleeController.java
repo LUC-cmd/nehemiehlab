@@ -8,6 +8,7 @@ import com.nehemiahlab.platform.model.User;
 import com.nehemiahlab.platform.repository.CentreRepository;
 import com.nehemiahlab.platform.repository.ConversationCibleeRepository;
 import com.nehemiahlab.platform.repository.MessageCibleRepository;
+import com.nehemiahlab.platform.repository.UserRepository;
 import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.service.NotificationDispatchService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,17 +20,22 @@ import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
- * Conversations ciblees : en plus des 4 canaux fixes (voir DiscussionController),
- * le Directeur peut ouvrir une discussion avec une audience precise --
- * les formateurs d'un centre, d'un cluster, et/ou le comptable (y compris
- * une discussion directe Directeur <-> Comptable seul).
- * L'appartenance est recalculee a la volee via NotificationDispatchService.resolveRecipients,
- * la meme logique qui sert deja a la diffusion d'alertes -- pas de table de membres.
+ * Conversations ciblees : deux modes possibles.
+ *  - "Cible" (reserve au Directeur) : audience calculee par centre, cluster et/ou comptable
+ *    (voir NotificationDispatchService.resolveRecipients) -- pas de gestion manuelle des membres,
+ *    et le Directeur a toujours acces (supervision).
+ *  - "Libre" (style WhatsApp, ouvert a tous les roles du module discussion) : le createur
+ *    choisit explicitement une ou plusieurs personnes precises. L'acces est alors strictement
+ *    limite a cette liste de participants -- pas d'acces automatique pour le Directeur.
+ * Dans les deux cas, une fois la conversation creee, tous les participants peuvent lire et
+ * repondre (ce n'est pas une diffusion a sens unique).
  */
 @RestController
 @RequestMapping("/discussion/conversations")
@@ -46,6 +52,9 @@ public class ConversationCibleeController {
     private CentreRepository centreRepository;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
     private NotificationDispatchService notificationDispatchService;
 
     /** Liste des conversations ciblees auxquelles l'utilisateur connecte a acces. */
@@ -57,55 +66,63 @@ public class ConversationCibleeController {
         List<Map<String, Object>> visibles = new ArrayList<>();
         for (ConversationCiblee conv : toutes) {
             if (!aAcces(conv, user)) continue;
-            Map<String, Object> m = new HashMap<>();
-            m.put("id", conv.getId());
-            m.put("label", label(conv));
-            m.put("centreId", conv.getCentreId());
-            m.put("centreNom", conv.getCentreNom());
-            m.put("cluster", conv.getCluster());
-            m.put("inclureComptable", conv.isInclureComptable());
-            m.put("createdBy", conv.getCreatedBy());
-            m.put("createdAt", conv.getCreatedAt());
-            m.put("nbMessages", messageRepository.countByConversationId(conv.getId()));
-            visibles.add(m);
+            visibles.add(toDto(conv, user));
         }
         return ResponseEntity.ok(visibles);
     }
 
-    /** Cree une conversation ciblee et son premier message (Directeur uniquement). */
+    /** Contacts disponibles pour demarrer une conversation libre (tous les roles du module discussion, sauf soi-meme). */
+    @GetMapping("/contacts")
+    public ResponseEntity<?> getContacts(Authentication auth) {
+        User user = (User) auth.getPrincipal();
+        List<Map<String, Object>> contacts = new ArrayList<>();
+        for (Role role : new Role[]{Role.DIRECTEUR, Role.FORMATEUR, Role.COMPTABLE}) {
+            for (User u : userRepository.findByRoleAndActifTrue(role)) {
+                if (u.getId() == null || u.getId().equals(user.getId())) continue;
+                Map<String, Object> m = new HashMap<>();
+                m.put("id", u.getId());
+                m.put("prenom", u.getPrenom());
+                m.put("nom", u.getNom());
+                m.put("role", u.getRole().name());
+                contacts.add(m);
+            }
+        }
+        return ResponseEntity.ok(contacts);
+    }
+
+    /** Cree une conversation ciblee (mode "cible", Directeur uniquement) ou "libre" (tous roles) et son premier message. */
     @PostMapping
-    @PreAuthorize("hasRole('DIRECTEUR')")
     public ResponseEntity<?> creerConversation(@RequestBody Map<String, Object> body, Authentication auth) {
-        User directeur = (User) auth.getPrincipal();
+        User createur = (User) auth.getPrincipal();
+
+        Set<Long> participantIds = new LinkedHashSet<>();
+        if (body.get("participantIds") instanceof List<?> rawList) {
+            for (Object o : rawList) {
+                try {
+                    participantIds.add(Long.valueOf(String.valueOf(o)));
+                } catch (NumberFormatException ignored) {
+                    /* skip */
+                }
+            }
+        }
+        boolean libre = !participantIds.isEmpty();
 
         Long centreId = null;
-        if (body.get("centreId") != null && !String.valueOf(body.get("centreId")).isBlank()) {
-            try {
-                centreId = Long.valueOf(String.valueOf(body.get("centreId")));
-            } catch (NumberFormatException e) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Centre invalide."));
-            }
-        }
-        String cluster = body.get("cluster") != null ? String.valueOf(body.get("cluster")).trim() : null;
-        if (cluster != null && cluster.isBlank()) cluster = null;
-        boolean inclureComptable = Boolean.TRUE.equals(body.get("inclureComptable"))
-                || "true".equalsIgnoreCase(String.valueOf(body.get("inclureComptable")));
+        String cluster = null;
+        boolean inclureComptable = false;
 
-        if (centreId != null && cluster != null) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Choisissez un centre OU un cluster, pas les deux."));
-        }
-        if (centreId == null && cluster == null && !inclureComptable) {
-            return ResponseEntity.badRequest().body(Map.of("message",
-                    "Sélectionnez au moins un destinataire : un centre, un cluster, ou le comptable."));
-        }
-
-        String centreNom = null;
-        if (centreId != null) {
-            Optional<Centre> centreOpt = centreRepository.findById(centreId);
-            if (centreOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Centre introuvable."));
+        if (!libre) {
+            if (body.get("centreId") != null && !String.valueOf(body.get("centreId")).isBlank()) {
+                try {
+                    centreId = Long.valueOf(String.valueOf(body.get("centreId")));
+                } catch (NumberFormatException e) {
+                    return ResponseEntity.badRequest().body(Map.of("message", "Centre invalide."));
+                }
             }
-            centreNom = centreOpt.get().getNom();
+            cluster = body.get("cluster") != null ? String.valueOf(body.get("cluster")).trim() : null;
+            if (cluster != null && cluster.isBlank()) cluster = null;
+            inclureComptable = Boolean.TRUE.equals(body.get("inclureComptable"))
+                    || "true".equalsIgnoreCase(String.valueOf(body.get("inclureComptable")));
         }
 
         String contenu = InputSanitizer.clean((String) body.get("contenu"));
@@ -116,30 +133,57 @@ public class ConversationCibleeController {
             return ResponseEntity.badRequest().body(Map.of("message", "Le message est trop long (4000 caractères max)."));
         }
 
-        ConversationCiblee conv = conversationRepository.save(ConversationCiblee.builder()
-                .centreId(centreId)
-                .centreNom(centreNom)
-                .cluster(cluster)
-                .inclureComptable(inclureComptable)
-                .createdBy(directeur)
-                .build());
+        String centreNom = null;
+        ConversationCiblee.ConversationCibleeBuilder builder = ConversationCiblee.builder().createdBy(createur);
+
+        if (libre) {
+            // Discussion directe / de groupe libre : ouverte a tous les roles du module.
+            if (centreId != null || cluster != null || inclureComptable) {
+                return ResponseEntity.badRequest().body(Map.of("message",
+                        "Choisissez soit des destinataires précis, soit un centre/cluster/comptable, pas les deux."));
+            }
+            participantIds.add(createur.getId());
+            List<User> trouves = userRepository.findAllById(participantIds);
+            if (trouves.size() != participantIds.size()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Un ou plusieurs destinataires sont introuvables."));
+            }
+            boolean valides = trouves.stream().allMatch(u -> u.isActif()
+                    && (u.getRole() == Role.DIRECTEUR || u.getRole() == Role.FORMATEUR || u.getRole() == Role.COMPTABLE));
+            if (!valides) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Destinataire invalide."));
+            }
+            builder.participantIds(participantIds);
+        } else {
+            // Ciblage par centre/cluster/comptable : reserve au Directeur.
+            if (createur.getRole() != Role.DIRECTEUR) {
+                return ResponseEntity.status(403).body(Map.of("message",
+                        "Seul le Directeur peut cibler par centre, cluster ou comptable. Choisissez des destinataires précis."));
+            }
+            if (centreId == null && cluster == null && !inclureComptable) {
+                return ResponseEntity.badRequest().body(Map.of("message",
+                        "Sélectionnez au moins un destinataire : un centre, un cluster, ou le comptable."));
+            }
+            if (centreId != null) {
+                Optional<Centre> centreOpt = centreRepository.findById(centreId);
+                if (centreOpt.isEmpty()) {
+                    return ResponseEntity.badRequest().body(Map.of("message", "Centre introuvable."));
+                }
+                centreNom = centreOpt.get().getNom();
+            }
+            builder.centreId(centreId).centreNom(centreNom).cluster(cluster).inclureComptable(inclureComptable);
+        }
+
+        ConversationCiblee conv = conversationRepository.save(builder.build());
 
         MessageCible message = messageRepository.save(MessageCible.builder()
                 .conversationId(conv.getId())
-                .auteur(directeur)
+                .auteur(createur)
                 .contenu(contenu)
                 .build());
 
-        notifierNouveauMessage(conv, directeur, contenu);
+        notifierNouveauMessage(conv, createur, contenu);
 
-        Map<String, Object> reponse = new HashMap<>();
-        reponse.put("id", conv.getId());
-        reponse.put("label", label(conv));
-        reponse.put("centreId", conv.getCentreId());
-        reponse.put("centreNom", conv.getCentreNom());
-        reponse.put("cluster", conv.getCluster());
-        reponse.put("inclureComptable", conv.isInclureComptable());
-        reponse.put("createdAt", conv.getCreatedAt());
+        Map<String, Object> reponse = toDto(conv, createur);
         reponse.put("premierMessage", message);
         return ResponseEntity.ok(reponse);
     }
@@ -184,8 +228,17 @@ public class ConversationCibleeController {
         return ResponseEntity.ok(message);
     }
 
-    /** Audience d'une conversation ciblee (Directeurs toujours inclus, + formateurs/comptable selon les criteres). */
+    private boolean estLibre(ConversationCiblee conv) {
+        return conv.getParticipantIds() != null && !conv.getParticipantIds().isEmpty();
+    }
+
+    /** Audience d'une conversation (participants explicites en mode libre, sinon calculee par criteres). */
     private List<User> resoudreParticipants(ConversationCiblee conv) {
+        if (estLibre(conv)) {
+            return userRepository.findAllById(conv.getParticipantIds()).stream()
+                    .filter(User::isActif)
+                    .toList();
+        }
         List<Role> roles = new ArrayList<>();
         roles.add(Role.DIRECTEUR);
         if (conv.getCentreId() != null || conv.getCluster() != null) {
@@ -198,7 +251,7 @@ public class ConversationCibleeController {
     }
 
     private boolean aAcces(ConversationCiblee conv, User user) {
-        if (user.getRole() == Role.DIRECTEUR) return true;
+        if (!estLibre(conv) && user.getRole() == Role.DIRECTEUR) return true;
         return resoudreParticipants(conv).stream()
                 .anyMatch(u -> u.getId() != null && u.getId().equals(user.getId()));
     }
@@ -210,13 +263,51 @@ public class ConversationCibleeController {
         if (destinataires.isEmpty()) return;
 
         String apercu = contenu.length() > 200 ? contenu.substring(0, 200) + "…" : contenu;
-        String titre = "Nouveau message ciblé — " + label(conv);
+        String titre = "Nouveau message" + (estLibre(conv) ? "" : " ciblé") + " — " + labelGenerique(conv);
         String messageNotif = (auteur.getPrenom() != null ? auteur.getPrenom() : "") + " "
                 + (auteur.getNom() != null ? auteur.getNom() : "") + " : " + apercu;
         notificationDispatchService.notifyMany(destinataires, titre, messageNotif.trim(), "DISCUSSION", conv.getId());
     }
 
-    private String label(ConversationCiblee conv) {
+    /** DTO renvoye au frontend, avec un libelle et une liste "autres participants" propres au point de vue de l'utilisateur connecte. */
+    private Map<String, Object> toDto(ConversationCiblee conv, User viewer) {
+        boolean libre = estLibre(conv);
+        Map<String, Object> m = new HashMap<>();
+        m.put("id", conv.getId());
+        m.put("libre", libre);
+        m.put("label", label(conv, viewer));
+        m.put("centreId", conv.getCentreId());
+        m.put("centreNom", conv.getCentreNom());
+        m.put("cluster", conv.getCluster());
+        m.put("inclureComptable", conv.isInclureComptable());
+        m.put("createdBy", conv.getCreatedBy());
+        m.put("createdAt", conv.getCreatedAt());
+        m.put("nbMessages", messageRepository.countByConversationId(conv.getId()));
+        if (libre) {
+            List<Map<String, Object>> autres = resoudreParticipants(conv).stream()
+                    .filter(u -> u.getId() != null && !u.getId().equals(viewer.getId()))
+                    .map(u -> {
+                        Map<String, Object> p = new HashMap<>();
+                        p.put("id", u.getId());
+                        p.put("prenom", u.getPrenom());
+                        p.put("nom", u.getNom());
+                        p.put("role", u.getRole().name());
+                        return p;
+                    })
+                    .toList();
+            m.put("participants", autres);
+        }
+        return m;
+    }
+
+    private String label(ConversationCiblee conv, User viewer) {
+        if (estLibre(conv)) {
+            List<User> autres = resoudreParticipants(conv).stream()
+                    .filter(u -> u.getId() != null && !u.getId().equals(viewer.getId()))
+                    .toList();
+            if (autres.isEmpty()) return "Notes personnelles";
+            return nomsCourts(autres);
+        }
         String base;
         boolean cible = conv.getCentreId() != null || (conv.getCluster() != null && !conv.getCluster().isBlank());
         if (conv.getCentreId() != null) {
@@ -230,5 +321,23 @@ public class ConversationCibleeController {
             base += " + Comptable";
         }
         return base;
+    }
+
+    /** Libelle neutre (non lie a un point de vue precis), utilise pour le titre des notifications. */
+    private String labelGenerique(ConversationCiblee conv) {
+        if (estLibre(conv)) {
+            return nomsCourts(resoudreParticipants(conv));
+        }
+        return label(conv, conv.getCreatedBy());
+    }
+
+    private String nomsCourts(List<User> utilisateurs) {
+        List<String> noms = utilisateurs.stream()
+                .limit(3)
+                .map(u -> ((u.getPrenom() != null ? u.getPrenom() : "") + " " + (u.getNom() != null ? u.getNom() : "")).trim())
+                .toList();
+        String joint = String.join(", ", noms);
+        if (utilisateurs.size() > 3) joint += "…";
+        return joint.isBlank() ? "Discussion" : joint;
     }
 }
