@@ -67,10 +67,39 @@ public class EleveController {
     public ResponseEntity<List<Eleve>> getByCentre(@PathVariable Long centreId, Authentication auth) {
         centreAccessService.requireCentreAccess((User) auth.getPrincipal(), centreId);
         List<Eleve> eleves = eleveRepository.findByCentreId(centreId);
-        for (Eleve e : eleves) {
-            calculateAndSetPerformance(e);
-        }
+        applyPerformances(eleves);
         return ResponseEntity.ok(eleves);
+    }
+
+    /**
+     * Calcule la performance moyenne de plusieurs élèves en une seule requête
+     * groupée, au lieu d'une requête par élève (corrige un N+1 sur les listes
+     * de centre : un centre de 50 élèves déclenchait 50 requêtes supplémentaires).
+     */
+    private void applyPerformances(List<Eleve> eleves) {
+        if (eleves.isEmpty()) return;
+        List<Long> ids = eleves.stream().map(Eleve::getId).collect(Collectors.toList());
+        List<Object[]> rows = evaluationSessionRepository.findEleveIdAndNoteByEleveIdIn(ids);
+        Map<Long, double[]> agg = new HashMap<>(); // eleveId -> [total, count]
+        for (Object[] row : rows) {
+            Long eleveId = (Long) row[0];
+            Double note = (Double) row[1];
+            if (note == null) continue;
+            double[] acc = agg.computeIfAbsent(eleveId, k -> new double[2]);
+            acc[0] += note;
+            acc[1] += 1;
+        }
+        for (Eleve e : eleves) {
+            double[] acc = agg.get(e.getId());
+            if (acc != null && acc[1] > 0) {
+                // Notes historiques pouvaient être /20 — normaliser en /10 pour l'affichage
+                double avg = acc[0] / acc[1];
+                if (avg > 10) avg = avg / 2.0;
+                e.setPerformanceMoyenne(Math.round(avg * 10.0) / 10.0);
+            } else {
+                e.setPerformanceMoyenne(null);
+            }
+        }
     }
 
     private void calculateAndSetPerformance(Eleve e) {

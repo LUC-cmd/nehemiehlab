@@ -12,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,8 +59,11 @@ public class DiscussionController {
         if (!c.accessiblePar(user.getRole())) {
             return ResponseEntity.status(403).body(Map.of("message", "Vous n'avez pas accès à ce groupe de discussion."));
         }
-        List<MessageGroupe> messages = messageGroupeRepository.findByCanalOrderByCreatedAtAsc(c);
-        return ResponseEntity.ok(messages);
+        // On ne charge que les 200 derniers messages (l'historique complet n'est
+        // pas nécessaire et cet endpoint est interrogé toutes les 8 secondes).
+        List<MessageGroupe> recent = messageGroupeRepository.findTop200ByCanalOrderByCreatedAtDesc(c);
+        Collections.reverse(recent);
+        return ResponseEntity.ok(recent);
     }
 
     @PostMapping("/{canal}/messages")
