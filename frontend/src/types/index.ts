@@ -206,9 +206,19 @@ export interface MessageGroupe {
   createdAt: string;
 }
 
-// --- Conversations ciblées (Directeur -> centre/cluster/comptable) ---
+// --- Conversations ciblées (mode "cible" par centre/cluster/comptable, Directeur
+// uniquement) et conversations "libres" (style WhatsApp, tous rôles, participants
+// choisis explicitement) ---
+export interface ConversationContact {
+  id: number;
+  prenom: string;
+  nom: string;
+  role: string;
+}
+
 export interface ConversationCiblee {
   id: number;
+  libre: boolean;
   label: string;
   centreId?: number;
   centreNom?: string;
@@ -217,6 +227,7 @@ export interface ConversationCiblee {
   createdBy?: User;
   createdAt: string;
   nbMessages: number;
+  participants?: ConversationContact[];
 }
 
 export interface MessageCible {
