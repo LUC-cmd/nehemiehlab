@@ -837,8 +837,14 @@ export const discussionService = {
   postMessage: (canal: string, contenu: string) =>
     api.post<import('../types').MessageGroupe>(`/discussion/${canal}/messages`, { contenu }),
   getConversations: () => api.get<import('../types').ConversationCiblee[]>('/discussion/conversations'),
-  creerConversation: (data: { centreId?: number; cluster?: string; inclureComptable?: boolean; contenu: string }) =>
-    api.post<import('../types').ConversationCiblee>('/discussion/conversations', data),
+  getContacts: () => api.get<import('../types').ConversationContact[]>('/discussion/conversations/contacts'),
+  creerConversation: (data: {
+    centreId?: number;
+    cluster?: string;
+    inclureComptable?: boolean;
+    participantIds?: number[];
+    contenu: string;
+  }) => api.post<import('../types').ConversationCiblee>('/discussion/conversations', data),
   getMessagesConversation: (id: number) =>
     api.get<import('../types').MessageCible[]>(`/discussion/conversations/${id}/messages`),
   postMessageConversation: (id: number, contenu: string) =>
