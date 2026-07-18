@@ -59,6 +59,7 @@ export type DashboardPage =
   | 'galerie'
   | 'ressources'
   | 'communaute'
+  | 'discussion'
   | 'profils-enfants'
   | 'controle-gestion'
   | 'utilisateurs'
@@ -94,6 +95,7 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { id: 'galerie', label: 'Galerie site', kind: 'voir' },
   { id: 'ressources', label: 'Ressources', kind: 'voir' },
   { id: 'communaute', label: 'Communauté CDEJ', kind: 'voir' },
+  { id: 'discussion', label: 'Groupes de discussion', kind: 'voir' },
   { id: 'profils-enfants', label: 'Profils enfants', kind: 'voir' },
   { id: 'controle-gestion', label: 'Contrôle de gestion', kind: 'voir' },
   { id: 'utilisateurs', label: 'Utilisateurs', kind: 'voir' },
@@ -126,6 +128,7 @@ export const PAGE_ROLES: Record<DashboardPage, Role[]> = {
   galerie: ['DIRECTEUR'],
   ressources: ['DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER', 'COMPTABLE', 'STAFF_NEHEMIAH', 'ANIMATEUR', 'BENEVOLE', 'PARTICIPANT'],
   communaute: ['DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER', 'COMPTABLE', 'STAFF_NEHEMIAH', 'ANIMATEUR', 'BENEVOLE', 'PARTICIPANT'],
+  discussion: ['DIRECTEUR', 'FORMATEUR', 'COMPTABLE'],
   'profils-enfants': ['DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER', 'COMPTABLE', 'STAFF_NEHEMIAH', 'ANIMATEUR', 'BENEVOLE', 'PARTICIPANT'],
   'controle-gestion': ['DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER', 'COMPTABLE', 'STAFF_NEHEMIAH', 'ANIMATEUR', 'BENEVOLE', 'PARTICIPANT'],
   utilisateurs: ['DIRECTEUR'],
@@ -160,6 +163,7 @@ export const NAV_FALLBACK: NavItemDef[] = [
   { page: 'galerie', to: '/dashboard/galerie', label: 'Galerie site' },
   { page: 'ressources', to: '/dashboard/ressources', label: 'Ressources' },
   { page: 'communaute', to: '/dashboard/communaute', label: 'Communauté CDEJ' },
+  { page: 'discussion', to: '/dashboard/discussion', label: 'Groupes de discussion' },
   { page: 'profils-enfants', to: '/dashboard/profils-enfants', label: 'Profils enfants' },
   { page: 'controle-gestion', to: '/dashboard/controle-gestion', label: 'Contrôle de gestion' },
   { page: 'utilisateurs', to: '/dashboard/utilisateurs', label: 'Utilisateurs' },
@@ -192,6 +196,7 @@ export const NAV_BY_ROLE: Record<Role, NavItemDef[]> = {
     { page: 'galerie', to: '/dashboard/galerie', label: 'Galerie site' },
     { page: 'ressources', to: '/dashboard/ressources', label: 'Ressources' },
     { page: 'communaute', to: '/dashboard/communaute', label: 'Communauté CDEJ' },
+    { page: 'discussion', to: '/dashboard/discussion', label: 'Groupes de discussion' },
     { page: 'profils-enfants', to: '/dashboard/profils-enfants', label: 'Profils enfants' },
     { page: 'controle-gestion', to: '/dashboard/controle-gestion', label: 'Contrôle de gestion' },
     { page: 'utilisateurs', to: '/dashboard/utilisateurs', label: 'Utilisateurs' },
@@ -207,6 +212,7 @@ export const NAV_BY_ROLE: Record<Role, NavItemDef[]> = {
     { page: 'evaluation-formateur', to: '/dashboard/evaluation-formateur', label: 'Évaluation formateur' },
     { page: 'ressources', to: '/dashboard/ressources', label: 'Ressources' },
     { page: 'communaute', to: '/dashboard/communaute', label: 'Communauté CDEJ' },
+    { page: 'discussion', to: '/dashboard/discussion', label: 'Groupes de discussion' },
     { page: 'profils-enfants', to: '/dashboard/profils-enfants', label: 'Profils enfants' },
     { page: 'transactions', to: '/dashboard/transactions', label: 'Mes Paiements' },
     { page: 'rapports', to: '/dashboard/rapports', label: 'Mes Rapports' },
@@ -242,6 +248,7 @@ export const NAV_BY_ROLE: Record<Role, NavItemDef[]> = {
     { page: 'transactions', to: '/dashboard/transactions', label: 'Transactions' },
     { page: 'rapports', to: '/dashboard/rapports', label: 'Rapports' },
     { page: 'communaute', to: '/dashboard/communaute', label: 'Communauté CDEJ' },
+    { page: 'discussion', to: '/dashboard/discussion', label: 'Groupes de discussion' },
     { page: 'controle-gestion', to: '/dashboard/controle-gestion', label: 'Contrôle de gestion' },
   ],
   STAFF_NEHEMIAH: [
@@ -271,12 +278,12 @@ export const NAV_BY_ROLE: Record<Role, NavItemDef[]> = {
 export const DEFAULT_FEATURES_BY_ROLE: Record<Role, FeatureId[]> = {
   DIRECTEUR: [
     'home', 'centres', 'formateurs', 'eleves', 'sessions', 'formations', 'supports-cours', 'journal-activite', 'evaluation-formateur', 'transactions', 'rapports',
-    'publications', 'actualites', 'galerie', 'ressources', 'communaute', 'profils-enfants', 'controle-gestion',
+    'publications', 'actualites', 'galerie', 'ressources', 'communaute', 'discussion', 'profils-enfants', 'controle-gestion',
     'utilisateurs', 'permissions', 'profil',
     'edit_centre_location', 'create_eleve', 'manage_sessions', 'manage_signalements',
   ],
   FORMATEUR: [
-    'home', 'mes-centres', 'eleves', 'sessions', 'formations', 'supports-cours', 'evaluation-formateur', 'ressources', 'communaute',
+    'home', 'mes-centres', 'eleves', 'sessions', 'formations', 'supports-cours', 'evaluation-formateur', 'ressources', 'communaute', 'discussion',
     'profils-enfants', 'transactions', 'rapports', 'profil',
     'edit_centre_location', 'create_eleve', 'manage_sessions', 'validate_transactions',
   ],
@@ -289,7 +296,7 @@ export const DEFAULT_FEATURES_BY_ROLE: Record<Role, FeatureId[]> = {
     'signalements', 'rapports', 'profil', 'edit_centre_location', 'create_eleve', 'manage_signalements',
   ],
   COMPTABLE: [
-    'home', 'transactions', 'rapports', 'communaute', 'controle-gestion', 'profil', 'validate_transactions',
+    'home', 'transactions', 'rapports', 'communaute', 'discussion', 'controle-gestion', 'profil', 'validate_transactions',
   ],
   STAFF_NEHEMIAH: ['home', 'ressources', 'communaute', 'profil'],
   ANIMATEUR: ['home', 'ressources', 'communaute', 'profil'],
@@ -353,6 +360,7 @@ export function pageFromPath(pathname: string): DashboardPage | null {
     '/dashboard/galerie': 'galerie',
     '/dashboard/ressources': 'ressources',
     '/dashboard/communaute': 'communaute',
+    '/dashboard/discussion': 'discussion',
     '/dashboard/profils-enfants': 'profils-enfants',
     '/dashboard/controle-gestion': 'controle-gestion',
     '/dashboard/utilisateurs': 'utilisateurs',
