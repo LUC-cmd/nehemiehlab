@@ -14,8 +14,10 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.http.HttpStatus;
 
 @Configuration
 @EnableWebSecurity
@@ -68,6 +70,14 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // Sans ceci, Spring Security renvoie 403 (au lieu de 401) des qu'un jeton est
+            // absent/expire/invalide, car aucun mecanisme d'authentification (formLogin,
+            // httpBasic) n'est configure pour fournir un AuthenticationEntryPoint par defaut.
+            // Or le frontend ne tente un rafraichissement silencieux du token que sur un 401 :
+            // sans ce 401 explicite, une session expiree provoque une boucle infinie de
+            // toasts "Acces refuse" au lieu de rafraichir le jeton ou de rediriger vers /connexion.
+            .exceptionHandling(exceptions -> exceptions
+                    .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
             .addFilterBefore(authRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
