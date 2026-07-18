@@ -607,6 +607,7 @@
   .modal-panel .btn-success {
     color: #ffffff !important;
   }
+  .modal-panel .text-dark-100 { color: #0f172a !important; }
   .modal-panel .text-dark-200,
   .modal-panel .text-dark-300,
   .modal-panel .text-dark-400,
