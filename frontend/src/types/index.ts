@@ -241,6 +241,15 @@ export interface MessageCible {
   createdAt: string;
 }
 
+// --- Accuses de lecture (visibles uniquement par l'auteur du message) ---
+export interface LectureInfo {
+  userId: number;
+  prenom?: string;
+  nom?: string;
+  avatar?: string;
+  dernierAcces: string;
+}
+
 // --- Signalement ---
 export interface Signalement {
   id: number;
