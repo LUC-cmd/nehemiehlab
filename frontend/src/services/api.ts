@@ -140,10 +140,13 @@ api.interceptors.response.use(
     // Ne pas toaster sur pages publiques ni sans session active (évite le spam au chargement)
     const hasSession = Boolean(getAuthToken());
     if (!isAuthPublicCall && !isPublicSiteCall && hasSession && !isPublicAppPath()) {
+      // Un id fixe par type d'erreur fait que les appels en boucle (ex: le polling de la
+      // discussion toutes les 8s) mettent a jour le meme toast au lieu d'en empiler un
+      // nouveau a chaque echec.
       if (error.response?.status === 403) {
-        toast.error("Accès refusé — vous n'avez pas les permissions nécessaires.");
+        toast.error("Accès refusé — vous n'avez pas les permissions nécessaires.", { id: 'http-403' });
       } else if (error.response?.status === 500) {
-        toast.error('Erreur serveur. Veuillez réessayer plus tard.');
+        toast.error('Erreur serveur. Veuillez réessayer plus tard.', { id: 'http-500' });
       }
     }
 
