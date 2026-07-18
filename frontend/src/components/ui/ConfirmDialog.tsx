@@ -11,7 +11,7 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onCancel: () => void;
   /**
    * Si renseigné, le bouton de confirmation reste désactivé tant que
@@ -38,9 +38,12 @@ export default function ConfirmDialog({
   typedConfirmationLabel,
 }: ConfirmDialogProps) {
   const [typedValue, setTypedValue] = useState('');
+  // Empeche les doubles soumissions : une fois "Confirmer" clique, le bouton
+  // se desactive jusqu'a ce que onConfirm() se termine (succes ou erreur).
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || submitting) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel();
     };
@@ -51,11 +54,24 @@ export default function ConfirmDialog({
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [open, onCancel]);
+  }, [open, submitting, onCancel]);
 
   useEffect(() => {
-    if (!open) setTypedValue('');
+    if (!open) {
+      setTypedValue('');
+      setSubmitting(false);
+    }
   }, [open]);
+
+  const handleConfirmClick = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await onConfirm();
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const typedConfirmationOk = useMemo(
     () => !requireTypedConfirmation || typedValue.trim() === requireTypedConfirmation,
@@ -67,7 +83,7 @@ export default function ConfirmDialog({
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="modal-overlay" role="presentation" onClick={onCancel}>
+        <div className="modal-overlay" role="presentation" onClick={submitting ? undefined : onCancel}>
           <motion.div
             role="alertdialog"
             aria-modal="true"
@@ -98,7 +114,8 @@ export default function ConfirmDialog({
               <button
                 type="button"
                 onClick={onCancel}
-                className="modal-close"
+                disabled={submitting}
+                className="modal-close disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Fermer"
               >
                 <X className="w-4 h-4" />
@@ -122,6 +139,7 @@ export default function ConfirmDialog({
                   <input
                     type="text"
                     autoFocus
+                    disabled={submitting}
                     className="input-field w-full"
                     value={typedValue}
                     onChange={(e) => setTypedValue(e.target.value)}
@@ -132,13 +150,19 @@ export default function ConfirmDialog({
             </div>
 
             <div className="modal-footer">
-              <button type="button" onClick={onCancel} className="btn-ghost w-full sm:w-auto justify-center">
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={submitting}
+                className="btn-ghost w-full sm:w-auto justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 {cancelLabel}
               </button>
               <ValidationActionButton
                 size="md"
                 variant={danger ? 'danger' : 'success'}
-                onClick={onConfirm}
+                onClick={() => void handleConfirmClick()}
+                loading={submitting}
                 disabled={!typedConfirmationOk}
               >
                 {confirmLabel}

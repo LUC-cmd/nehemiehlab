@@ -5,13 +5,14 @@ import { eleveService, centreService } from '../../services/api';
 import type { Eleve, Centre, ChildSessionRow } from '../../types';
 import { centreLabel } from '../../utils/centreLabel';
 import { NIVEAUX_MAITRISE } from '../../types';
-import { Plus, Search, MessageSquare, AlertTriangle, Edit2, KeyRound, Copy, CalendarDays, Loader2 } from 'lucide-react';
+import { Plus, Search, MessageSquare, AlertTriangle, Edit2, KeyRound, Copy, CalendarDays, Loader2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import EleveFicheForm from '../../components/dashboard/EleveFicheForm';
 import { emptyEleveFiche, eleveToFicheValues } from '../../utils/eleveForm';
 import { PageLoadingSkeleton, TableSkeleton } from '../../components/ui/DashboardSkeletons';
 import { useMinDelayLoading } from '../../hooks/useMinDelayLoading';
 import Modal from '../../components/ui/Modal';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import ChildSessionHistory from '../../components/dashboard/ChildSessionHistory';
 import { formatFullName } from '../../utils/displayName';
 
@@ -67,6 +68,8 @@ export default function ElevesPage() {
   const [showSeancesModal, setShowSeancesModal] = useState(false);
   const [seancesEleve, setSeancesEleve] = useState<ChildSessionRow[]>([]);
   const [seancesLoading, setSeancesLoading] = useState(false);
+
+  const [deleteEleveTarget, setDeleteEleveTarget] = useState<Eleve | null>(null);
 
   useEffect(() => {
     fetchInitialData();
@@ -190,6 +193,22 @@ export default function ElevesPage() {
       });
     } catch {
       toast.error("Impossible de générer le code d'activation parent.");
+    }
+  };
+
+  const handleDeleteEleve = async () => {
+    if (!deleteEleveTarget) return;
+    try {
+      const res = await eleveService.delete(deleteEleveTarget.id);
+      toast.success((res.data as { message?: string })?.message || 'Élève supprimé définitivement.');
+      setDeleteEleveTarget(null);
+      fetchEleves(Number(selectedCentreId));
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        "Erreur lors de la suppression de l'élève.";
+      toast.error(msg);
+      throw err;
     }
   };
 
@@ -482,6 +501,15 @@ export default function ElevesPage() {
                           className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors" title="Signaler">
                           <AlertTriangle className="w-4 h-4" />
                         </button>
+                        {isDir && (
+                          <button
+                            onClick={() => setDeleteEleveTarget(eleve)}
+                            className="p-2 text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                            title="Supprimer définitivement l'élève"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -792,6 +820,31 @@ export default function ElevesPage() {
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={deleteEleveTarget != null}
+        title="Supprimer définitivement cet élève ?"
+        message={
+          deleteEleveTarget
+            ? `Toutes les données liées à ${formatFullName(deleteEleveTarget.prenom, deleteEleveTarget.nom)} (présences, commentaires, signalements, projet) seront définitivement supprimées. Cette action est irréversible.`
+            : ''
+        }
+        confirmLabel="Supprimer définitivement"
+        danger
+        requireTypedConfirmation={deleteEleveTarget ? formatFullName(deleteEleveTarget.prenom, deleteEleveTarget.nom) : undefined}
+        typedConfirmationLabel={
+          deleteEleveTarget ? (
+            <>
+              Pour confirmer, retapez le nom complet de l'élève :{' '}
+              <span className="font-mono font-semibold text-slate-700">
+                {formatFullName(deleteEleveTarget.prenom, deleteEleveTarget.nom)}
+              </span>
+            </>
+          ) : undefined
+        }
+        onConfirm={handleDeleteEleve}
+        onCancel={() => setDeleteEleveTarget(null)}
+      />
     </div>
   );
 }

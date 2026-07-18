@@ -12,6 +12,8 @@ public interface ParentActivationCodeRepository extends JpaRepository<ParentActi
 
     List<ParentActivationCode> findByEleveIdAndUsedAtIsNull(Long eleveId);
 
+    List<ParentActivationCode> findByEleveId(Long eleveId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ParentActivationCode> findFirstByEleveIdAndUsedAtIsNullOrderByCreatedAtDesc(Long eleveId);
 }

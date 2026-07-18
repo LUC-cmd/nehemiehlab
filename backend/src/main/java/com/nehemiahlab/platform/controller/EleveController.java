@@ -56,6 +56,12 @@ public class EleveController {
     @Autowired
     private ParentActivationService parentActivationService;
 
+    @Autowired
+    private EnfantProfileRepository enfantProfileRepository;
+
+    @Autowired
+    private ParentActivationCodeRepository parentActivationCodeRepository;
+
     @GetMapping("/centre/{centreId}")
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER')")
     public ResponseEntity<List<Eleve>> getByCentre(@PathVariable Long centreId, Authentication auth) {
@@ -500,5 +506,36 @@ public class EleveController {
         }
 
         return ResponseEntity.ok(signalement);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<?> deleteEleve(@PathVariable Long id) {
+        Optional<Eleve> eleveOpt = eleveRepository.findById(id);
+        if (eleveOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Eleve eleve = eleveOpt.get();
+
+        List<User> parentsLies = userRepository.findByEleveId(id);
+        if (!parentsLies.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Un compte parent est lié à cet élève (matricule "
+                            + (eleve.getMatricule() != null ? eleve.getMatricule() : "-")
+                            + "). Supprimez ou dissociez d'abord ce compte parent avant de supprimer l'élève."
+            ));
+        }
+
+        evaluationSessionRepository.deleteAll(evaluationSessionRepository.findByEleveId(id));
+        presenceRepository.deleteAll(presenceRepository.findByEleveId(id));
+        commentaireRepository.deleteAll(commentaireRepository.findByEleveIdOrderByCreatedAtDesc(id));
+        signalementRepository.deleteAll(signalementRepository.findByEleveId(id));
+        parentActivationCodeRepository.deleteAll(parentActivationCodeRepository.findByEleveId(id));
+        enfantProfileRepository.findByEleveId(id).ifPresent(enfantProfileRepository::delete);
+
+        String eleveLabel = eleve.getPrenom() + " " + eleve.getNom();
+        eleveRepository.delete(eleve);
+
+        return ResponseEntity.ok(Map.of("message", "Élève " + eleveLabel + " supprimé définitivement."));
     }
 }

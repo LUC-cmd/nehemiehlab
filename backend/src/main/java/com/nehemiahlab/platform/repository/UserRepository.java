@@ -16,4 +16,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByRoleAndActifFalseOrderByCreatedAtDesc(Role role);
     List<User> findByRoleOrderByCreatedAtDesc(Role role);
     boolean existsByEmail(String email);
+    List<User> findByEleveId(Long eleveId);
 }
