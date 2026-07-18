@@ -852,6 +852,11 @@ export const discussionService = {
     api.get<import('../types').MessageCible[]>(`/discussion/conversations/${id}/messages`),
   postMessageConversation: (id: number, contenu: string, envoyerEmail?: boolean) =>
     api.post<import('../types').MessageCible>(`/discussion/conversations/${id}/messages`, { contenu, envoyerEmail }),
+  marquerLu: (canal: string) => api.post(`/discussion/${canal}/lu`),
+  getLecteurs: (canal: string) => api.get<import('../types').LectureInfo[]>(`/discussion/${canal}/lecteurs`),
+  marquerLuConversation: (id: number) => api.post(`/discussion/conversations/${id}/lu`),
+  getLecteursConversation: (id: number) =>
+    api.get<import('../types').LectureInfo[]>(`/discussion/conversations/${id}/lecteurs`),
 };
 
 export default api;
