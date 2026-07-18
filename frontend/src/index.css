@@ -663,6 +663,14 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  /* Discussions : force les zones defilantes (liste des fils, messages) a avoir
+     leur propre calque de defilement tactile — sans ca, sur certains mobiles,
+     le doigt fait defiler la page entiere au lieu de la zone visee. */
+  .chat-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
   @media (max-width: 639px) {
     /* Boutons principaux des footers / formulaires pleine largeur */
     .modal-footer .btn-primary,
