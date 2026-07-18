@@ -844,11 +844,12 @@ export const discussionService = {
     inclureComptable?: boolean;
     participantIds?: number[];
     contenu: string;
+    envoyerEmail?: boolean;
   }) => api.post<import('../types').ConversationCiblee>('/discussion/conversations', data),
   getMessagesConversation: (id: number) =>
     api.get<import('../types').MessageCible[]>(`/discussion/conversations/${id}/messages`),
-  postMessageConversation: (id: number, contenu: string) =>
-    api.post<import('../types').MessageCible>(`/discussion/conversations/${id}/messages`, { contenu }),
+  postMessageConversation: (id: number, contenu: string, envoyerEmail?: boolean) =>
+    api.post<import('../types').MessageCible>(`/discussion/conversations/${id}/messages`, { contenu, envoyerEmail }),
 };
 
 export default api;

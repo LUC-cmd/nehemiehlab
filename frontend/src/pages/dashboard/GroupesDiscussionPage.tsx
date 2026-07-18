@@ -58,6 +58,7 @@ export default function GroupesDiscussionPage() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [texte, setTexte] = useState('');
   const [sending, setSending] = useState(false);
+  const [envoyerEmailReply, setEnvoyerEmailReply] = useState(false);
   const skeletonLoading = useMinDelayLoading(loadingThreads, 220);
   const listEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -79,6 +80,7 @@ export default function GroupesDiscussionPage() {
   const [inclureComptable, setInclureComptable] = useState(false);
   const [composeTexte, setComposeTexte] = useState('');
   const [composing, setComposing] = useState(false);
+  const [envoyerEmailCompose, setEnvoyerEmailCompose] = useState(false);
 
   const fetchThreads = useCallback(async () => {
     try {
@@ -183,12 +185,13 @@ export default function GroupesDiscussionPage() {
           prev.map((c) => (c.canal === activeThread.canal ? { ...c, nbMessages: c.nbMessages + 1 } : c))
         );
       } else {
-        await discussionService.postMessageConversation(activeThread.id, contenu);
+        await discussionService.postMessageConversation(activeThread.id, contenu, envoyerEmailReply);
         setConversations((prev) =>
           prev.map((c) => (c.id === activeThread.id ? { ...c, nbMessages: c.nbMessages + 1 } : c))
         );
       }
       setTexte('');
+      setEnvoyerEmailReply(false);
       await fetchMessages(activeThread, true);
     } catch (err: unknown) {
       const msg =
@@ -206,6 +209,7 @@ export default function GroupesDiscussionPage() {
     setClusterNom('');
     setInclureComptable(false);
     setComposeTexte('');
+    setEnvoyerEmailCompose(false);
   };
 
   const handleCreerConversation = async () => {
@@ -227,10 +231,10 @@ export default function GroupesDiscussionPage() {
     try {
       const payload =
         targetMode === 'centre'
-          ? { centreId: Number(centreId), inclureComptable, contenu }
+          ? { centreId: Number(centreId), inclureComptable, contenu, envoyerEmail: envoyerEmailCompose }
           : targetMode === 'cluster'
-          ? { cluster: clusterNom, inclureComptable, contenu }
-          : { inclureComptable: true, contenu };
+          ? { cluster: clusterNom, inclureComptable, contenu, envoyerEmail: envoyerEmailCompose }
+          : { inclureComptable: true, contenu, envoyerEmail: envoyerEmailCompose };
 
       const res = await discussionService.creerConversation(payload);
       toast.success('Message envoyé.');
@@ -291,6 +295,13 @@ export default function GroupesDiscussionPage() {
     if (!q) return true;
     return `${c.prenom} ${c.nom}`.toLowerCase().includes(q);
   });
+
+  // Une diffusion ciblée (centre/cluster/comptable) est une alerte à sens unique : seul le
+  // Directeur peut y répondre. Les conversations "canal" et "libre" restent à deux sens.
+  const activeConv =
+    activeThread?.type === 'conversation' ? conversations.find((c) => c.id === activeThread.id) : undefined;
+  const canReply = activeThread?.type === 'canal' || !activeConv || activeConv.peutRepondre;
+  const isCibleThread = activeThread?.type === 'conversation' && activeConv && !activeConv.libre;
 
   if (skeletonLoading) {
     return <PageLoadingSkeleton />;
@@ -466,32 +477,51 @@ export default function GroupesDiscussionPage() {
                 <div ref={listEndRef} />
               </div>
 
-              <div className="border-t border-dark-700 p-3 flex items-end gap-2">
-                <textarea
-                  className="input-field flex-1 resize-none"
-                  rows={2}
-                  placeholder="Écrire un message…"
-                  value={texte}
-                  onChange={(e) => setTexte(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      void handleSend();
-                    }
-                  }}
-                  disabled={sending}
-                />
-                <ValidationActionButton
-                  onClick={() => void handleSend()}
-                  loading={sending}
-                  disabled={!texte.trim()}
-                  icon={Send}
-                  variant="primary"
-                  size="md"
-                >
-                  Envoyer
-                </ValidationActionButton>
-              </div>
+              {canReply ? (
+                <div className="border-t border-dark-700 p-3">
+                  {isDirecteur && isCibleThread && (
+                    <label className="flex items-center gap-2 text-xs text-dark-300 mb-2">
+                      <input
+                        type="checkbox"
+                        checked={envoyerEmailReply}
+                        onChange={(e) => setEnvoyerEmailReply(e.target.checked)}
+                        className="rounded border-dark-600"
+                      />
+                      Envoyer aussi par email
+                    </label>
+                  )}
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      className="input-field flex-1 resize-none"
+                      rows={2}
+                      placeholder="Écrire un message…"
+                      value={texte}
+                      onChange={(e) => setTexte(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          void handleSend();
+                        }
+                      }}
+                      disabled={sending}
+                    />
+                    <ValidationActionButton
+                      onClick={() => void handleSend()}
+                      loading={sending}
+                      disabled={!texte.trim()}
+                      icon={Send}
+                      variant="primary"
+                      size="md"
+                    >
+                      Envoyer
+                    </ValidationActionButton>
+                  </div>
+                </div>
+              ) : (
+                <div className="border-t border-dark-700 p-4 text-xs text-dark-400 text-center">
+                  Vous consultez cette diffusion du Directeur. Seul le Directeur peut y répondre.
+                </div>
+              )}
             </>
           )}
         </div>
@@ -583,7 +613,7 @@ export default function GroupesDiscussionPage() {
         <Modal
           open={composeOpen}
           title="Nouveau message ciblé"
-          subtitle="Envoyez un message aux formateurs d'un centre, d'un cluster, et/ou au comptable."
+          subtitle="Envoyez une alerte aux formateurs d'un centre, d'un cluster, et/ou au comptable. Ils la consultent en temps réel mais ne peuvent pas y répondre."
           onClose={() => {
             setComposeOpen(false);
             resetCompose();
@@ -688,6 +718,16 @@ export default function GroupesDiscussionPage() {
                 disabled={composing}
               />
             </div>
+
+            <label className="flex items-center gap-2 text-sm text-dark-200">
+              <input
+                type="checkbox"
+                checked={envoyerEmailCompose}
+                onChange={(e) => setEnvoyerEmailCompose(e.target.checked)}
+                className="rounded border-dark-600"
+              />
+              Envoyer aussi par email aux destinataires
+            </label>
 
             <div className="flex justify-end gap-2 pt-2">
               <ValidationActionButton
