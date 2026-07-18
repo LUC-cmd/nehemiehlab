@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { MessageSquare, Send, Users, Plus, Building2, Network, Wallet } from 'lucide-react';
+import { MessageSquare, Send, Users, Plus, Building2, Network, Wallet, MessageCircle, ArrowLeft, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { discussionService, centreService, clusterService } from '../../services/api';
 import type {
@@ -8,6 +8,7 @@ import type {
   MessageGroupe,
   ConversationCiblee,
   MessageCible,
+  ConversationContact,
   Centre,
   Cluster,
 } from '../../types';
@@ -58,6 +59,14 @@ export default function GroupesDiscussionPage() {
   const [sending, setSending] = useState(false);
   const skeletonLoading = useMinDelayLoading(loadingThreads, 220);
   const listEndRef = useRef<HTMLDivElement | null>(null);
+
+  // --- Nouvelle discussion libre (tous les rôles, style WhatsApp) ---
+  const [contactPickerOpen, setContactPickerOpen] = useState(false);
+  const [contacts, setContacts] = useState<ConversationContact[]>([]);
+  const [contactSearch, setContactSearch] = useState('');
+  const [selectedContactIds, setSelectedContactIds] = useState<number[]>([]);
+  const [contactTexte, setContactTexte] = useState('');
+  const [contactSending, setContactSending] = useState(false);
 
   // --- Composition d'un message ciblé (Directeur uniquement) ---
   const [composeOpen, setComposeOpen] = useState(false);
@@ -118,6 +127,13 @@ export default function GroupesDiscussionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThread ? threadKey(activeThread) : null, fetchMessages]);
 
+  // Rafraîchit aussi périodiquement la liste des fils (pour voir apparaître une nouvelle
+  // conversation démarrée par quelqu'un d'autre, sans recharger toute la page).
+  useEffect(() => {
+    const interval = setInterval(() => fetchThreads(), POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [fetchThreads]);
+
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -127,6 +143,13 @@ export default function GroupesDiscussionPage() {
     centreService.getAll().then((res) => setCentres(res.data as Centre[])).catch(() => {});
     clusterService.getAll().then((res) => setClusters(res.data as Cluster[])).catch(() => {});
   }, [composeOpen, isDirecteur]);
+
+  useEffect(() => {
+    if (!contactPickerOpen) return;
+    discussionService.getContacts().then((res) => setContacts(res.data)).catch(() => {
+      toast.error('Erreur lors du chargement des contacts.');
+    });
+  }, [contactPickerOpen]);
 
   const handleSend = async () => {
     if (!activeThread) return;
@@ -205,6 +228,50 @@ export default function GroupesDiscussionPage() {
     }
   };
 
+  const resetContactPicker = () => {
+    setContactSearch('');
+    setSelectedContactIds([]);
+    setContactTexte('');
+  };
+
+  const toggleContact = (id: number) => {
+    setSelectedContactIds((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
+  };
+
+  const handleDemarrerDiscussion = async () => {
+    const contenu = contactTexte.trim();
+    if (!contenu) {
+      toast.error('Écrivez un message.');
+      return;
+    }
+    if (selectedContactIds.length === 0) {
+      toast.error('Sélectionnez au moins une personne.');
+      return;
+    }
+    setContactSending(true);
+    try {
+      const res = await discussionService.creerConversation({ participantIds: selectedContactIds, contenu });
+      toast.success('Message envoyé.');
+      setContactPickerOpen(false);
+      resetContactPicker();
+      await fetchThreads();
+      setActiveThread({ type: 'conversation', id: res.data.id });
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        "Erreur lors de l'envoi du message.";
+      toast.error(msg);
+    } finally {
+      setContactSending(false);
+    }
+  };
+
+  const filteredContacts = contacts.filter((c) => {
+    const q = contactSearch.trim().toLowerCase();
+    if (!q) return true;
+    return `${c.prenom} ${c.nom}`.toLowerCase().includes(q);
+  });
+
   if (skeletonLoading) {
     return <PageLoadingSkeleton />;
   }
@@ -228,118 +295,259 @@ export default function GroupesDiscussionPage() {
             <MessageSquare className="w-6 h-6 text-primary-400" />
             Groupes de discussion
           </h1>
-          <p className="text-dark-400 mt-1">Échangez avec les formateurs, le directeur et le comptable selon vos groupes.</p>
+          <p className="text-dark-400 mt-1">Échangez avec les formateurs, le directeur et le comptable.</p>
         </div>
-        {isDirecteur && (
+        <div className="flex gap-2 flex-wrap">
           <ValidationActionButton
-            onClick={() => setComposeOpen(true)}
-            icon={Plus}
-            variant="primary"
+            onClick={() => setContactPickerOpen(true)}
+            icon={MessageCircle}
+            variant="sky"
             size="md"
           >
-            Nouveau message ciblé
+            Nouvelle discussion
           </ValidationActionButton>
-        )}
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {canaux.map((c) => (
-          <button
-            key={`canal:${c.canal}`}
-            type="button"
-            onClick={() => setActiveThread({ type: 'canal', canal: c.canal })}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-              activeThread?.type === 'canal' && activeThread.canal === c.canal
-                ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                : 'bg-dark-800 text-dark-400 border border-dark-700 hover:text-white'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            {c.label}
-            <span className="text-[10px] opacity-70">({c.nbMessages})</span>
-          </button>
-        ))}
-        {conversations.map((c) => (
-          <button
-            key={`conv:${c.id}`}
-            type="button"
-            onClick={() => setActiveThread({ type: 'conversation', id: c.id })}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-              activeThread?.type === 'conversation' && activeThread.id === c.id
-                ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                : 'bg-dark-800 text-dark-400 border border-dark-700 hover:text-white'
-            }`}
-          >
-            {c.centreId ? <Building2 className="w-3.5 h-3.5" /> : c.cluster ? <Network className="w-3.5 h-3.5" /> : <Wallet className="w-3.5 h-3.5" />}
-            {c.label}
-            <span className="text-[10px] opacity-70">({c.nbMessages})</span>
-          </button>
-        ))}
-      </div>
-
-      {!activeThread ? (
-        <div className="bg-dark-800 border border-dark-700 rounded-2xl p-6 text-dark-400 text-sm">
-          Aucune conversation pour l'instant.
+          {isDirecteur && (
+            <ValidationActionButton
+              onClick={() => setComposeOpen(true)}
+              icon={Plus}
+              variant="primary"
+              size="md"
+            >
+              Nouveau message ciblé
+            </ValidationActionButton>
+          )}
         </div>
-      ) : (
-        <div className="bg-dark-800 border border-dark-700 rounded-2xl flex flex-col h-[60vh]">
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {loadingMessages ? (
-              <div className="text-dark-400 text-sm">Chargement des messages…</div>
-            ) : messages.length === 0 ? (
-              <div className="text-dark-400 text-sm">Aucun message pour l'instant. Soyez le premier à écrire.</div>
-            ) : (
-              messages.map((m) => {
-                const isMine = m.auteur.id === user?.id;
+      </div>
+
+      <div className="bg-dark-800 border border-dark-700 rounded-2xl flex flex-col md:flex-row h-[70vh] overflow-hidden">
+        {/* Colonne des fils de discussion (sidebar) */}
+        <div
+          className={`w-full md:w-72 flex-shrink-0 border-r border-dark-700 overflow-y-auto p-3 space-y-5 ${
+            activeThread ? 'hidden md:block' : 'block'
+          }`}
+        >
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-dark-500 px-2 mb-2">Groupes</div>
+            <div className="space-y-1">
+              {canaux.map((c) => {
+                const active = activeThread?.type === 'canal' && activeThread.canal === c.canal;
                 return (
-                  <div key={m.id} className={`flex gap-3 ${isMine ? 'flex-row-reverse text-right' : ''}`}>
-                    <div className="w-9 h-9 rounded-full bg-primary-500/20 text-primary-300 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                      {initials(m.auteur.prenom, m.auteur.nom)}
-                    </div>
-                    <div className={`max-w-[75%] ${isMine ? 'items-end' : 'items-start'} flex flex-col`}>
-                      <div className="text-xs text-dark-400 mb-1">
-                        {formatFullName(m.auteur.prenom, m.auteur.nom)}
-                        {' · '}
-                        {ROLE_LABELS[m.auteur.role]}
-                        {' · '}
-                        {formatHeure(m.createdAt)}
+                  <button
+                    key={`canal:${c.canal}`}
+                    type="button"
+                    onClick={() => setActiveThread({ type: 'canal', canal: c.canal })}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-all ${
+                      active
+                        ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+                        : 'text-dark-300 hover:bg-dark-700/60 border border-transparent'
+                    }`}
+                  >
+                    <Users className="w-4 h-4 flex-shrink-0" />
+                    <span className="flex-1 truncate">{c.label}</span>
+                    <span className="text-[10px] opacity-70">{c.nbMessages}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-dark-500 px-2 mb-2">Messages</div>
+            {conversations.length === 0 ? (
+              <div className="text-xs text-dark-500 px-2">Aucune conversation pour l'instant.</div>
+            ) : (
+              <div className="space-y-1">
+                {conversations.map((c) => {
+                  const active = activeThread?.type === 'conversation' && activeThread.id === c.id;
+                  const Icon = c.libre
+                    ? (c.participants?.length ?? 0) > 1
+                      ? Users
+                      : MessageCircle
+                    : c.centreId
+                    ? Building2
+                    : c.cluster
+                    ? Network
+                    : Wallet;
+                  return (
+                    <button
+                      key={`conv:${c.id}`}
+                      type="button"
+                      onClick={() => setActiveThread({ type: 'conversation', id: c.id })}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-all ${
+                        active
+                          ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+                          : 'text-dark-300 hover:bg-dark-700/60 border border-transparent'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      <span className="flex-1 truncate">{c.label}</span>
+                      <span className="text-[10px] opacity-70">{c.nbMessages}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Fil actif */}
+        <div className={`flex-1 flex flex-col min-w-0 ${activeThread ? 'flex' : 'hidden md:flex'}`}>
+          {!activeThread ? (
+            <div className="flex-1 flex items-center justify-center text-dark-400 text-sm p-6 text-center">
+              Sélectionnez un groupe ou une conversation pour commencer.
+            </div>
+          ) : (
+            <>
+              <div className="md:hidden border-b border-dark-700 p-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveThread(null)}
+                  className="flex items-center gap-1.5 text-xs text-dark-300 px-2 py-1"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Retour
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {loadingMessages ? (
+                  <div className="text-dark-400 text-sm">Chargement des messages…</div>
+                ) : messages.length === 0 ? (
+                  <div className="text-dark-400 text-sm">Aucun message pour l'instant. Soyez le premier à écrire.</div>
+                ) : (
+                  messages.map((m) => {
+                    const isMine = m.auteur.id === user?.id;
+                    return (
+                      <div key={m.id} className={`flex gap-3 ${isMine ? 'flex-row-reverse text-right' : ''}`}>
+                        <div className="w-9 h-9 rounded-full bg-primary-500/20 text-primary-300 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                          {initials(m.auteur.prenom, m.auteur.nom)}
+                        </div>
+                        <div className={`max-w-[75%] ${isMine ? 'items-end' : 'items-start'} flex flex-col`}>
+                          <div className="text-xs text-dark-400 mb-1">
+                            {formatFullName(m.auteur.prenom, m.auteur.nom)}
+                            {' · '}
+                            {ROLE_LABELS[m.auteur.role]}
+                            {' · '}
+                            {formatHeure(m.createdAt)}
+                          </div>
+                          <div
+                            className={`rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap break-words ${
+                              isMine
+                                ? 'bg-primary-500/20 text-white border border-primary-500/30'
+                                : 'bg-dark-700 text-dark-100 border border-dark-600'
+                            }`}
+                          >
+                            {m.contenu}
+                          </div>
+                        </div>
                       </div>
-                      <div
-                        className={`rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap break-words ${
-                          isMine
-                            ? 'bg-primary-500/20 text-white border border-primary-500/30'
-                            : 'bg-dark-700 text-dark-100 border border-dark-600'
-                        }`}
-                      >
-                        {m.contenu}
-                      </div>
+                    );
+                  })
+                )}
+                <div ref={listEndRef} />
+              </div>
+
+              <div className="border-t border-dark-700 p-3 flex items-end gap-2">
+                <textarea
+                  className="input-field flex-1 resize-none"
+                  rows={2}
+                  placeholder="Écrire un message…"
+                  value={texte}
+                  onChange={(e) => setTexte(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      void handleSend();
+                    }
+                  }}
+                  disabled={sending}
+                />
+                <ValidationActionButton
+                  onClick={() => void handleSend()}
+                  loading={sending}
+                  disabled={!texte.trim()}
+                  icon={Send}
+                  variant="primary"
+                  size="md"
+                >
+                  Envoyer
+                </ValidationActionButton>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Nouvelle discussion libre : accessible à tous les rôles du module */}
+      <Modal
+        open={contactPickerOpen}
+        title="Nouvelle discussion"
+        subtitle="Choisissez une ou plusieurs personnes pour démarrer une conversation."
+        onClose={() => {
+          setContactPickerOpen(false);
+          resetContactPicker();
+        }}
+      >
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="w-4 h-4 text-dark-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              className="input-field w-full pl-9"
+              placeholder="Rechercher une personne…"
+              value={contactSearch}
+              onChange={(e) => setContactSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="max-h-56 overflow-y-auto border border-dark-700 rounded-lg divide-y divide-dark-700">
+            {filteredContacts.length === 0 ? (
+              <div className="p-3 text-sm text-dark-400">Aucun résultat.</div>
+            ) : (
+              filteredContacts.map((c) => {
+                const checked = selectedContactIds.includes(c.id);
+                return (
+                  <label
+                    key={c.id}
+                    className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${
+                      checked ? 'bg-primary-500/10' : 'hover:bg-dark-700/50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleContact(c.id)}
+                      className="rounded border-dark-600"
+                    />
+                    <div className="w-8 h-8 rounded-full bg-primary-500/20 text-primary-300 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                      {initials(c.prenom, c.nom)}
                     </div>
-                  </div>
+                    <div className="min-w-0">
+                      <div className="text-sm text-dark-100 truncate">{formatFullName(c.prenom, c.nom)}</div>
+                      <div className="text-[11px] text-dark-500">{ROLE_LABELS[c.role as keyof typeof ROLE_LABELS] || c.role}</div>
+                    </div>
+                  </label>
                 );
               })
             )}
-            <div ref={listEndRef} />
           </div>
 
-          <div className="border-t border-dark-700 p-3 flex items-end gap-2">
+          <div>
+            <label className="text-xs font-semibold text-dark-400 mb-1 block">Message</label>
             <textarea
-              className="input-field flex-1 resize-none"
-              rows={2}
-              placeholder="Écrire un message…"
-              value={texte}
-              onChange={(e) => setTexte(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  void handleSend();
-                }
-              }}
-              disabled={sending}
+              className="input-field w-full resize-none"
+              rows={4}
+              placeholder="Écrire votre message…"
+              value={contactTexte}
+              onChange={(e) => setContactTexte(e.target.value)}
+              disabled={contactSending}
             />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
             <ValidationActionButton
-              onClick={() => void handleSend()}
-              loading={sending}
-              disabled={!texte.trim()}
+              onClick={() => void handleDemarrerDiscussion()}
+              loading={contactSending}
+              disabled={!contactTexte.trim() || selectedContactIds.length === 0}
               icon={Send}
               variant="primary"
               size="md"
@@ -348,8 +556,9 @@ export default function GroupesDiscussionPage() {
             </ValidationActionButton>
           </div>
         </div>
-      )}
+      </Modal>
 
+      {/* Message ciblé par centre/cluster/comptable : réservé au Directeur */}
       {isDirecteur && (
         <Modal
           open={composeOpen}
