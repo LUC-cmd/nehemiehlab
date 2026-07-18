@@ -206,6 +206,27 @@ export interface MessageGroupe {
   createdAt: string;
 }
 
+// --- Conversations ciblées (Directeur -> centre/cluster/comptable) ---
+export interface ConversationCiblee {
+  id: number;
+  label: string;
+  centreId?: number;
+  centreNom?: string;
+  cluster?: string;
+  inclureComptable: boolean;
+  createdBy?: User;
+  createdAt: string;
+  nbMessages: number;
+}
+
+export interface MessageCible {
+  id: number;
+  conversationId: number;
+  auteur: User;
+  contenu: string;
+  createdAt: string;
+}
+
 // --- Signalement ---
 export interface Signalement {
   id: number;
