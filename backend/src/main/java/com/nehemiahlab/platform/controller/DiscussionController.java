@@ -5,6 +5,7 @@ import com.nehemiahlab.platform.model.MessageGroupe;
 import com.nehemiahlab.platform.model.User;
 import com.nehemiahlab.platform.repository.MessageGroupeRepository;
 import com.nehemiahlab.platform.security.InputSanitizer;
+import com.nehemiahlab.platform.service.NotificationDispatchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,6 +32,9 @@ public class DiscussionController {
 
     @Autowired
     private MessageGroupeRepository messageGroupeRepository;
+
+    @Autowired
+    private NotificationDispatchService notificationDispatchService;
 
     /** Liste des canaux auxquels l'utilisateur connecte a accès, avec le nombre de messages. */
     @GetMapping("/canaux")
@@ -89,8 +93,25 @@ public class DiscussionController {
                 .auteur(user)
                 .contenu(contenu)
                 .build();
+        MessageGroupe saved = messageGroupeRepository.save(message);
 
-        return ResponseEntity.ok(messageGroupeRepository.save(message));
+        notifierNouveauMessage(c, user, contenu);
+
+        return ResponseEntity.ok(saved);
+    }
+
+    /** Notifie (in-app temps reel + email) les autres membres du canal qu'un nouveau message a ete poste. */
+    private void notifierNouveauMessage(CanalDiscussion c, User auteur, String contenu) {
+        List<User> destinataires = notificationDispatchService.resolveRecipients(c.roles(), null, null).stream()
+                .filter(u -> u.getId() != null && !u.getId().equals(auteur.getId()))
+                .toList();
+        if (destinataires.isEmpty()) return;
+
+        String apercu = contenu.length() > 200 ? contenu.substring(0, 200) + "…" : contenu;
+        String titre = "Nouveau message — " + c.label();
+        String messageNotif = (auteur.getPrenom() != null ? auteur.getPrenom() : "") + " "
+                + (auteur.getNom() != null ? auteur.getNom() : "") + " : " + apercu;
+        notificationDispatchService.notifyMany(destinataires, titre, messageNotif.trim(), "DISCUSSION", null);
     }
 
     private CanalDiscussion parseCanal(String raw) {
