@@ -10,5 +10,12 @@ import java.util.List;
 public interface MessageGroupeRepository extends JpaRepository<MessageGroupe, Long> {
     List<MessageGroupe> findByCanalOrderByCreatedAtAsc(CanalDiscussion canal);
 
+    /**
+     * Les 200 messages les plus recents d'un canal (ordre decroissant), pour
+     * eviter de charger l'historique complet a chaque poll (le frontend
+     * interroge cet endpoint toutes les 8 secondes).
+     */
+    List<MessageGroupe> findTop200ByCanalOrderByCreatedAtDesc(CanalDiscussion canal);
+
     long countByCanal(CanalDiscussion canal);
 }
