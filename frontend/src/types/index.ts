@@ -185,6 +185,27 @@ export interface Commentaire {
   createdAt: string;
 }
 
+// --- Groupes de discussion ---
+export type CanalDiscussion =
+  | 'FORMATEURS'
+  | 'FORMATEURS_DIRECTEUR'
+  | 'DIRECTION'
+  | 'COMPTABLE_FORMATEURS';
+
+export interface CanalDiscussionInfo {
+  canal: CanalDiscussion;
+  label: string;
+  nbMessages: number;
+}
+
+export interface MessageGroupe {
+  id: number;
+  canal: CanalDiscussion;
+  auteur: User;
+  contenu: string;
+  createdAt: string;
+}
+
 // --- Signalement ---
 export interface Signalement {
   id: number;
