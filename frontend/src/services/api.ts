@@ -836,6 +836,13 @@ export const discussionService = {
     api.get<import('../types').MessageGroupe[]>(`/discussion/${canal}/messages`),
   postMessage: (canal: string, contenu: string) =>
     api.post<import('../types').MessageGroupe>(`/discussion/${canal}/messages`, { contenu }),
+  getConversations: () => api.get<import('../types').ConversationCiblee[]>('/discussion/conversations'),
+  creerConversation: (data: { centreId?: number; cluster?: string; inclureComptable?: boolean; contenu: string }) =>
+    api.post<import('../types').ConversationCiblee>('/discussion/conversations', data),
+  getMessagesConversation: (id: number) =>
+    api.get<import('../types').MessageCible[]>(`/discussion/conversations/${id}/messages`),
+  postMessageConversation: (id: number, contenu: string) =>
+    api.post<import('../types').MessageCible>(`/discussion/conversations/${id}/messages`, { contenu }),
 };
 
 export default api;
