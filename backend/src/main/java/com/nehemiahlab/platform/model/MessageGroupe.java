@@ -27,6 +27,10 @@ public class MessageGroupe {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String contenu;
 
+    /** Id du message (du meme canal) auquel celui-ci repond, ou null. */
+    @Column(name = "reponse_a_id")
+    private Long reponseAId;
+
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 }

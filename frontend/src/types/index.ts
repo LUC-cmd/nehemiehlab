@@ -206,6 +206,7 @@ export interface MessageGroupe {
   canal: CanalDiscussion;
   auteur: User;
   contenu: string;
+  reponseAId?: number | null;
   createdAt: string;
 }
 
@@ -240,6 +241,7 @@ export interface MessageCible {
   conversationId: number;
   auteur: User;
   contenu: string;
+  reponseAId?: number | null;
   createdAt: string;
 }
 

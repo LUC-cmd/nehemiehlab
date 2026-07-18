@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { MessageSquare, Send, Users, Plus, Building2, Network, Wallet, MessageCircle, ArrowLeft, Search } from 'lucide-react';
+import { MessageSquare, Send, Users, Plus, Building2, Network, Wallet, MessageCircle, ArrowLeft, Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { discussionService, centreService, clusterService } from '../../services/api';
 import { connectNotificationsSocket } from '../../services/notificationsSocket';
@@ -79,6 +79,9 @@ export default function GroupesDiscussionPage() {
   // "on vient d'ouvrir ce fil" (scroll vers le premier non lu) de "ce fil recoit une
   // mise a jour de polling" (ne pas interrompre une lecture en cours plus haut).
   const lastScrolledThreadKeyRef = useRef<string | null>(null);
+  // Message auquel on est en train de repondre (clic sur un message) : affiche un
+  // apercu au-dessus du champ de saisie, envoye avec le message puis reinitialise.
+  const [replyTo, setReplyTo] = useState<AnyMessage | null>(null);
 
   // --- Nouvelle discussion libre (tous les rôles, style WhatsApp) ---
   const [contactPickerOpen, setContactPickerOpen] = useState(false);
@@ -156,7 +159,18 @@ export default function GroupesDiscussionPage() {
         return prev.map((c) => (c.id === thread.id ? { ...c, nbNonLus: 0 } : c));
       });
     }
+    setReplyTo(null);
     setActiveThread(thread);
+  }, []);
+
+  /** Fait defiler jusqu'a un message precis (utilise pour le lien "repondre a") et le
+   * met brievement en surbrillance pour aider a le repérer dans l'historique. */
+  const scrollToMessage = useCallback((id: number) => {
+    const el = messagesContainerRef.current?.querySelector<HTMLElement>(`[data-message-id="${id}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('ring-2', 'ring-primary-500');
+    window.setTimeout(() => el.classList.remove('ring-2', 'ring-primary-500'), 1200);
   }, []);
 
   const fetchMessages = useCallback(async (thread: Thread, silent = false) => {
@@ -277,6 +291,10 @@ export default function GroupesDiscussionPage() {
     const contenu = texte.trim();
     if (!contenu) return;
     const emailPourCetEnvoi = envoyerEmailReply;
+    // On ne transmet la reference "reponse a" que si le message cite est deja
+    // reellement enregistre cote serveur (id positif) — un message optimiste pas
+    // encore confirme (id negatif temporaire) ne peut pas encore etre cite.
+    const replyToPourCetEnvoi = replyTo && replyTo.id > 0 ? replyTo : null;
 
     // Envoi optimiste : le champ se vide et le message apparaît immédiatement, sans
     // attendre la réponse serveur. On réconcilie avec fetchMessages() une fois le
@@ -286,22 +304,29 @@ export default function GroupesDiscussionPage() {
       id: tempId,
       auteur: user,
       contenu,
+      reponseAId: replyToPourCetEnvoi?.id ?? null,
       createdAt: new Date().toISOString(),
       ...(activeThread.type === 'canal' ? { canal: activeThread.canal } : { conversationId: activeThread.id }),
     } as AnyMessage;
 
     setTexte('');
     setEnvoyerEmailReply(false);
+    setReplyTo(null);
     setMessages((prev) => [...prev, optimiste]);
     setSending(true);
     try {
       if (activeThread.type === 'canal') {
-        await discussionService.postMessage(activeThread.canal, contenu);
+        await discussionService.postMessage(activeThread.canal, contenu, replyToPourCetEnvoi?.id);
         setCanaux((prev) =>
           prev.map((c) => (c.canal === activeThread.canal ? { ...c, nbMessages: c.nbMessages + 1 } : c))
         );
       } else {
-        await discussionService.postMessageConversation(activeThread.id, contenu, emailPourCetEnvoi);
+        await discussionService.postMessageConversation(
+          activeThread.id,
+          contenu,
+          emailPourCetEnvoi,
+          replyToPourCetEnvoi?.id
+        );
         setConversations((prev) =>
           prev.map((c) => (c.id === activeThread.id ? { ...c, nbMessages: c.nbMessages + 1 } : c))
         );
@@ -314,6 +339,7 @@ export default function GroupesDiscussionPage() {
       toast.error(msg);
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
       setTexte(contenu);
+      setReplyTo(replyToPourCetEnvoi);
     } finally {
       setSending(false);
     }
@@ -476,10 +502,10 @@ export default function GroupesDiscussionPage() {
         </div>
       </div>
 
-      <div className="bg-dark-800 border border-dark-700 rounded-2xl flex flex-col md:flex-row h-[70vh] overflow-hidden">
+      <div className="bg-dark-800 border border-dark-700 rounded-2xl flex flex-col md:flex-row h-[70vh] h-[70dvh] overflow-hidden">
         {/* Colonne des fils de discussion (sidebar) */}
         <div
-          className={`w-full md:w-72 flex-shrink-0 border-r border-dark-700 overflow-y-auto p-3 space-y-5 ${
+          className={`w-full md:w-72 flex-shrink-0 border-r border-dark-700 overflow-y-auto chat-scroll min-h-0 p-3 space-y-5 ${
             activeThread ? 'hidden md:block' : 'block'
           }`}
         >
@@ -556,7 +582,7 @@ export default function GroupesDiscussionPage() {
         </div>
 
         {/* Fil actif */}
-        <div className={`flex-1 flex flex-col min-w-0 ${activeThread ? 'flex' : 'hidden md:flex'}`}>
+        <div className={`flex-1 flex flex-col min-w-0 min-h-0 ${activeThread ? 'flex' : 'hidden md:flex'}`}>
           {!activeThread ? (
             <div className="flex-1 flex items-center justify-center text-dark-400 text-sm p-6 text-center">
               Sélectionnez un groupe ou une conversation pour commencer.
@@ -566,14 +592,14 @@ export default function GroupesDiscussionPage() {
               <div className="md:hidden border-b border-dark-700 p-2">
                 <button
                   type="button"
-                  onClick={() => setActiveThread(null)}
+                  onClick={() => { setReplyTo(null); setActiveThread(null); }}
                   className="flex items-center gap-1.5 text-xs text-dark-300 px-2 py-1"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   Retour
                 </button>
               </div>
-              <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div ref={messagesContainerRef} className="flex-1 overflow-y-auto chat-scroll min-h-0 p-4 space-y-4">
                 {loadingMessages ? (
                   <div className="text-dark-400 text-sm">Chargement des messages…</div>
                 ) : messages.length === 0 ? (
@@ -590,6 +616,13 @@ export default function GroupesDiscussionPage() {
                         )
                       : [];
                     const isFirstUnread = idx === firstUnreadIndex;
+                    // Message d'origine cite par celui-ci (retrouve dans la fenetre de
+                    // messages deja chargee — pas d'appel serveur supplementaire).
+                    const messageCite = m.reponseAId != null ? messages.find((mm) => mm.id === m.reponseAId) : null;
+                    // On peut repondre a un message deja confirme par le serveur (id positif)
+                    // dans un fil ou l'envoi est autorise — pas a un message optimiste en
+                    // cours d'envoi (id negatif temporaire).
+                    const peutRepondreCe = canReply && m.id > 0;
                     return (
                       <React.Fragment key={m.id}>
                         {isFirstUnread && (
@@ -616,12 +649,37 @@ export default function GroupesDiscussionPage() {
                             {formatHeure(m.createdAt)}
                           </div>
                           <div
-                            className={`rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap break-words ${
+                            data-message-id={m.id}
+                            onClick={peutRepondreCe ? () => setReplyTo(m) : undefined}
+                            title={peutRepondreCe ? 'Cliquer pour répondre à ce message' : undefined}
+                            className={`rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap break-words transition-shadow ${
+                              peutRepondreCe ? 'cursor-pointer hover:brightness-110' : ''
+                            } ${
                               isMine
                                 ? 'bg-primary-500/20 text-white border border-primary-500/30'
                                 : 'bg-dark-700 text-dark-100 border border-dark-600'
                             }`}
                           >
+                            {m.reponseAId != null && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  scrollToMessage(m.reponseAId!);
+                                }}
+                                className="block w-full text-left mb-1.5 px-2 py-1 rounded-lg bg-black/20 border-l-2 border-primary-400 text-[11px] text-dark-200 hover:bg-black/30 transition-colors truncate"
+                              >
+                                <span className="text-primary-300 font-semibold">
+                                  {messageCite ? formatFullName(messageCite.auteur.prenom, messageCite.auteur.nom) : 'Message'}
+                                </span>
+                                {' — '}
+                                {messageCite
+                                  ? messageCite.contenu.length > 80
+                                    ? messageCite.contenu.slice(0, 80) + '…'
+                                    : messageCite.contenu
+                                  : "message d'origine non chargé"}
+                              </button>
+                            )}
                             {m.contenu}
                           </div>
                           {isMine && lecteursMessage.length > 0 && (
@@ -655,6 +713,24 @@ export default function GroupesDiscussionPage() {
 
               {canReply ? (
                 <div className="border-t border-dark-700 p-3">
+                  {replyTo && (
+                    <div className="flex items-start gap-2 mb-2 px-3 py-2 rounded-lg bg-dark-700/60 border-l-2 border-primary-500 text-xs">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-primary-400 font-semibold mb-0.5">
+                          Réponse à {formatFullName(replyTo.auteur.prenom, replyTo.auteur.nom)}
+                        </div>
+                        <div className="text-dark-300 truncate">{replyTo.contenu}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setReplyTo(null)}
+                        className="text-dark-400 hover:text-dark-200 flex-shrink-0"
+                        aria-label="Annuler la réponse"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                   {isDirecteur && isCibleThread && (
                     <label className="flex items-center gap-2 text-xs text-dark-300 mb-2">
                       <input
