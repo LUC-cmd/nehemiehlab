@@ -11,6 +11,7 @@ import com.nehemiahlab.platform.repository.MessageCibleRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
 import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.service.NotificationDispatchService;
+import com.nehemiahlab.platform.service.ThreadLectureService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -59,6 +60,9 @@ public class ConversationCibleeController {
 
     @Autowired
     private NotificationDispatchService notificationDispatchService;
+
+    @Autowired
+    private ThreadLectureService threadLectureService;
 
     /** Liste des conversations ciblees auxquelles l'utilisateur connecte a acces. */
     @GetMapping
@@ -238,6 +242,31 @@ public class ConversationCibleeController {
         notifierNouveauMessage(conv, user, contenu, envoyerEmail);
 
         return ResponseEntity.ok(message);
+    }
+
+    /** Marque la conversation comme lue par l'utilisateur connecte (a chaque consultation). */
+    @PostMapping("/{id}/lu")
+    public ResponseEntity<?> marquerLu(@PathVariable Long id, Authentication auth) {
+        User user = (User) auth.getPrincipal();
+        ConversationCiblee conv = conversationRepository.findById(id).orElse(null);
+        if (conv == null) return ResponseEntity.notFound().build();
+        if (!aAcces(conv, user)) {
+            return ResponseEntity.status(403).body(Map.of("message", "Vous n'avez pas accès à cette conversation."));
+        }
+        threadLectureService.marquerLu("CONVERSATION", id.toString(), user);
+        return ResponseEntity.ok().build();
+    }
+
+    /** Qui a deja consulte cette conversation et quand. */
+    @GetMapping("/{id}/lecteurs")
+    public ResponseEntity<?> getLecteurs(@PathVariable Long id, Authentication auth) {
+        User user = (User) auth.getPrincipal();
+        ConversationCiblee conv = conversationRepository.findById(id).orElse(null);
+        if (conv == null) return ResponseEntity.notFound().build();
+        if (!aAcces(conv, user)) {
+            return ResponseEntity.status(403).body(Map.of("message", "Vous n'avez pas accès à cette conversation."));
+        }
+        return ResponseEntity.ok(threadLectureService.getLecteurs("CONVERSATION", id.toString()));
     }
 
     private boolean estLibre(ConversationCiblee conv) {

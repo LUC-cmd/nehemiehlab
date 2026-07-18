@@ -12,12 +12,14 @@ import type {
   ConversationContact,
   Centre,
   Cluster,
+  LectureInfo,
 } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { formatFullName } from '../../utils/displayName';
 import { ROLE_LABELS } from '../../constants/roleAccess';
 import ValidationActionButton from '../../components/ui/ValidationActionButton';
 import Modal from '../../components/ui/Modal';
+import UserAvatar from '../../components/ui/UserAvatar';
 import { PageLoadingSkeleton } from '../../components/ui/DashboardSkeletons';
 import { useMinDelayLoading } from '../../hooks/useMinDelayLoading';
 
@@ -59,6 +61,7 @@ export default function GroupesDiscussionPage() {
   const [texte, setTexte] = useState('');
   const [sending, setSending] = useState(false);
   const [envoyerEmailReply, setEnvoyerEmailReply] = useState(false);
+  const [lecteurs, setLecteurs] = useState<LectureInfo[]>([]);
   const skeletonLoading = useMinDelayLoading(loadingThreads, 220);
   const listEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -118,17 +121,38 @@ export default function GroupesDiscussionPage() {
     }
   }, []);
 
+  // Marque le fil comme lu par l'utilisateur courant (WhatsApp-like : le dernier accès
+  // sert a deduire, message par message, qui l'a deja lu) et rafraichit la liste des
+  // lecteurs pour affichage cote expediteur.
+  const markAndLoadLecteurs = useCallback((thread: Thread) => {
+    const marquer =
+      thread.type === 'canal'
+        ? discussionService.marquerLu(thread.canal)
+        : discussionService.marquerLuConversation(thread.id);
+    marquer.catch(() => {});
+    const lecteursPromise =
+      thread.type === 'canal'
+        ? discussionService.getLecteurs(thread.canal)
+        : discussionService.getLecteursConversation(thread.id);
+    lecteursPromise.then((res) => setLecteurs(res.data)).catch(() => {});
+  }, []);
+
   useEffect(() => {
     fetchThreads();
   }, [fetchThreads]);
 
   useEffect(() => {
     if (!activeThread) return;
+    setLecteurs([]);
     fetchMessages(activeThread);
-    const interval = setInterval(() => fetchMessages(activeThread, true), POLL_INTERVAL_MS);
+    markAndLoadLecteurs(activeThread);
+    const interval = setInterval(() => {
+      fetchMessages(activeThread, true);
+      markAndLoadLecteurs(activeThread);
+    }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeThread ? threadKey(activeThread) : null, fetchMessages]);
+  }, [activeThread ? threadKey(activeThread) : null, fetchMessages, markAndLoadLecteurs]);
 
   // Rafraîchit aussi périodiquement la liste des fils (pour voir apparaître une nouvelle
   // conversation démarrée par quelqu'un d'autre, sans recharger toute la page).
@@ -174,9 +198,26 @@ export default function GroupesDiscussionPage() {
   }, [contactPickerOpen]);
 
   const handleSend = async () => {
-    if (!activeThread) return;
+    if (!activeThread || !user) return;
     const contenu = texte.trim();
     if (!contenu) return;
+    const emailPourCetEnvoi = envoyerEmailReply;
+
+    // Envoi optimiste : le champ se vide et le message apparaît immédiatement, sans
+    // attendre la réponse serveur. On réconcilie avec fetchMessages() une fois le
+    // message réellement enregistré (ou on retire le message optimiste en cas d'échec).
+    const tempId = -Date.now();
+    const optimiste = {
+      id: tempId,
+      auteur: user,
+      contenu,
+      createdAt: new Date().toISOString(),
+      ...(activeThread.type === 'canal' ? { canal: activeThread.canal } : { conversationId: activeThread.id }),
+    } as AnyMessage;
+
+    setTexte('');
+    setEnvoyerEmailReply(false);
+    setMessages((prev) => [...prev, optimiste]);
     setSending(true);
     try {
       if (activeThread.type === 'canal') {
@@ -185,19 +226,19 @@ export default function GroupesDiscussionPage() {
           prev.map((c) => (c.canal === activeThread.canal ? { ...c, nbMessages: c.nbMessages + 1 } : c))
         );
       } else {
-        await discussionService.postMessageConversation(activeThread.id, contenu, envoyerEmailReply);
+        await discussionService.postMessageConversation(activeThread.id, contenu, emailPourCetEnvoi);
         setConversations((prev) =>
           prev.map((c) => (c.id === activeThread.id ? { ...c, nbMessages: c.nbMessages + 1 } : c))
         );
       }
-      setTexte('');
-      setEnvoyerEmailReply(false);
       await fetchMessages(activeThread, true);
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         "Erreur lors de l'envoi du message.";
       toast.error(msg);
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setTexte(contenu);
     } finally {
       setSending(false);
     }
@@ -447,11 +488,21 @@ export default function GroupesDiscussionPage() {
                 ) : (
                   messages.map((m) => {
                     const isMine = m.auteur.id === user?.id;
+                    // Accuse de lecture : visible uniquement par l'auteur du message. Un
+                    // lecteur "a lu" ce message si son dernier acces au fil est posterieur
+                    // (ou egal) a la creation du message.
+                    const lecteursMessage = isMine
+                      ? lecteurs.filter(
+                          (l) => l.userId !== m.auteur.id && new Date(l.dernierAcces) >= new Date(m.createdAt)
+                        )
+                      : [];
                     return (
                       <div key={m.id} className={`flex gap-3 ${isMine ? 'flex-row-reverse text-right' : ''}`}>
-                        <div className="w-9 h-9 rounded-full bg-primary-500/20 text-primary-300 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                          {initials(m.auteur.prenom, m.auteur.nom)}
-                        </div>
+                        <UserAvatar
+                          user={{ prenom: m.auteur.prenom, nom: m.auteur.nom, avatar: m.auteur.avatar }}
+                          size="md"
+                          className="flex-shrink-0"
+                        />
                         <div className={`max-w-[75%] ${isMine ? 'items-end' : 'items-start'} flex flex-col`}>
                           <div className="text-xs text-dark-400 mb-1">
                             {formatFullName(m.auteur.prenom, m.auteur.nom)}
@@ -469,6 +520,26 @@ export default function GroupesDiscussionPage() {
                           >
                             {m.contenu}
                           </div>
+                          {isMine && lecteursMessage.length > 0 && (
+                            <div
+                              className="flex items-center gap-1 mt-1 justify-end"
+                              title={`Lu par ${lecteursMessage
+                                .map((l) => formatFullName(l.prenom, l.nom))
+                                .join(', ')}`}
+                            >
+                              <span className="text-[10px] text-dark-400">Lu</span>
+                              <div className="flex -space-x-1.5">
+                                {lecteursMessage.slice(0, 4).map((l) => (
+                                  <UserAvatar
+                                    key={l.userId}
+                                    user={{ prenom: l.prenom || '', nom: l.nom || '', avatar: l.avatar }}
+                                    size="xs"
+                                    className="ring-2 ring-dark-800"
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -503,7 +574,6 @@ export default function GroupesDiscussionPage() {
                           void handleSend();
                         }
                       }}
-                      disabled={sending}
                     />
                     <ValidationActionButton
                       onClick={() => void handleSend()}
