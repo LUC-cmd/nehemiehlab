@@ -46,6 +46,15 @@ private static final Logger log = LoggerFactory.getLogger(NotificationDispatchSe
     private String platformUrl;
 
     public void notify(User recipient, String titre, String message, String type, Long lienId) {
+        notify(recipient, titre, message, type, lienId, true);
+    }
+
+    /**
+     * @param envoyerEmail si false, la notification reste temps reel (in-app + WebSocket)
+     *                      uniquement, sans email — utilise pour les simples discussions
+     *                      de groupe qui ne doivent pas generer d'email a chaque message.
+     */
+    public void notify(User recipient, String titre, String message, String type, Long lienId, boolean envoyerEmail) {
         if (recipient == null || recipient.getId() == null) return;
         Notification saved = notificationRepository.save(Notification.builder()
                 .userId(recipient.getId())
@@ -54,7 +63,9 @@ private static final Logger log = LoggerFactory.getLogger(NotificationDispatchSe
                 .type(type != null ? type : "INFO")
                 .lienId(lienId)
                 .build());
-        sendEmail(recipient, titre, message, type, lienId);
+        if (envoyerEmail) {
+            sendEmail(recipient, titre, message, type, lienId);
+        }
         try {
             messagingTemplate.convertAndSendToUser(recipient.getEmail(), "/queue/notifications", saved);
         } catch (Exception e) {
@@ -63,6 +74,15 @@ private static final Logger log = LoggerFactory.getLogger(NotificationDispatchSe
     }
 
     public void notifyMany(Collection<User> recipients, String titre, String message, String type, Long lienId) {
+        notifyMany(recipients, titre, message, type, lienId, true);
+    }
+
+    /** Variante sans email — voir {@link #notify(User, String, String, String, Long, boolean)}. */
+    public void notifyManyInApp(Collection<User> recipients, String titre, String message, String type, Long lienId) {
+        notifyMany(recipients, titre, message, type, lienId, false);
+    }
+
+    public void notifyMany(Collection<User> recipients, String titre, String message, String type, Long lienId, boolean envoyerEmail) {
         if (recipients == null || recipients.isEmpty()) return;
         Map<Long, User> unique = new LinkedHashMap<>();
         for (User u : recipients) {
@@ -71,7 +91,7 @@ private static final Logger log = LoggerFactory.getLogger(NotificationDispatchSe
             }
         }
         for (User u : unique.values()) {
-            notify(u, titre, message, type, lienId);
+            notify(u, titre, message, type, lienId, envoyerEmail);
         }
     }
 
