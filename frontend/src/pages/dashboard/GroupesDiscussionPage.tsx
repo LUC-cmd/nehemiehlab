@@ -100,7 +100,7 @@ export default function GroupesDiscussionPage() {
         return null;
       });
     } catch {
-      toast.error('Erreur lors du chargement des groupes de discussion.');
+      toast.error('Erreur lors du chargement des groupes de discussion.', { id: 'discussion-threads-error' });
     } finally {
       setLoadingThreads(false);
     }
@@ -115,7 +115,7 @@ export default function GroupesDiscussionPage() {
           : await discussionService.getMessagesConversation(thread.id);
       setMessages(res.data);
     } catch {
-      if (!silent) toast.error('Erreur lors du chargement des messages.');
+      if (!silent) toast.error('Erreur lors du chargement des messages.', { id: 'discussion-messages-error' });
     } finally {
       if (!silent) setLoadingMessages(false);
     }
