@@ -253,6 +253,18 @@ public class AuthController {
             return ResponseEntity.status(400).body(Map.of("message", "Cet email est déjà utilisé."));
         }
 
+        String nomPropre = InputSanitizer.clean(nom);
+        String prenomPropre = InputSanitizer.clean(prenom);
+        // Empeche un meme formateur de s'inscrire deux fois (nom+prenom identiques, meme avec
+        // un email different) : la comparaison est insensible a la casse pour couvrir les
+        // variantes de saisie (ex. "KOFFI"/"Koffi").
+        if (userRepository.existsByNomIgnoreCaseAndPrenomIgnoreCaseAndRole(nomPropre, prenomPropre, Role.FORMATEUR)) {
+            return ResponseEntity.status(400).body(Map.of(
+                    "message",
+                    "Un compte formateur existe déjà avec ce nom et prénom. Si c'est une erreur, contactez le Directeur."
+            ));
+        }
+
         if (!PasswordPolicy.isValid(motDePasseParam)) {
             return ResponseEntity.badRequest().body(Map.of("message", PasswordPolicy.requirementMessage()));
         }
@@ -293,8 +305,8 @@ public class AuthController {
         }
 
         User formateur = User.builder()
-                .nom(InputSanitizer.clean(nom))
-                .prenom(InputSanitizer.clean(prenom))
+                .nom(nomPropre)
+                .prenom(prenomPropre)
                 .email(email)
                 .motDePasse(passwordEncoder.encode(motDePasseParam.trim()))
                 .telephone(telephone)
@@ -306,7 +318,15 @@ public class AuthController {
                 .actif(false)
                 .build();
 
-        userRepository.save(formateur);
+        try {
+            userRepository.save(formateur);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // Filet de securite contre une condition de course (deux soumissions quasi
+            // simultanees passant toutes les deux la verification existsByEmail ci-dessus
+            // avant que l'une des deux ne soit enregistree) : la contrainte unique en base
+            // sur l'email rejette l'insertion en double plutot que de la laisser passer.
+            return ResponseEntity.status(400).body(Map.of("message", "Cet email est déjà utilisé."));
+        }
 
         boolean emailEnvoye = emailNotificationService.sendFormateurInscriptionConfirmation(
                 email, formateur.getPrenom(), formateur.getNom());
