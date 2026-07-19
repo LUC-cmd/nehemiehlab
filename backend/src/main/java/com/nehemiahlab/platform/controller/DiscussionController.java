@@ -79,7 +79,7 @@ public class DiscussionController {
         // pas nécessaire et cet endpoint est interrogé toutes les 8 secondes).
         List<MessageGroupe> recent = messageGroupeRepository.findTop200ByCanalOrderByCreatedAtDesc(c);
         Collections.reverse(recent);
-        return ResponseEntity.ok(recent);
+        return ResponseEntity.ok(recent.stream().map(this::toDto).toList());
     }
 
     @PostMapping("/{canal}/messages")
@@ -121,7 +121,7 @@ public class DiscussionController {
 
         notifierNouveauMessage(c, user, contenu);
 
-        return ResponseEntity.ok(saved);
+        return ResponseEntity.ok(toDto(saved));
     }
 
     /** Notifie (in-app temps reel + email) les autres membres du canal qu'un nouveau message a ete poste. */
@@ -166,6 +166,32 @@ public class DiscussionController {
             return ResponseEntity.status(403).body(Map.of("message", "Vous n'avez pas accès à ce groupe de discussion."));
         }
         return ResponseEntity.ok(threadLectureService.getLecteurs("CANAL", canal));
+    }
+
+    /** Convertit un message en reponse JSON allegee : l'auteur est reduit aux champs
+     * necessaires a l'affichage (id/prenom/nom/avatar/role) au lieu de l'entite User
+     * complete, qui contient des donnees sensibles (IBAN, mobile money, piece d'identite,
+     * adresse, telephone...) qui n'ont rien a faire dans une reponse de messagerie visible
+     * par tous les membres du canal. */
+    private Map<String, Object> toDto(MessageGroupe m) {
+        Map<String, Object> dto = new HashMap<>();
+        dto.put("id", m.getId());
+        dto.put("canal", m.getCanal());
+        dto.put("auteur", auteurDto(m.getAuteur()));
+        dto.put("contenu", m.getContenu());
+        dto.put("reponseAId", m.getReponseAId());
+        dto.put("createdAt", m.getCreatedAt());
+        return dto;
+    }
+
+    private Map<String, Object> auteurDto(User u) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("id", u.getId());
+        m.put("prenom", u.getPrenom());
+        m.put("nom", u.getNom());
+        m.put("avatar", u.getAvatar());
+        m.put("role", u.getRole());
+        return m;
     }
 
     private CanalDiscussion parseCanal(String raw) {

@@ -173,6 +173,20 @@ export default function GroupesDiscussionPage() {
     window.setTimeout(() => el.classList.remove('ring-2', 'ring-primary-500'), 1200);
   }, []);
 
+  /** Vrai si l'erreur est un 403 (acces refuse), pour distinguer un vrai probleme
+   * reseau/serveur d'une perte d'acces legitime (changement de role en cours de
+   * session, par ex.) — dans ce cas on arrete de solliciter le fil en boucle plutot
+   * que de re-essayer indefiniment a chaque cycle de polling. */
+  const estAccesRefuse = (err: unknown): boolean =>
+    (err as { response?: { status?: number } })?.response?.status === 403;
+
+  /** Reagit a un fil devenu inaccessible : previent une seule fois puis revient a la
+   * liste des fils (ce qui arrete aussi le polling grace a l'effet ci-dessous). */
+  const gererAccesRevoque = useCallback(() => {
+    toast.error("Vous n'avez plus accès à cette discussion.", { id: 'discussion-access-revoked' });
+    setActiveThread(null);
+  }, []);
+
   const fetchMessages = useCallback(async (thread: Thread, silent = false) => {
     if (!silent) setLoadingMessages(true);
     try {
@@ -181,12 +195,16 @@ export default function GroupesDiscussionPage() {
           ? await discussionService.getMessages(thread.canal)
           : await discussionService.getMessagesConversation(thread.id);
       setMessages(res.data);
-    } catch {
+    } catch (err: unknown) {
+      if (estAccesRefuse(err)) {
+        gererAccesRevoque();
+        return;
+      }
       if (!silent) toast.error('Erreur lors du chargement des messages.', { id: 'discussion-messages-error' });
     } finally {
       if (!silent) setLoadingMessages(false);
     }
-  }, []);
+  }, [gererAccesRevoque]);
 
   // Marque le fil comme lu par l'utilisateur courant (WhatsApp-like : le dernier accès
   // sert a deduire, message par message, qui l'a deja lu) et rafraichit la liste des
@@ -196,13 +214,17 @@ export default function GroupesDiscussionPage() {
       thread.type === 'canal'
         ? discussionService.marquerLu(thread.canal)
         : discussionService.marquerLuConversation(thread.id);
-    marquer.catch(() => {});
+    marquer.catch((err: unknown) => {
+      if (estAccesRefuse(err)) gererAccesRevoque();
+    });
     const lecteursPromise =
       thread.type === 'canal'
         ? discussionService.getLecteurs(thread.canal)
         : discussionService.getLecteursConversation(thread.id);
-    lecteursPromise.then((res) => setLecteurs(res.data)).catch(() => {});
-  }, []);
+    lecteursPromise.then((res) => setLecteurs(res.data)).catch((err: unknown) => {
+      if (estAccesRefuse(err)) gererAccesRevoque();
+    });
+  }, [gererAccesRevoque]);
 
   useEffect(() => {
     fetchThreads();

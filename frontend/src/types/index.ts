@@ -201,10 +201,22 @@ export interface CanalDiscussionInfo {
   nbNonLus: number;
 }
 
+/** Auteur allege renvoye par les endpoints Discussion (id/prenom/nom/avatar/role
+ * uniquement) — le backend ne renvoie plus l'entite User complete pour eviter
+ * d'exposer des donnees sensibles (IBAN, mobile money, piece d'identite...) a tous
+ * les participants d'un fil de discussion. */
+export interface AuteurResume {
+  id: number;
+  prenom: string;
+  nom: string;
+  avatar?: string;
+  role: Role;
+}
+
 export interface MessageGroupe {
   id: number;
   canal: CanalDiscussion;
-  auteur: User;
+  auteur: AuteurResume;
   contenu: string;
   reponseAId?: number | null;
   createdAt: string;
@@ -228,7 +240,7 @@ export interface ConversationCiblee {
   centreNom?: string;
   cluster?: string;
   inclureComptable: boolean;
-  createdBy?: User;
+  createdBy?: AuteurResume;
   createdAt: string;
   nbMessages: number;
   nbNonLus: number;
@@ -239,7 +251,7 @@ export interface ConversationCiblee {
 export interface MessageCible {
   id: number;
   conversationId: number;
-  auteur: User;
+  auteur: AuteurResume;
   contenu: string;
   reponseAId?: number | null;
   createdAt: string;
