@@ -220,6 +220,7 @@ public class SessionController {
                 if (!eval.isPresent()) {
                     eval.setHeureDepart(null);
                     eval.setDureeMinutes(0L);
+                    eval.setDureeSecondes(0L);
                     evaluationSessionRepository.save(eval);
                     continue;
                 }
@@ -232,10 +233,12 @@ public class SessionController {
                 if (arrivee.isAfter(fin)) {
                     arrivee = fin;
                 }
-                long minutes = Math.max(0, Duration.between(arrivee, fin).toMinutes());
+                long secondes = Math.max(0, Duration.between(arrivee, fin).getSeconds());
+                long minutes = secondes / 60;
                 eval.setHeureArrivee(arrivee);
                 eval.setHeureDepart(fin);
                 eval.setDureeMinutes(minutes);
+                eval.setDureeSecondes(secondes);
                 evaluationSessionRepository.save(eval);
 
                 if (eval.getEleve() != null && minutes > 0) {
@@ -391,6 +394,7 @@ public class SessionController {
                     eval.setHeureArrivee(null);
                     eval.setHeureDepart(null);
                     eval.setDureeMinutes(null);
+                    eval.setDureeSecondes(null);
                     eval.setProjetFinal(false);
                     eval.setProjetProbleme(null);
                     eval.setProjetSolution(null);
