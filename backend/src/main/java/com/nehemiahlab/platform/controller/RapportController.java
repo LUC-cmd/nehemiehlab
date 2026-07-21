@@ -902,7 +902,7 @@ public class RapportController {
         CellStyle headerStyle = buildHeaderStyle(workbook);
 
         Row headerRow = sheet.createRow(0);
-        String[] columns = {"N°", "Nom", "Prenom", "Email", "Telephone", "Date de naissance", "Lieu de naissance", "Adresse", "Statut", "Centre(s)", "Date d'entree", "CNI"};
+        String[] columns = {"N°", "Nom", "Prenom", "Email", "Telephone", "Date de naissance", "Lieu de naissance", "Adresse", "Statut", "Centre(s)", "Date d'entree", "CNI", "Taille habit", "Taille casquette"};
         for (int i = 0; i < columns.length; i++) {
             Cell cell = headerRow.createCell(i);
             cell.setCellValue(columns[i]);
@@ -924,6 +924,8 @@ public class RapportController {
             row.createCell(9).setCellValue(centresLabel(f));
             row.createCell(10).setCellValue(ancienneteLabel(f));
             row.createCell(11).setCellValue(cniLabel(f));
+            row.createCell(12).setCellValue(f.getTailleHabit() != null ? f.getTailleHabit() : "-");
+            row.createCell(13).setCellValue(f.getTailleCasquette() != null ? f.getTailleCasquette() : "-");
             n++;
         }
 
@@ -955,7 +957,9 @@ public class RapportController {
                 f.isActif() ? "Valide" : "En attente",
                 centresLabel(f),
                 ancienneteLabel(f),
-                cniLabel(f)
+                cniLabel(f),
+                f.getTailleHabit() != null ? f.getTailleHabit() : "-",
+                f.getTailleCasquette() != null ? f.getTailleCasquette() : "-"
         )).toList();
 
         Map<String, String> meta = new LinkedHashMap<>();
@@ -966,11 +970,11 @@ public class RapportController {
 
         byte[] pdf = buildPdfTableReport(
                 "Liste des formateurs",
-                List.of("N°", "Nom", "Prénom", "Email", "Telephone", "Naissance", "Lieu naiss.", "Adresse", "Statut", "Centre(s)", "Entree", "CNI"),
+                List.of("N°", "Nom", "Prénom", "Email", "Telephone", "Naissance", "Lieu naiss.", "Adresse", "Statut", "Centre(s)", "Entree", "CNI", "Habit", "Casquette"),
                 withRowNumbers(rows),
                 meta,
                 ReportTemplate.ACTIVITES,
-                new float[]{24f, 62f, 60f, 95f, 55f, 50f, 60f, 75f, 40f, 85f, 42f, 48f}
+                new float[]{24f, 60f, 58f, 88f, 52f, 48f, 56f, 65f, 38f, 75f, 40f, 44f, 36f, 46f}
         );
 
         return ResponseEntity.ok()
