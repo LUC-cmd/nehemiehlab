@@ -1,9 +1,16 @@
 package com.nehemiahlab.platform.controller;
 
 import com.nehemiahlab.platform.model.CanalDiscussion;
+import com.nehemiahlab.platform.model.ConversationCiblee;
 import com.nehemiahlab.platform.model.MessageGroupe;
+import com.nehemiahlab.platform.model.Notification;
+import com.nehemiahlab.platform.model.Role;
 import com.nehemiahlab.platform.model.User;
+import com.nehemiahlab.platform.repository.ConversationCibleeRepository;
+import com.nehemiahlab.platform.repository.MessageCibleRepository;
 import com.nehemiahlab.platform.repository.MessageGroupeRepository;
+import com.nehemiahlab.platform.repository.NotificationRepository;
+import com.nehemiahlab.platform.repository.UserRepository;
 import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.service.NotificationDispatchService;
 import com.nehemiahlab.platform.service.ThreadLectureService;
@@ -14,6 +21,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -40,6 +48,18 @@ public class DiscussionController {
 
     @Autowired
     private ThreadLectureService threadLectureService;
+
+    @Autowired
+    private ConversationCibleeRepository conversationRepository;
+
+    @Autowired
+    private MessageCibleRepository messageCibleRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private NotificationRepository notificationRepository;
 
     /** Liste des canaux auxquels l'utilisateur connecte a accès, avec le nombre de messages. */
     @GetMapping("/canaux")
@@ -151,6 +171,17 @@ public class DiscussionController {
             return ResponseEntity.status(403).body(Map.of("message", "Vous n'avez pas accès à ce groupe de discussion."));
         }
         threadLectureService.marquerLu("CANAL", canal, user);
+        // L'utilisateur vient de consulter ce canal : ses notifications DISCUSSION de canal
+        // (lienId null — les notifications de conversation portent l'id de la conversation)
+        // sont marquees lues automatiquement, sans qu'il ait besoin de les ouvrir une par une.
+        List<Notification> aMarquer = notificationRepository
+                .findByUserIdAndTypeAndLuFalse(user.getId(), "DISCUSSION").stream()
+                .filter(n -> n.getLienId() == null)
+                .toList();
+        if (!aMarquer.isEmpty()) {
+            aMarquer.forEach(n -> n.setLu(true));
+            notificationRepository.saveAll(aMarquer);
+        }
         return ResponseEntity.ok().build();
     }
 
@@ -166,6 +197,60 @@ public class DiscussionController {
             return ResponseEntity.status(403).body(Map.of("message", "Vous n'avez pas accès à ce groupe de discussion."));
         }
         return ResponseEntity.ok(threadLectureService.getLecteurs("CANAL", canal));
+    }
+
+    /**
+     * Nombre total de messages non lus (canaux + conversations) pour le badge de la barre
+     * du haut. Volontairement leger : uniquement des COUNT, pas de chargement de messages.
+     * Distinct des notifications : ce badge reflete l'etat reel de lecture des fils.
+     */
+    @GetMapping("/non-lus")
+    public ResponseEntity<?> getNonLus(Authentication auth) {
+        User user = (User) auth.getPrincipal();
+        long total = 0;
+
+        for (CanalDiscussion c : CanalDiscussion.values()) {
+            if (!c.accessiblePar(user.getRole())) continue;
+            LocalDateTime dernierAcces = threadLectureService.getDernierAcces("CANAL", c.name(), user.getId());
+            total += dernierAcces == null
+                    ? messageGroupeRepository.countByCanal(c)
+                    : messageGroupeRepository.countByCanalAndCreatedAtAfter(c, dernierAcces);
+        }
+
+        for (ConversationCiblee conv : conversationRepository.findAllByOrderByCreatedAtDesc()) {
+            if (!aAccesConversation(conv, user)) continue;
+            LocalDateTime dernierAcces = threadLectureService.getDernierAcces(
+                    "CONVERSATION", conv.getId().toString(), user.getId());
+            total += dernierAcces == null
+                    ? messageCibleRepository.countByConversationId(conv.getId())
+                    : messageCibleRepository.countByConversationIdAndCreatedAtAfter(conv.getId(), dernierAcces);
+        }
+
+        return ResponseEntity.ok(Map.of("total", total));
+    }
+
+    /** Meme regle d'acces que ConversationCibleeController.aAcces (participants explicites en
+     * mode libre, audience calculee par criteres sinon, Directeur toujours inclus hors mode libre). */
+    private boolean aAccesConversation(ConversationCiblee conv, User user) {
+        boolean libre = conv.getParticipantIds() != null && !conv.getParticipantIds().isEmpty();
+        if (!libre && user.getRole() == Role.DIRECTEUR) return true;
+        List<User> participants;
+        if (libre) {
+            participants = userRepository.findAllById(conv.getParticipantIds()).stream()
+                    .filter(User::isActif)
+                    .toList();
+        } else {
+            List<Role> roles = new ArrayList<>();
+            roles.add(Role.DIRECTEUR);
+            if (conv.getCentreId() != null || conv.getCluster() != null) {
+                roles.add(Role.FORMATEUR);
+            }
+            if (conv.isInclureComptable()) {
+                roles.add(Role.COMPTABLE);
+            }
+            participants = notificationDispatchService.resolveRecipients(roles, conv.getCentreId(), conv.getCluster());
+        }
+        return participants.stream().anyMatch(u -> u.getId() != null && u.getId().equals(user.getId()));
     }
 
     /** Convertit un message en reponse JSON allegee : l'auteur est reduit aux champs
