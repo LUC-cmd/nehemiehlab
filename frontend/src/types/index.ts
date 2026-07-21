@@ -40,6 +40,10 @@ export interface User {
   adresse?: string;
   eleveId?: number;
   assignedCluster?: string;
+  /** Taille de vetement (formateur) : XS a 4XL — pour les commandes d'habits. */
+  tailleHabit?: string;
+  /** Taille de casquette (formateur) : S/M, L/XL ou AJUSTABLE. */
+  tailleCasquette?: string;
   actif: boolean;
   totalHeuresSeances?: number;
   centres?: Centre[];
