@@ -49,6 +49,12 @@ public class EvaluationSession {
     @Column(columnDefinition = "TEXT")
     private String projetSolution;
 
+    /** Fichier optionnel prouvant le projet réalisé (photo, vidéo, .sb3) — vide si l'enfant n'a rien réalisé */
+    private String projetFichierUrl;
+
+    /** Nom original du fichier envoyé (affichage) */
+    private String projetFichierNom;
+
     /** Heure d'arrivée réelle (quand le formateur passe sur ON — gère les retards) */
     private java.time.LocalDateTime heureArrivee;
 
