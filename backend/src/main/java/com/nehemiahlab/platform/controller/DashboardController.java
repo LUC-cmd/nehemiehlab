@@ -80,7 +80,7 @@ public class DashboardController {
             List<Centre> centres = centreAccessService.accessibleCentres(user);
             List<Long> centreIds = centres.stream().map(Centre::getId).toList();
             List<Eleve> eleves = centreIds.stream()
-                    .flatMap(id -> eleveRepository.findByCentreId(id).stream())
+                    .flatMap(id -> eleveRepository.findByCentreIdOrderByNomAscPrenomAsc(id).stream())
                     .toList();
             List<SessionCours> sessions = centreIds.stream()
                     .flatMap(id -> sessionCoursRepository.findByCentreIdOrderByCreatedAtDesc(id).stream())

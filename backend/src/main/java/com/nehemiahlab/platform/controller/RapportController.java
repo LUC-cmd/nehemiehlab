@@ -700,9 +700,12 @@ public class RapportController {
                     .toList();
         }
         if (centreIds.isEmpty()) return List.of();
-        if (centreIds.size() == 1) return eleveRepository.findByCentreId(centreIds.get(0));
+        if (centreIds.size() == 1) return eleveRepository.findByCentreIdOrderByNomAscPrenomAsc(centreIds.get(0));
         return eleveRepository.findAll().stream()
                 .filter(e -> e.getCentre() != null && centreIds.contains(e.getCentre().getId()))
+                .sorted(java.util.Comparator
+                        .comparing((Eleve e) -> e.getNom() == null ? "" : e.getNom(), String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(e -> e.getPrenom() == null ? "" : e.getPrenom(), String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
@@ -1589,7 +1592,7 @@ public class RapportController {
                 metrics.alertesEnAttenteCentre = pendingAlertsByCentre.getOrDefault(currentCentreId, 0L);
             }
 
-            List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursId(session.getId());
+            List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId());
             for (EvaluationSession ev : evals) {
                 if (ev.getEleve() == null) continue;
                 Row row = sheet.createRow(rowNum++);
@@ -1826,7 +1829,7 @@ public class RapportController {
         List<Map<String, Object>> rows = new ArrayList<>();
         int presentsTotal = 0;
         for (SessionCours session : sessions) {
-            List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursId(session.getId());
+            List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId());
             int presents = (int) evals.stream().filter(EvaluationSession::isPresent).count();
             presentsTotal += presents;
             rows.add(toExecutionSeanceRow(session, evals.size(), presents));
@@ -1903,7 +1906,7 @@ public class RapportController {
             return ResponseEntity.status(403).build();
         }
 
-        List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursId(sessionId);
+        List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(sessionId);
         byte[] pdf = rapportExecutionSeancePdfBuilder.buildSingle(session, evals);
 
         String centreName = session.getCentre() != null && session.getCentre().getNom() != null
@@ -1952,7 +1955,7 @@ public class RapportController {
     private Map<Long, List<EvaluationSession>> loadEvaluationsBySession(List<SessionCours> sessions) {
         Map<Long, List<EvaluationSession>> map = new HashMap<>();
         for (SessionCours session : sessions) {
-            map.put(session.getId(), evaluationSessionRepository.findBySessionCoursId(session.getId()));
+            map.put(session.getId(), evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId()));
         }
         return map;
     }
@@ -2142,7 +2145,7 @@ public class RapportController {
             ));
         }
 
-        List<Eleve> eleves = eleveRepository.findByCentreId(centreId);
+        List<Eleve> eleves = eleveRepository.findByCentreIdOrderByNomAscPrenomAsc(centreId);
         return ResponseEntity.ok(rapportFormateurPdfBuilder.buildApercu(centre, eleves, debutDate, finDate));
     }
 
@@ -2166,7 +2169,7 @@ public class RapportController {
             return ResponseEntity.badRequest().build();
         }
 
-        List<Eleve> eleves = eleveRepository.findByCentreId(centreId);
+        List<Eleve> eleves = eleveRepository.findByCentreIdOrderByNomAscPrenomAsc(centreId);
         RapportSyntheseCentre synthese = rapportFormateurPdfBuilder
                 .loadSynthese(centreId, moduleLabel, debutDate, finDate)
                 .orElse(null);

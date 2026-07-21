@@ -66,7 +66,7 @@ public class EleveController {
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER')")
     public ResponseEntity<List<Eleve>> getByCentre(@PathVariable Long centreId, Authentication auth) {
         centreAccessService.requireCentreAccess((User) auth.getPrincipal(), centreId);
-        List<Eleve> eleves = eleveRepository.findByCentreId(centreId);
+        List<Eleve> eleves = eleveRepository.findByCentreIdOrderByNomAscPrenomAsc(centreId);
         applyPerformances(eleves);
         return ResponseEntity.ok(eleves);
     }
@@ -216,7 +216,7 @@ public class EleveController {
 
         // Anti-doublon : même nom + prénom dans le même centre (et même date de naissance si connue)
         final LocalDate dn = dateNaissance;
-        boolean doublon = eleveRepository.findByCentreId(centreId).stream().anyMatch(e ->
+        boolean doublon = eleveRepository.findByCentreIdOrderByNomAscPrenomAsc(centreId).stream().anyMatch(e ->
                 e.getNom() != null && e.getNom().equalsIgnoreCase(nomClean)
                 && e.getPrenom() != null && e.getPrenom().equalsIgnoreCase(prenomClean)
                 && (dn == null || e.getDateNaissance() == null || dn.equals(e.getDateNaissance())));
