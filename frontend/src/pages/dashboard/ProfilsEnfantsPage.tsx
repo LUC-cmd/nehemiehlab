@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { centreService, contentManagementService, eleveService } from '../../services/api';
 import type { Centre, Eleve, EnfantProfilePublic, EnfantProject, ProjectMediaType } from '../../types';
 import { centreLabel } from '../../utils/centreLabel';
+import { compareEleveNomPrenom } from '../../utils/eleveSort';
 import { useAuth } from '../../context/AuthContext';
 import { mediaUrl } from '../../utils/media';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -234,17 +235,19 @@ export default function ProfilsEnfantsPage() {
 
   const filteredProfiles = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return profiles.filter((p) => {
-      if (!matchesGeo(p)) return false;
-      if (!q) return true;
-      return (
-        `${p.prenom} ${p.nom}`.toLowerCase().includes(q) ||
-        (p.centre || '').toLowerCase().includes(q) ||
-        (p.presentation || '').toLowerCase().includes(q) ||
-        (p.pointsForts || '').toLowerCase().includes(q) ||
-        (p.projets || []).some((pr) => pr.titre.toLowerCase().includes(q))
-      );
-    });
+    return profiles
+      .filter((p) => {
+        if (!matchesGeo(p)) return false;
+        if (!q) return true;
+        return (
+          `${p.prenom} ${p.nom}`.toLowerCase().includes(q) ||
+          (p.centre || '').toLowerCase().includes(q) ||
+          (p.presentation || '').toLowerCase().includes(q) ||
+          (p.pointsForts || '').toLowerCase().includes(q) ||
+          (p.projets || []).some((pr) => pr.titre.toLowerCase().includes(q))
+        );
+      })
+      .sort(compareEleveNomPrenom);
   }, [profiles, search, region, cluster, centreFilter, centres]);
 
   const filteredProjects = useMemo(() => {

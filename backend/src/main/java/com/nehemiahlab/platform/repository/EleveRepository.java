@@ -13,7 +13,7 @@ import java.util.Optional;
 @Repository
 public interface EleveRepository extends JpaRepository<Eleve, Long> {
     List<Eleve> findByCentre(Centre centre);
-    List<Eleve> findByCentreId(Long centreId);
+    List<Eleve> findByCentreIdOrderByNomAscPrenomAsc(Long centreId);
     long countByCentreId(Long centreId);
 
     Optional<Eleve> findByMatriculeIgnoreCase(String matricule);

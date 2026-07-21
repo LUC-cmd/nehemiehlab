@@ -9,6 +9,7 @@ import type { Centre, ModuleFormation, SessionCours } from '../../types';
 import { formatFullName } from '../../utils/displayName';
 import { fetchWithOfflineCache } from '../../utils/offlineCache';
 import EnfantsProfilesShowcase from '../../components/dashboard/EnfantsProfilesShowcase';
+import CentreElevesPanel from '../../components/dashboard/CentreElevesPanel';
 import LocalisationDashboardSection from '../../components/dashboard/LocalisationDashboardSection';
 
 const chartTooltipStyle = { background: '#18152c', border: '1px solid #282343', borderRadius: '12px', color: '#fff' };
@@ -116,6 +117,12 @@ export default function FormateurDashboard() {
         onCentresRefresh={() => {
           centreService.getMesCentres().then((r) => setMesCentres(r.data || [])).catch(() => {});
         }}
+      />
+
+      <CentreElevesPanel
+        centres={mesCentres}
+        title="Mes élèves"
+        subtitle="Choisissez un centre pour voir l’effectif et la liste complète, classée de A à Z."
       />
 
       {coordinateurs.length > 0 && (

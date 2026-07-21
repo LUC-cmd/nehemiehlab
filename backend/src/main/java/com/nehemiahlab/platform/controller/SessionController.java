@@ -68,7 +68,7 @@ public class SessionController {
         }
 
         for (SessionCours session : sessions) {
-            List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursId(session.getId());
+            List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId());
             session.setNbTotalEleves((long) evals.size());
             session.setNbPresents(evals.stream().filter(EvaluationSession::isPresent).count());
         }
@@ -87,7 +87,7 @@ public class SessionController {
             return ResponseEntity.status(403).body(Map.of("message", "Accès non autorisé à cette session."));
         }
 
-        List<EvaluationSession> evaluations = evaluationSessionRepository.findBySessionCoursId(id);
+        List<EvaluationSession> evaluations = evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(id);
         Map<String, Object> response = new HashMap<>();
         response.put("session", session);
         response.put("evaluations", evaluations);
@@ -150,7 +150,7 @@ public class SessionController {
 
         sessionCoursRepository.save(session);
 
-        List<Eleve> eleves = eleveRepository.findByCentreId(session.getCentre().getId());
+        List<Eleve> eleves = eleveRepository.findByCentreIdOrderByNomAscPrenomAsc(session.getCentre().getId());
         for (Eleve e : eleves) {
             String projetNom = (e.getProjet() != null && e.getProjet().getNom() != null)
                     ? e.getProjet().getNom() : null;
@@ -182,7 +182,7 @@ public class SessionController {
             return ResponseEntity.status(403).body(Map.of("message", "Action non autorisée."));
         }
         if ("EN_COURS".equals(session.getStatut())) {
-            List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursId(id);
+            List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(id);
             for (EvaluationSession eval : evals) {
                 if (eval.isPresent() && eval.getNote() == null) {
                     return ResponseEntity.badRequest().body(Map.of(

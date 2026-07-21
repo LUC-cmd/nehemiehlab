@@ -46,7 +46,7 @@ public class SignalementController {
             List<Centre> mesCentres = centreAccessService.accessibleCentres(user);
             List<Long> centreIds = mesCentres.stream().map(Centre::getId).toList();
             List<Long> eleveIds = mesCentres.stream()
-                    .flatMap(c -> eleveRepository.findByCentreId(c.getId()).stream())
+                    .flatMap(c -> eleveRepository.findByCentreIdOrderByNomAscPrenomAsc(c.getId()).stream())
                     .map(Eleve::getId)
                     .collect(Collectors.toList());
 
@@ -64,7 +64,7 @@ public class SignalementController {
             List<Centre> mesCentres = centreRepository.findByFormateurId(user.getId());
             List<Long> centreIds = mesCentres.stream().map(Centre::getId).toList();
             List<Long> eleveIds = mesCentres.stream()
-                    .flatMap(c -> eleveRepository.findByCentreId(c.getId()).stream())
+                    .flatMap(c -> eleveRepository.findByCentreIdOrderByNomAscPrenomAsc(c.getId()).stream())
                     .map(Eleve::getId)
                     .collect(Collectors.toList());
             signalements = signalementRepository.findAllByOrderByCreatedAtDesc().stream()

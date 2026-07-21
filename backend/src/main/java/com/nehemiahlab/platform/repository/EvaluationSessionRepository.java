@@ -9,7 +9,7 @@ import java.util.List;
 
 @Repository
 public interface EvaluationSessionRepository extends JpaRepository<EvaluationSession, Long> {
-    List<EvaluationSession> findBySessionCoursId(Long sessionCoursId);
+    List<EvaluationSession> findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(Long sessionCoursId);
     List<EvaluationSession> findByEleveId(Long eleveId);
     EvaluationSession findBySessionCoursIdAndEleveId(Long sessionCoursId, Long eleveId);
     java.util.Optional<EvaluationSession> findByProjetFichierUrl(String projetFichierUrl);
