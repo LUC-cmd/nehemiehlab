@@ -524,6 +524,17 @@ export const sessionService = {
       },
     });
   },
+  uploadProjetFichier: (sessionId: number, evalId: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(`/sessions/${sessionId}/evaluations/${evalId}/projet-fichier`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  deleteProjetFichier: (sessionId: number, evalId: number) =>
+    api.delete(`/sessions/${sessionId}/evaluations/${evalId}/projet-fichier`),
 };
 
 // ============================================================

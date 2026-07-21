@@ -47,6 +47,9 @@ export function mediaUrl(path?: string | null): string {
   if (path.startsWith('/uploads/formateur-documents/')) {
     return `${API_BASE}/secure-files/formateur-documents/${path.slice('/uploads/formateur-documents/'.length)}`;
   }
+  if (path.startsWith('/uploads/evaluations-projets/')) {
+    return `${API_BASE}/secure-files/evaluations-projets/${path.slice('/uploads/evaluations-projets/'.length)}`;
+  }
 
   return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
 
@@ -67,6 +70,7 @@ export function isSecureMediaPath(path?: string | null): boolean {
     || path.startsWith('/uploads/projets-enfants/')
     || path.startsWith('/uploads/rapports/')
     || path.startsWith('/uploads/formateur-documents/')
+    || path.startsWith('/uploads/evaluations-projets/')
 
     || path.includes('/secure-files/identite/')
 
@@ -74,7 +78,8 @@ export function isSecureMediaPath(path?: string | null): boolean {
     || path.includes('/secure-files/enfants/')
     || path.includes('/secure-files/projets-enfants/')
     || path.includes('/secure-files/rapports/')
-    || path.includes('/secure-files/formateur-documents/');
+    || path.includes('/secure-files/formateur-documents/')
+    || path.includes('/secure-files/evaluations-projets/');
 
 }
 

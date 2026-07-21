@@ -12,6 +12,7 @@ public interface EvaluationSessionRepository extends JpaRepository<EvaluationSes
     List<EvaluationSession> findBySessionCoursId(Long sessionCoursId);
     List<EvaluationSession> findByEleveId(Long eleveId);
     EvaluationSession findBySessionCoursIdAndEleveId(Long sessionCoursId, Long eleveId);
+    java.util.Optional<EvaluationSession> findByProjetFichierUrl(String projetFichierUrl);
 
     /**
      * Projection légère (eleveId, note) pour calculer la performance moyenne de
