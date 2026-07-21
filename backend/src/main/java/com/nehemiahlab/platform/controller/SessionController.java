@@ -436,7 +436,14 @@ public class SessionController {
             }
         }
 
-        return ResponseEntity.ok(Map.of("message", "Évaluations mises à jour."));
+        // Renvoie l'état serveur à jour (heure d'arrivée, durée, note...) pour que le
+        // formateur voie immédiatement la présence enregistrée, sans dépendre d'un
+        // bouton "Enregistrer" séparé ni d'un rechargement de page.
+        List<EvaluationSession> updated = evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(id);
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Évaluations mises à jour.");
+        response.put("evaluations", updated);
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}/contexte")
