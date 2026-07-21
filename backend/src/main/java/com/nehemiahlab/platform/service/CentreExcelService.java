@@ -90,7 +90,7 @@ public class CentreExcelService {
             writeHeader(elevesSheet, eleveCols, headerStyle);
             int eRow = 1;
             for (Centre c : centres) {
-                for (Eleve e : eleveRepository.findByCentreId(c.getId())) {
+                for (Eleve e : eleveRepository.findByCentreIdOrderByNomAscPrenomAsc(c.getId())) {
                     Row row = elevesSheet.createRow(eRow++);
                     int col = 0;
                     row.createCell(col++).setCellValue(nz(c.getNom()));
@@ -247,7 +247,7 @@ public class CentreExcelService {
                     }
                     Centre centre = centreOpt.get();
 
-                    boolean exists = eleveRepository.findByCentreId(centre.getId()).stream()
+                    boolean exists = eleveRepository.findByCentreIdOrderByNomAscPrenomAsc(centre.getId()).stream()
                             .anyMatch(e -> e.getNom().equalsIgnoreCase(nom.trim())
                                     && e.getPrenom().equalsIgnoreCase(prenom.trim()));
                     if (exists) {
