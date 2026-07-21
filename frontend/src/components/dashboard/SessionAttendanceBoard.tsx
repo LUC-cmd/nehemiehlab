@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   UserCheck, UserX, Search, Clock, Star, MessageSquare,
-  Briefcase, Users, TrendingUp, Sparkles, Award, FlaskConical,
+  Briefcase, Users, TrendingUp, Award, FlaskConical,
   AlertTriangle, Eye, Hammer, Paperclip, Upload, Trash2, Loader2,
+  ChevronDown, ChevronRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { EvaluationSession, SessionCours } from '../../types';
@@ -31,28 +32,24 @@ function initials(prenom?: string, nom?: string) {
   return `${p}${n}`.toUpperCase() || '?';
 }
 
-function formatDuration(ev: EvaluationSession, session: SessionCours): string {
-  if (!ev.present) return '—';
-  if (ev.dureeMinutes != null) {
-    const h = Math.floor(ev.dureeMinutes / 60);
-    const m = ev.dureeMinutes % 60;
-    return h > 0 ? `${h} h ${m.toString().padStart(2, '0')}` : `${m} min`;
+/** Durée en secondes : chrono en direct si la séance est en cours, sinon valeur figée à la clôture. */
+function computeDureeSecondes(ev: EvaluationSession, session: SessionCours, tick: number): number | null {
+  if (!ev.present) return null;
+  if (session.statut === 'EN_COURS' && ev.heureArrivee) {
+    return Math.max(0, Math.floor((tick - new Date(ev.heureArrivee).getTime()) / 1000));
   }
-  if (ev.heureArrivee && session.statut === 'EN_COURS') {
-    const mins = Math.max(0, Math.floor((Date.now() - new Date(ev.heureArrivee).getTime()) / 60000));
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return h > 0 ? `${h} h ${m.toString().padStart(2, '0')}` : `${m} min`;
-  }
-  return '—';
+  if (ev.dureeSecondes != null) return ev.dureeSecondes;
+  if (ev.dureeMinutes != null) return ev.dureeMinutes * 60;
+  return null;
 }
 
-function noteColor(note?: number | null): string {
-  if (note == null) return 'from-slate-500 to-slate-600';
-  const n = note > 10 ? note / 2 : note;
-  if (n >= 8) return 'from-emerald-400 to-teal-500';
-  if (n >= 5) return 'from-amber-400 to-orange-500';
-  return 'from-rose-400 to-red-500';
+function formatHMS(totalSeconds: number | null): string {
+  if (totalSeconds == null) return '—';
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
 }
 
 function noteLabel(note?: number | null): string {
@@ -62,6 +59,14 @@ function noteLabel(note?: number | null): string {
   if (n >= 6) return 'Bien';
   if (n >= 4) return 'Moyen';
   return 'À suivre';
+}
+
+function noteTextColor(note?: number | null): string {
+  if (note == null) return 'text-dark-500';
+  const n = note > 10 ? note / 2 : note;
+  if (n >= 8) return 'text-emerald-300';
+  if (n >= 5) return 'text-amber-300';
+  return 'text-rose-300';
 }
 
 function isWorking(ev: EvaluationSession): boolean {
@@ -81,6 +86,7 @@ export default function SessionAttendanceBoard({
 }: Props) {
   const [tab, setTab] = useState<FilterTab>('all');
   const [search, setSearch] = useState('');
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [alertTarget, setAlertTarget] = useState<EvaluationSession | null>(null);
   const [alertForm, setAlertForm] = useState({
     description: '',
@@ -88,6 +94,15 @@ export default function SessionAttendanceBoard({
     inclureDansRapport: true,
   });
   const [alertSending, setAlertSending] = useState(false);
+
+  // Chrono en direct : se met à jour chaque seconde tant que la séance est en cours,
+  // pour afficher une durée h:min:s qui avance réellement sous les yeux du formateur.
+  const [tick, setTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (session.statut !== 'EN_COURS') return;
+    const id = window.setInterval(() => setTick(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [session.statut]);
 
   const stats = useMemo(() => {
     const total = evaluations.length;
@@ -130,6 +145,7 @@ export default function SessionAttendanceBoard({
                 ? p.heureArrivee || new Date().toISOString()
                 : undefined,
               dureeMinutes: !p.present ? p.dureeMinutes : undefined,
+              dureeSecondes: !p.present ? p.dureeSecondes : undefined,
               projetFinal: !p.present ? p.projetFinal : false,
               projetProbleme: !p.present ? p.projetProbleme : undefined,
               projetSolution: !p.present ? p.projetSolution : undefined,
@@ -137,6 +153,7 @@ export default function SessionAttendanceBoard({
           : p,
       ),
     );
+    if (!ev.present) setExpandedId(null);
   };
 
   const [uploadingEvalId, setUploadingEvalId] = useState<number | null>(null);
@@ -219,6 +236,7 @@ export default function SessionAttendanceBoard({
   };
 
   const displayOnly = readOnly || supervisionMode;
+  const showAlertColumn = canSignal && !supervisionMode;
 
   return (
     <div className="space-y-5">
@@ -230,7 +248,7 @@ export default function SessionAttendanceBoard({
               Mode consultation — suivi en direct des enfants sur le terrain (lecture seule).
             </span>
           ) : (
-            'Saisie terrain : présence, note, projet (pratique ou final), commentaire et alerte si besoin. Tout alimente le rapport annuel.'
+            'Feuille de présence : activez chaque enfant présent, saisissez note et projet en face de son nom. Tout alimente le rapport annuel.'
           )}
         </p>
         <div className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/15 to-emerald-900/10 p-4">
@@ -321,228 +339,163 @@ export default function SessionAttendanceBoard({
           <p className="text-dark-400 text-sm">Aucun élève ne correspond à ce filtre.</p>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 gap-4">
-          {filtered.map((ev) => {
-            const noteVal = displayNote10(ev.note);
-            const noteNum = typeof noteVal === 'number' ? noteVal : null;
-            const pct = noteNum != null ? Math.min(100, (noteNum / 10) * 100) : 0;
-            const ringStroke =
-              noteNum == null ? '#475569' : noteNum >= 8 ? '#34d399' : noteNum >= 5 ? '#fbbf24' : '#fb7185';
-            const working = isWorking(ev);
-
-            return (
-              <article
-                key={ev.id}
-                className={`relative overflow-hidden rounded-2xl border transition-all duration-300 ${
-                  ev.present
+        <div className="rounded-2xl border border-dark-700 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse min-w-[980px]">
+              <thead>
+                <tr className="bg-dark-800/80 border-b border-dark-700 text-dark-400 text-[10px] uppercase tracking-wide">
+                  <th className="text-left font-semibold px-3 py-2.5 w-10">#</th>
+                  <th className="text-left font-semibold px-3 py-2.5 min-w-[190px]">Élève</th>
+                  <th className="text-center font-semibold px-3 py-2.5 w-[116px]">Présence</th>
+                  <th className="text-center font-semibold px-3 py-2.5 w-[104px]">
+                    <span className="inline-flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> Durée (h:min:s)
+                    </span>
+                  </th>
+                  <th className="text-center font-semibold px-3 py-2.5 w-[76px]">Note /10</th>
+                  <th className="text-left font-semibold px-3 py-2.5 min-w-[170px]">
+                    <span className="inline-flex items-center gap-1">
+                      <Briefcase className="w-3 h-3" /> Projet travaillé
+                    </span>
+                  </th>
+                  <th className="text-center font-semibold px-3 py-2.5 w-12">Fichier</th>
+                  <th className="text-left font-semibold px-3 py-2.5 min-w-[160px]">
+                    <span className="inline-flex items-center gap-1">
+                      <MessageSquare className="w-3 h-3" /> Commentaire
+                    </span>
+                  </th>
+                  <th className="text-center font-semibold px-3 py-2.5 w-12">Détails</th>
+                  {showAlertColumn && <th className="text-center font-semibold px-3 py-2.5 w-12">Alerte</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-dark-800">
+                {filtered.map((ev, idx) => {
+                  const noteVal = displayNote10(ev.note);
+                  const working = isWorking(ev);
+                  const dureeSec = computeDureeSecondes(ev, session, tick);
+                  const isExpanded = expandedId === ev.id;
+                  const rowBorder = ev.present
                     ? working
-                      ? 'border-sky-500/40 bg-gradient-to-br from-sky-500/[0.1] via-dark-900/40 to-dark-900/60 shadow-lg shadow-sky-900/10'
-                      : 'border-emerald-500/35 bg-gradient-to-br from-emerald-500/[0.08] via-dark-900/40 to-dark-900/60 shadow-lg shadow-emerald-900/10'
-                    : 'border-dark-700/80 bg-dark-900/50 opacity-90'
-                } ${!displayOnly && !ev.present ? 'hover:border-rose-500/30' : ''}`}
-              >
-                {ev.present && session.statut === 'EN_COURS' && (
-                  <span className="absolute top-3 right-3 flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
-                  </span>
-                )}
+                      ? 'border-l-sky-500'
+                      : 'border-l-emerald-500'
+                    : 'border-l-transparent';
 
-                <div className="p-4 sm:p-5">
-                  <div className="flex items-start gap-4">
-                    <div
-                      className={`relative shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold text-white shadow-inner ${
-                        ev.present
-                          ? working
-                            ? 'bg-gradient-to-br from-sky-500 to-indigo-600 ring-2 ring-sky-400/40'
-                            : 'bg-gradient-to-br from-emerald-500 to-teal-600 ring-2 ring-emerald-400/40'
-                          : 'bg-gradient-to-br from-slate-600 to-slate-800 ring-2 ring-dark-600'
-                      }`}
-                    >
-                      {initials(ev.eleve.prenom, ev.eleve.nom)}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-bold text-white text-lg leading-tight truncate">
-                        {formatFullName(ev.eleve.prenom, ev.eleve.nom)}
-                      </h3>
-                      <div className="flex flex-wrap gap-1.5 mt-1.5">
-                        {ev.eleve.classe && (
-                          <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md bg-dark-800 text-dark-300 border border-dark-700">
-                            {ev.eleve.classe}
-                          </span>
-                        )}
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-dark-800 text-dark-400 border border-dark-700">
-                          {ev.eleve.age} ans · {ev.eleve.sexe === 'F' ? 'Fille' : 'Garçon'}
-                        </span>
-                        {working && (
-                          <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-sky-500/15 text-sky-300 border border-sky-500/30">
-                            En travail
-                          </span>
-                        )}
-                        {ev.projetFinal && (
-                          <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                            Projet final
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {displayOnly ? (
-                      <span
-                        className={`shrink-0 flex flex-col items-center gap-1 rounded-xl px-3 py-2 border ${
-                          ev.present
-                            ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
-                            : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
-                        }`}
+                  return (
+                    <React.Fragment key={ev.id}>
+                      <tr
+                        className={`border-l-4 ${rowBorder} transition-colors ${
+                          ev.present ? 'bg-emerald-500/[0.03]' : 'bg-transparent'
+                        } hover:bg-dark-800/40`}
                       >
-                        {ev.present ? <UserCheck className="w-5 h-5" /> : <UserX className="w-5 h-5" />}
-                        <span className="text-[10px] font-bold uppercase tracking-wider">
-                          {ev.present ? 'Présent' : 'Absent'}
-                        </span>
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => togglePresence(ev)}
-                        className={`shrink-0 flex flex-col items-center gap-1 rounded-xl px-3 py-2 border transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
-                          ev.present
-                            ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
-                            : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
-                        }`}
-                      >
-                        {ev.present ? <UserCheck className="w-5 h-5" /> : <UserX className="w-5 h-5" />}
-                        <span className="text-[10px] font-bold uppercase tracking-wider">
-                          {ev.present ? 'Présent' : 'Absent'}
-                        </span>
-                      </button>
-                    )}
-                  </div>
+                        <td className="px-3 py-2 text-dark-500 text-xs align-top">{idx + 1}</td>
 
-                  {canSignal && !supervisionMode && (
-                    <div className="mt-3 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setAlertTarget(ev)}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 transition-colors"
-                      >
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        Signaler / alerter
-                      </button>
-                    </div>
-                  )}
+                        <td className="px-3 py-2 align-top">
+                          <div className="flex items-center gap-2.5">
+                            <div
+                              className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white ${
+                                ev.present
+                                  ? working
+                                    ? 'bg-gradient-to-br from-sky-500 to-indigo-600'
+                                    : 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                                  : 'bg-gradient-to-br from-slate-600 to-slate-800'
+                              }`}
+                            >
+                              {initials(ev.eleve.prenom, ev.eleve.nom)}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-white leading-tight truncate">
+                                {formatFullName(ev.eleve.prenom, ev.eleve.nom)}
+                              </p>
+                              <p className="text-[10px] text-dark-500 truncate mt-0.5">
+                                {ev.eleve.classe ? `${ev.eleve.classe} · ` : ''}
+                                {ev.eleve.age} ans · {ev.eleve.sexe === 'F' ? 'Fille' : 'Garçon'}
+                              </p>
+                              {ev.projetFinal && (
+                                <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                  <Award className="w-2.5 h-2.5" /> Projet final
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
 
-                  {ev.present && (
-                    <div className="mt-4 pt-4 border-t border-dark-700/60 space-y-4">
-                      <div className="flex items-center gap-4">
-                        {displayOnly ? (
-                          <div className="w-16 h-16 shrink-0 rounded-2xl bg-dark-800 border border-dark-700 flex flex-col items-center justify-center">
-                            <span className="text-2xl font-bold text-white">
-                              {noteNum != null ? noteNum : '—'}
+                        <td className="px-3 py-2 align-top text-center">
+                          <button
+                            type="button"
+                            disabled={displayOnly}
+                            onClick={() => togglePresence(ev)}
+                            title={
+                              displayOnly
+                                ? undefined
+                                : ev.present
+                                ? 'Cliquer pour marquer absent'
+                                : "Cliquer pour activer la présence"
+                            }
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-wide transition-all ${
+                              ev.present
+                                ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                                : 'border-dark-600 bg-dark-800/80 text-dark-400'
+                            } ${
+                              displayOnly
+                                ? 'cursor-default'
+                                : ev.present
+                                ? 'hover:bg-emerald-500/25 cursor-pointer'
+                                : 'hover:border-rose-500/40 hover:text-rose-300 cursor-pointer'
+                            }`}
+                          >
+                            {ev.present ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
+                            {ev.present ? 'Présent' : 'Absent'}
+                          </button>
+                          {ev.present && ev.heureArrivee && (
+                            <p className="text-[9px] text-dark-500 mt-1">
+                              depuis {new Date(ev.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          )}
+                        </td>
+
+                        <td className="px-3 py-2 align-top text-center">
+                          <span
+                            className={`font-mono text-xs font-semibold ${
+                              ev.present ? (session.statut === 'EN_COURS' ? 'text-emerald-300' : 'text-white') : 'text-dark-600'
+                            }`}
+                          >
+                            {formatHMS(dureeSec)}
+                          </span>
+                        </td>
+
+                        <td className="px-3 py-2 align-top text-center">
+                          {!ev.present ? (
+                            <span className="text-dark-600 text-xs">—</span>
+                          ) : displayOnly ? (
+                            <span className={`text-sm font-bold ${noteTextColor(ev.note)}`}>
+                              {noteVal !== '' ? noteVal : '—'}
                             </span>
-                            <span className="text-[9px] text-dark-500">/10</span>
-                          </div>
-                        ) : (
-                          <div className="relative w-16 h-16 shrink-0">
-                            <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36">
-                              <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="2" className="text-dark-700" />
-                              <circle
-                                cx="18" cy="18" r="15.5" fill="none" strokeWidth="2.5"
-                                strokeLinecap="round"
-                                stroke={ringStroke}
-                                strokeDasharray={`${pct} 100`}
-                              />
-                            </svg>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center">
-                              <input
-                                type="number"
-                                min={0}
-                                max={10}
-                                step={0.5}
-                                className="w-10 bg-transparent text-center text-lg font-bold text-white focus:outline-none"
-                                placeholder="—"
-                                value={noteVal}
-                                onChange={(e) => onNoteChange(ev.id, e.target.value)}
-                              />
-                              <span className="text-[9px] text-dark-500 font-medium">/10</span>
-                            </div>
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-dark-500 uppercase tracking-wide font-semibold">Participation</p>
-                          <p className={`text-sm font-semibold mt-0.5 bg-gradient-to-r ${noteColor(ev.note)} bg-clip-text text-transparent`}>
-                            {noteLabel(ev.note)}
-                          </p>
-                          {!displayOnly && (
-                            <div className="h-1.5 rounded-full bg-dark-800 mt-2 overflow-hidden">
-                              <div
-                                className={`h-full rounded-full bg-gradient-to-r ${noteColor(ev.note)} transition-all duration-500`}
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
+                          ) : (
+                            <input
+                              type="number"
+                              min={0}
+                              max={10}
+                              step={0.5}
+                              className="input-field text-center text-xs py-1.5 px-1 w-16 mx-auto"
+                              placeholder="—"
+                              value={noteVal}
+                              onChange={(e) => onNoteChange(ev.id, e.target.value)}
+                            />
                           )}
-                        </div>
-                        <div className="text-right shrink-0 space-y-1">
-                          <div className="inline-flex items-center gap-1 text-xs text-sky-300 bg-sky-500/10 border border-sky-500/20 px-2 py-1 rounded-lg">
-                            <Clock className="w-3 h-3" />
-                            {ev.heureArrivee
-                              ? new Date(ev.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-                              : 'À l\'appel'}
-                          </div>
-                          <p className="text-xs font-semibold text-emerald-400">{formatDuration(ev, session)}</p>
-                        </div>
-                      </div>
+                          {ev.present && (
+                            <p className={`text-[9px] mt-0.5 ${noteTextColor(ev.note)}`}>{noteLabel(ev.note)}</p>
+                          )}
+                        </td>
 
-                      {displayOnly ? (
-                        <div className="space-y-2 text-sm">
-                          {ev.projetTravaille && (
-                            <div className="rounded-xl border border-dark-700 bg-dark-800/40 p-3">
-                              <p className="text-[10px] uppercase font-semibold text-dark-500 flex items-center gap-1">
-                                <Briefcase className="w-3 h-3" />
-                                {ev.projetFinal ? 'Projet final' : 'Projet travaillé'}
-                              </p>
-                              <p className="text-white font-medium mt-1">{ev.projetTravaille}</p>
-                              {ev.projetFinal && ev.projetProbleme && (
-                                <p className="text-dark-300 text-xs mt-2"><span className="text-dark-500">Problème :</span> {ev.projetProbleme}</p>
-                              )}
-                              {ev.projetFinal && ev.projetSolution && (
-                                <p className="text-dark-300 text-xs mt-1"><span className="text-dark-500">Solution :</span> {ev.projetSolution}</p>
-                              )}
-                              {ev.projetFichierUrl && (
-                                <button
-                                  type="button"
-                                  onClick={() => void handleDownloadProjetFichier(ev)}
-                                  disabled={downloadingEvalId === ev.id}
-                                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-sky-300 hover:underline"
-                                >
-                                  {downloadingEvalId === ev.id ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  ) : (
-                                    <Paperclip className="w-3.5 h-3.5" />
-                                  )}
-                                  {ev.projetFichierNom || 'Voir le fichier du projet'}
-                                </button>
-                              )}
-                            </div>
-                          )}
-                          {ev.commentaire && (
-                            <div className="rounded-xl border border-dark-700 bg-dark-800/40 p-3">
-                              <p className="text-[10px] uppercase font-semibold text-dark-500 flex items-center gap-1">
-                                <MessageSquare className="w-3 h-3" /> Observation
-                              </p>
-                              <p className="text-dark-200 mt-1">{ev.commentaire}</p>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="grid sm:grid-cols-2 gap-3">
-                          <div className="sm:col-span-2">
-                            <label className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-dark-500 mb-1.5">
-                              <Briefcase className="w-3 h-3" /> Projet travaillé
-                            </label>
+                        <td className="px-3 py-2 align-top">
+                          {!ev.present ? (
+                            <span className="text-dark-600 text-xs italic">Marquer présent pour saisir</span>
+                          ) : displayOnly ? (
+                            <span className="text-dark-200 text-sm">{ev.projetTravaille || '—'}</span>
+                          ) : (
                             <input
                               type="text"
-                              className="input-field text-sm py-2"
+                              className="input-field text-sm py-1.5"
                               placeholder={ev.eleve.projet?.nom || 'Projet du jour…'}
                               value={ev.projetTravaille || ''}
                               onChange={(e) =>
@@ -553,159 +506,75 @@ export default function SessionAttendanceBoard({
                                 )
                               }
                             />
-                          </div>
+                          )}
+                        </td>
 
-                          <div className="sm:col-span-2">
-                            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-dark-500 mb-1.5">
-                              <Paperclip className="w-3 h-3" /> Fichier du projet réalisé (optionnel)
-                            </p>
-                            <p className="text-[11px] text-dark-500 mb-1.5">
-                              Uniquement si l'enfant a réalisé quelque chose pendant cette séance — photo, vidéo ou fichier .sb3.
-                            </p>
-                            {ev.projetFichierUrl ? (
-                              <div className="flex items-center justify-between gap-2 rounded-lg border border-dark-700 bg-dark-800/40 px-3 py-2">
-                                <button
-                                  type="button"
-                                  onClick={() => void handleDownloadProjetFichier(ev)}
-                                  disabled={downloadingEvalId === ev.id}
-                                  className="flex items-center gap-2 text-sm text-sky-300 font-medium hover:underline min-w-0"
-                                >
-                                  {downloadingEvalId === ev.id ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                                  ) : (
-                                    <Paperclip className="w-3.5 h-3.5 shrink-0" />
-                                  )}
-                                  <span className="truncate">{ev.projetFichierNom || 'Fichier envoyé'}</span>
-                                </button>
+                        <td className="px-3 py-2 align-top text-center">
+                          {!ev.present ? (
+                            <span className="text-dark-700">—</span>
+                          ) : ev.projetFichierUrl ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => void handleDownloadProjetFichier(ev)}
+                                disabled={downloadingEvalId === ev.id}
+                                title={ev.projetFichierNom || 'Voir le fichier'}
+                                className="p-1.5 rounded text-sky-300 hover:bg-sky-500/10"
+                              >
+                                {downloadingEvalId === ev.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Paperclip className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                              {!displayOnly && (
                                 <button
                                   type="button"
                                   onClick={() => void handleRemoveProjetFichier(ev)}
-                                  className="p-1 rounded text-dark-500 hover:text-rose-400 hover:bg-rose-500/10 shrink-0"
-                                  aria-label="Retirer le fichier"
+                                  title="Retirer le fichier"
+                                  className="p-1.5 rounded text-dark-500 hover:text-rose-400 hover:bg-rose-500/10"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
-                              </div>
-                            ) : (
-                              <label
-                                className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border cursor-pointer ${
-                                  uploadingEvalId === ev.id
-                                    ? 'opacity-60 pointer-events-none'
-                                    : 'border-dark-600 text-dark-300 hover:border-sky-500/40 hover:text-sky-300'
-                                }`}
-                              >
-                                {uploadingEvalId === ev.id ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <Upload className="w-3.5 h-3.5" />
-                                )}
-                                Ajouter un fichier
-                                <input
-                                  type="file"
-                                  accept="image/*,video/*,.sb3"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) void handleUploadProjetFichier(ev, file);
-                                    e.target.value = '';
-                                  }}
-                                />
-                              </label>
-                            )}
-                          </div>
-
-                          <div className="sm:col-span-2">
-                            <p className="text-[10px] font-semibold uppercase tracking-wide text-dark-500 mb-1.5">
-                              Type de projet
-                            </p>
-                            <div className="inline-flex rounded-xl border border-dark-700 p-0.5 bg-dark-900/60">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  onEvaluationsChange((prev) =>
-                                    prev.map((p) =>
-                                      p.id === ev.id
-                                        ? { ...p, projetFinal: false, projetProbleme: undefined, projetSolution: undefined }
-                                        : p,
-                                    ),
-                                  )
-                                }
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                                  !ev.projetFinal
-                                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
-                                    : 'text-dark-400 hover:text-dark-200'
-                                }`}
-                              >
-                                <FlaskConical className="w-3.5 h-3.5" />
-                                Pratique
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  onEvaluationsChange((prev) =>
-                                    prev.map((p) =>
-                                      p.id === ev.id ? { ...p, projetFinal: true } : p,
-                                    ),
-                                  )
-                                }
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                                  ev.projetFinal
-                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                    : 'text-dark-400 hover:text-dark-200'
-                                }`}
-                              >
-                                <Award className="w-3.5 h-3.5" />
-                                Projet final
-                              </button>
+                              )}
                             </div>
-                          </div>
-
-                          {ev.projetFinal && (
-                            <>
-                              <div>
-                                <label className="text-[10px] font-semibold uppercase tracking-wide text-dark-500 mb-1.5 block">
-                                  Problème
-                                </label>
-                                <textarea
-                                  rows={2}
-                                  className="input-field text-sm py-2 resize-y min-h-[4rem]"
-                                  value={ev.projetProbleme || ''}
-                                  onChange={(e) =>
-                                    onEvaluationsChange((prev) =>
-                                      prev.map((p) =>
-                                        p.id === ev.id ? { ...p, projetProbleme: e.target.value } : p,
-                                      ),
-                                    )
-                                  }
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-semibold uppercase tracking-wide text-dark-500 mb-1.5 block">
-                                  Solution
-                                </label>
-                                <textarea
-                                  rows={2}
-                                  className="input-field text-sm py-2 resize-y min-h-[4rem]"
-                                  value={ev.projetSolution || ''}
-                                  onChange={(e) =>
-                                    onEvaluationsChange((prev) =>
-                                      prev.map((p) =>
-                                        p.id === ev.id ? { ...p, projetSolution: e.target.value } : p,
-                                      ),
-                                    )
-                                  }
-                                />
-                              </div>
-                            </>
-                          )}
-
-                          <div className={ev.projetFinal ? 'sm:col-span-2' : ''}>
-                            <label className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-dark-500 mb-1.5">
-                              <MessageSquare className="w-3 h-3" /> Commentaire
+                          ) : displayOnly ? (
+                            <span className="text-dark-700">—</span>
+                          ) : (
+                            <label
+                              title="Ajouter un fichier (photo, vidéo, .sb3)"
+                              className={`inline-flex p-1.5 rounded text-dark-400 hover:text-sky-300 hover:bg-sky-500/10 cursor-pointer ${
+                                uploadingEvalId === ev.id ? 'opacity-60 pointer-events-none' : ''
+                              }`}
+                            >
+                              {uploadingEvalId === ev.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Upload className="w-3.5 h-3.5" />
+                              )}
+                              <input
+                                type="file"
+                                accept="image/*,video/*,.sb3"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) void handleUploadProjetFichier(ev, file);
+                                  e.target.value = '';
+                                }}
+                              />
                             </label>
+                          )}
+                        </td>
+
+                        <td className="px-3 py-2 align-top">
+                          {!ev.present ? (
+                            <span className="text-dark-700 text-xs">—</span>
+                          ) : displayOnly ? (
+                            <span className="text-dark-300 text-sm">{ev.commentaire || '—'}</span>
+                          ) : (
                             <input
                               type="text"
-                              className="input-field text-sm py-2"
+                              className="input-field text-sm py-1.5"
                               placeholder="Observation…"
                               value={ev.commentaire || ''}
                               onChange={(e) =>
@@ -716,22 +585,159 @@ export default function SessionAttendanceBoard({
                                 )
                               }
                             />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                          )}
+                        </td>
 
-                  {!ev.present && !displayOnly && (
-                    <div className="mt-3 flex items-center gap-2 text-xs text-dark-500 italic">
-                      <Sparkles className="w-3.5 h-3.5 text-dark-600" />
-                      Marquer présent pour saisir note et suivi
-                    </div>
-                  )}
-                </div>
-              </article>
-            );
-          })}
+                        <td className="px-3 py-2 align-top text-center">
+                          <button
+                            type="button"
+                            disabled={!ev.present}
+                            onClick={() => setExpandedId(isExpanded ? null : ev.id)}
+                            title="Type de projet, problème et solution"
+                            className={`p-1.5 rounded ${
+                              !ev.present
+                                ? 'text-dark-700 cursor-not-allowed'
+                                : 'text-dark-400 hover:text-primary-300 hover:bg-primary-500/10'
+                            }`}
+                          >
+                            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          </button>
+                        </td>
+
+                        {showAlertColumn && (
+                          <td className="px-3 py-2 align-top text-center">
+                            <button
+                              type="button"
+                              onClick={() => setAlertTarget(ev)}
+                              title="Signaler / alerter"
+                              className="p-1.5 rounded text-amber-400/80 hover:text-amber-300 hover:bg-amber-500/10"
+                            >
+                              <AlertTriangle className="w-4 h-4" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+
+                      {isExpanded && ev.present && (
+                        <tr className="bg-dark-900/60 border-l-4 border-l-dark-700">
+                          <td />
+                          <td colSpan={showAlertColumn ? 8 : 7} className="px-3 py-3">
+                            <div className="rounded-xl border border-dark-700 bg-dark-800/40 p-3 space-y-3">
+                              <div>
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-dark-500 mb-1.5">
+                                  Type de projet
+                                </p>
+                                {displayOnly ? (
+                                  <span
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                                      ev.projetFinal
+                                        ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                                        : 'bg-sky-500/15 text-sky-300 border border-sky-500/30'
+                                    }`}
+                                  >
+                                    {ev.projetFinal ? <Award className="w-3.5 h-3.5" /> : <FlaskConical className="w-3.5 h-3.5" />}
+                                    {ev.projetFinal ? 'Projet final' : 'Pratique'}
+                                  </span>
+                                ) : (
+                                  <div className="inline-flex rounded-xl border border-dark-700 p-0.5 bg-dark-900/60">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        onEvaluationsChange((prev) =>
+                                          prev.map((p) =>
+                                            p.id === ev.id
+                                              ? { ...p, projetFinal: false, projetProbleme: undefined, projetSolution: undefined }
+                                              : p,
+                                          ),
+                                        )
+                                      }
+                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                        !ev.projetFinal
+                                          ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                                          : 'text-dark-400 hover:text-dark-200'
+                                      }`}
+                                    >
+                                      <FlaskConical className="w-3.5 h-3.5" />
+                                      Pratique
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        onEvaluationsChange((prev) =>
+                                          prev.map((p) =>
+                                            p.id === ev.id ? { ...p, projetFinal: true } : p,
+                                          ),
+                                        )
+                                      }
+                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                        ev.projetFinal
+                                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                          : 'text-dark-400 hover:text-dark-200'
+                                      }`}
+                                    >
+                                      <Award className="w-3.5 h-3.5" />
+                                      Projet final
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
+                              {ev.projetFinal && (
+                                <div className="grid sm:grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="text-[10px] font-semibold uppercase tracking-wide text-dark-500 mb-1.5 block">
+                                      Problème
+                                    </label>
+                                    {displayOnly ? (
+                                      <p className="text-dark-200 text-sm">{ev.projetProbleme || '—'}</p>
+                                    ) : (
+                                      <textarea
+                                        rows={2}
+                                        className="input-field text-sm py-2 resize-y min-h-[4rem]"
+                                        value={ev.projetProbleme || ''}
+                                        onChange={(e) =>
+                                          onEvaluationsChange((prev) =>
+                                            prev.map((p) =>
+                                              p.id === ev.id ? { ...p, projetProbleme: e.target.value } : p,
+                                            ),
+                                          )
+                                        }
+                                      />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] font-semibold uppercase tracking-wide text-dark-500 mb-1.5 block">
+                                      Solution
+                                    </label>
+                                    {displayOnly ? (
+                                      <p className="text-dark-200 text-sm">{ev.projetSolution || '—'}</p>
+                                    ) : (
+                                      <textarea
+                                        rows={2}
+                                        className="input-field text-sm py-2 resize-y min-h-[4rem]"
+                                        value={ev.projetSolution || ''}
+                                        onChange={(e) =>
+                                          onEvaluationsChange((prev) =>
+                                            prev.map((p) =>
+                                              p.id === ev.id ? { ...p, projetSolution: e.target.value } : p,
+                                            ),
+                                          )
+                                        }
+                                      />
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

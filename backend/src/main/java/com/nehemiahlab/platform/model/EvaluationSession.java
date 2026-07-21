@@ -63,4 +63,7 @@ public class EvaluationSession {
 
     /** Minutes réellement effectuées par l'enfant dans cette séance */
     private Long dureeMinutes;
+
+    /** Durée précise en secondes (source pour l'affichage h:min:s) — duréeMinutes reste pour compat rapports/exports */
+    private Long dureeSecondes;
 }

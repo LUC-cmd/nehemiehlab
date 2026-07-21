@@ -167,6 +167,8 @@ export interface EvaluationSession {
   heureDepart?: string;
   /** Minutes réellement effectuées */
   dureeMinutes?: number;
+  /** Durée précise en secondes (source pour l'affichage h:min:s) */
+  dureeSecondes?: number;
   /** Fichier optionnel prouvant le projet réalisé (photo, vidéo, .sb3) */
   projetFichierUrl?: string;
   /** Nom original du fichier envoyé */
