@@ -310,6 +310,61 @@ public class SessionController {
         }
     }
 
+    @PostMapping("/{id}/evaluations/{evalId}/projet-fichier")
+    @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR')")
+    public ResponseEntity<?> uploadProjetFichier(
+            @PathVariable Long id,
+            @PathVariable Long evalId,
+            @RequestParam("file") MultipartFile file,
+            Authentication auth) {
+        User user = (User) auth.getPrincipal();
+        SessionCours session = sessionCoursRepository.findById(id).orElse(null);
+        if (session == null) return ResponseEntity.notFound().build();
+        if (!canModifySession(user, session)) {
+            return ResponseEntity.status(403).body(Map.of("message", "Action non autorisée."));
+        }
+        EvaluationSession eval = evaluationSessionRepository.findById(evalId).orElse(null);
+        if (eval == null || eval.getSessionCours() == null || !eval.getSessionCours().getId().equals(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!eval.isPresent()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "L'enfant doit être marqué présent avant d'ajouter un fichier de projet."));
+        }
+        try {
+            String url = secureFileStorage.store(
+                    file, "evaluations-projets", "media", 25L * 1024 * 1024, "projet-eval-" + evalId);
+            eval.setProjetFichierUrl(url);
+            eval.setProjetFichierNom(file.getOriginalFilename());
+            evaluationSessionRepository.save(eval);
+            return ResponseEntity.ok(eval);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("message", "Erreur lors de l'upload du fichier"));
+        }
+    }
+
+    @DeleteMapping("/{id}/evaluations/{evalId}/projet-fichier")
+    @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR')")
+    public ResponseEntity<?> deleteProjetFichier(
+            @PathVariable Long id, @PathVariable Long evalId, Authentication auth) {
+        User user = (User) auth.getPrincipal();
+        SessionCours session = sessionCoursRepository.findById(id).orElse(null);
+        if (session == null) return ResponseEntity.notFound().build();
+        if (!canModifySession(user, session)) {
+            return ResponseEntity.status(403).body(Map.of("message", "Action non autorisée."));
+        }
+        EvaluationSession eval = evaluationSessionRepository.findById(evalId).orElse(null);
+        if (eval == null || eval.getSessionCours() == null || !eval.getSessionCours().getId().equals(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        eval.setProjetFichierUrl(null);
+        eval.setProjetFichierNom(null);
+        evaluationSessionRepository.save(eval);
+        return ResponseEntity.ok(eval);
+    }
+
     @PutMapping("/{id}/evaluations")
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR')")
     public ResponseEntity<?> updateEvaluations(

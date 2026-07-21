@@ -3,12 +3,14 @@ package com.nehemiahlab.platform.controller;
 import com.nehemiahlab.platform.model.Role;
 import com.nehemiahlab.platform.model.EnfantProfile;
 import com.nehemiahlab.platform.model.EnfantProject;
+import com.nehemiahlab.platform.model.EvaluationSession;
 import com.nehemiahlab.platform.model.FormateurDocument;
 import com.nehemiahlab.platform.model.SessionCours;
 import com.nehemiahlab.platform.model.Transaction;
 import com.nehemiahlab.platform.model.User;
 import com.nehemiahlab.platform.repository.EnfantProfileRepository;
 import com.nehemiahlab.platform.repository.EnfantProjectRepository;
+import com.nehemiahlab.platform.repository.EvaluationSessionRepository;
 import com.nehemiahlab.platform.repository.FormateurDocumentRepository;
 import com.nehemiahlab.platform.repository.SessionCoursRepository;
 import com.nehemiahlab.platform.repository.TransactionRepository;
@@ -50,6 +52,9 @@ public class SecureFileController {
 
     @Autowired
     private SessionCoursRepository sessionCoursRepository;
+
+    @Autowired
+    private EvaluationSessionRepository evaluationSessionRepository;
 
     @Autowired
     private CentreAccessService centreAccessService;
@@ -172,6 +177,32 @@ public class SecureFileController {
                 && owner.getFormateur().getId().equals(current.getId());
         boolean isDirecteur = current.getRole() == Role.DIRECTEUR;
         if (owner == null || !(isOwner || isDirecteur)) {
+            return ResponseEntity.status(403).body(Map.of("message", "Accès refusé."));
+        }
+        return resolveAndServe(relative);
+    }
+
+    @GetMapping("/evaluations-projets/**")
+    public ResponseEntity<?> getEvaluationProjetFichier(
+            Authentication auth, jakarta.servlet.http.HttpServletRequest request) {
+        if (auth == null || !(auth.getPrincipal() instanceof User current)) {
+            return ResponseEntity.status(401).body(Map.of("message", "Authentification requise."));
+        }
+        String relative = extractRelative(
+                request.getRequestURI(), "/secure-files/evaluations-projets/", "/uploads/evaluations-projets/");
+        if (relative == null) return ResponseEntity.badRequest().body(Map.of("message", "Chemin invalide."));
+
+        EvaluationSession owner = evaluationSessionRepository.findByProjetFichierUrl(relative).orElse(null);
+        if (owner == null || owner.getSessionCours() == null) {
+            return ResponseEntity.status(403).body(Map.of("message", "Accès refusé."));
+        }
+        SessionCours session = owner.getSessionCours();
+        boolean isFormateurProprietaire = session.getFormateur() != null
+                && session.getFormateur().getId().equals(current.getId());
+        boolean isDirecteur = current.getRole() == Role.DIRECTEUR;
+        boolean hasCentreAccess = session.getCentre() != null
+                && centreAccessService.canAccessCentre(current, session.getCentre().getId());
+        if (!(isFormateurProprietaire || isDirecteur || hasCentreAccess)) {
             return ResponseEntity.status(403).body(Map.of("message", "Accès refusé."));
         }
         return resolveAndServe(relative);
