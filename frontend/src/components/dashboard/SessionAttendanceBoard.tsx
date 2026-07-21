@@ -2,12 +2,13 @@ import React, { useMemo, useState } from 'react';
 import {
   UserCheck, UserX, Search, Clock, Star, MessageSquare,
   Briefcase, Users, TrendingUp, Sparkles, Award, FlaskConical,
-  AlertTriangle, Eye, Hammer,
+  AlertTriangle, Eye, Hammer, Paperclip, Upload, Trash2, Loader2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { EvaluationSession, SessionCours } from '../../types';
 import { formatFullName } from '../../utils/displayName';
-import { signalementService } from '../../services/api';
+import { signalementService, sessionService } from '../../services/api';
+import { fetchSecureMediaBlobUrl } from '../../utils/media';
 import Modal from '../ui/Modal';
 
 type FilterTab = 'all' | 'present' | 'absent' | 'working';
@@ -136,6 +137,61 @@ export default function SessionAttendanceBoard({
           : p,
       ),
     );
+  };
+
+  const [uploadingEvalId, setUploadingEvalId] = useState<number | null>(null);
+  const [downloadingEvalId, setDownloadingEvalId] = useState<number | null>(null);
+
+  const handleUploadProjetFichier = async (ev: EvaluationSession, file: File) => {
+    if (!session.id) return;
+    setUploadingEvalId(ev.id);
+    try {
+      const { data } = await sessionService.uploadProjetFichier(session.id, ev.id, file);
+      onEvaluationsChange((prev) =>
+        prev.map((p) =>
+          p.id === ev.id
+            ? { ...p, projetFichierUrl: data.projetFichierUrl, projetFichierNom: data.projetFichierNom }
+            : p,
+        ),
+      );
+      toast.success('Fichier du projet ajouté.');
+    } catch (err) {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(message || "Échec de l'envoi du fichier.");
+    } finally {
+      setUploadingEvalId(null);
+    }
+  };
+
+  const handleRemoveProjetFichier = async (ev: EvaluationSession) => {
+    if (!session.id) return;
+    try {
+      await sessionService.deleteProjetFichier(session.id, ev.id);
+      onEvaluationsChange((prev) =>
+        prev.map((p) => (p.id === ev.id ? { ...p, projetFichierUrl: undefined, projetFichierNom: undefined } : p)),
+      );
+    } catch {
+      toast.error('Impossible de retirer ce fichier.');
+    }
+  };
+
+  const handleDownloadProjetFichier = async (ev: EvaluationSession) => {
+    if (!ev.projetFichierUrl) return;
+    setDownloadingEvalId(ev.id);
+    try {
+      const blobUrl = await fetchSecureMediaBlobUrl(ev.projetFichierUrl);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = ev.projetFichierNom || 'projet';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    } catch {
+      toast.error('Impossible de télécharger ce fichier.');
+    } finally {
+      setDownloadingEvalId(null);
+    }
   };
 
   const submitAlert = async () => {
@@ -452,6 +508,21 @@ export default function SessionAttendanceBoard({
                               {ev.projetFinal && ev.projetSolution && (
                                 <p className="text-dark-300 text-xs mt-1"><span className="text-dark-500">Solution :</span> {ev.projetSolution}</p>
                               )}
+                              {ev.projetFichierUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDownloadProjetFichier(ev)}
+                                  disabled={downloadingEvalId === ev.id}
+                                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-sky-300 hover:underline"
+                                >
+                                  {downloadingEvalId === ev.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Paperclip className="w-3.5 h-3.5" />
+                                  )}
+                                  {ev.projetFichierNom || 'Voir le fichier du projet'}
+                                </button>
+                              )}
                             </div>
                           )}
                           {ev.commentaire && (
@@ -482,6 +553,65 @@ export default function SessionAttendanceBoard({
                                 )
                               }
                             />
+                          </div>
+
+                          <div className="sm:col-span-2">
+                            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-dark-500 mb-1.5">
+                              <Paperclip className="w-3 h-3" /> Fichier du projet réalisé (optionnel)
+                            </p>
+                            <p className="text-[11px] text-dark-500 mb-1.5">
+                              Uniquement si l'enfant a réalisé quelque chose pendant cette séance — photo, vidéo ou fichier .sb3.
+                            </p>
+                            {ev.projetFichierUrl ? (
+                              <div className="flex items-center justify-between gap-2 rounded-lg border border-dark-700 bg-dark-800/40 px-3 py-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDownloadProjetFichier(ev)}
+                                  disabled={downloadingEvalId === ev.id}
+                                  className="flex items-center gap-2 text-sm text-sky-300 font-medium hover:underline min-w-0"
+                                >
+                                  {downloadingEvalId === ev.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                                  ) : (
+                                    <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                                  )}
+                                  <span className="truncate">{ev.projetFichierNom || 'Fichier envoyé'}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleRemoveProjetFichier(ev)}
+                                  className="p-1 rounded text-dark-500 hover:text-rose-400 hover:bg-rose-500/10 shrink-0"
+                                  aria-label="Retirer le fichier"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <label
+                                className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border cursor-pointer ${
+                                  uploadingEvalId === ev.id
+                                    ? 'opacity-60 pointer-events-none'
+                                    : 'border-dark-600 text-dark-300 hover:border-sky-500/40 hover:text-sky-300'
+                                }`}
+                              >
+                                {uploadingEvalId === ev.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Upload className="w-3.5 h-3.5" />
+                                )}
+                                Ajouter un fichier
+                                <input
+                                  type="file"
+                                  accept="image/*,video/*,.sb3"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) void handleUploadProjetFichier(ev, file);
+                                    e.target.value = '';
+                                  }}
+                                />
+                              </label>
+                            )}
                           </div>
 
                           <div className="sm:col-span-2">
