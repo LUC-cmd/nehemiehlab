@@ -46,6 +46,8 @@ export default function ProfilPage() {
     dateNaissance: user?.dateNaissance ? String(user.dateNaissance).slice(0, 10) : '',
     lieuNaissance: user?.lieuNaissance || '',
     adresse: user?.adresse || '',
+    tailleHabit: user?.tailleHabit || '',
+    tailleCasquette: user?.tailleCasquette || '',
     numeroCompteBancaire: user?.numeroCompteBancaire || '',
     numeroMobileMoney: user?.numeroMobileMoney || '',
     operateurMobileMoney: user?.operateurMobileMoney || '',
@@ -119,6 +121,8 @@ export default function ProfilPage() {
         dateNaissance: form.dateNaissance || undefined,
         lieuNaissance: form.lieuNaissance || undefined,
         adresse: form.adresse || undefined,
+        tailleHabit: form.tailleHabit,
+        tailleCasquette: form.tailleCasquette,
         numeroCompteBancaire: form.numeroCompteBancaire || undefined,
         numeroMobileMoney: form.numeroMobileMoney || undefined,
         operateurMobileMoney: form.operateurMobileMoney,
@@ -138,6 +142,8 @@ export default function ProfilPage() {
         dateNaissance: data.dateNaissance ?? form.dateNaissance,
         lieuNaissance: data.lieuNaissance ?? form.lieuNaissance,
         adresse: data.adresse ?? form.adresse,
+        tailleHabit: data.tailleHabit ?? form.tailleHabit,
+        tailleCasquette: data.tailleCasquette ?? form.tailleCasquette,
         numeroCompteBancaire: data.numeroCompteBancaire ?? form.numeroCompteBancaire,
         numeroMobileMoney: data.numeroMobileMoney ?? form.numeroMobileMoney,
         operateurMobileMoney: (data.operateurMobileMoney ?? form.operateurMobileMoney) as '' | 'MIXX_BY_YAS' | 'MOOV_MONEY',
@@ -413,6 +419,45 @@ export default function ProfilPage() {
               </div>
             </div>
           </section>
+
+          {isFormateur && (
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                <User className="w-4 h-4 text-[#004b57]" /> Tailles (habits &amp; casquette SKA)
+              </h2>
+              <p className="text-xs text-slate-500 -mt-1">
+                Ces tailles servent au Directeur pour commander vos habits et casquettes aux bonnes dimensions.
+              </p>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Taille d'habit</label>
+                  <select
+                    className="input-field"
+                    value={form.tailleHabit}
+                    onChange={(e) => setForm({ ...form, tailleHabit: e.target.value })}
+                  >
+                    <option value="">— Non renseignée —</option>
+                    {['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'].map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Taille de casquette</label>
+                  <select
+                    className="input-field"
+                    value={form.tailleCasquette}
+                    onChange={(e) => setForm({ ...form, tailleCasquette: e.target.value })}
+                  >
+                    <option value="">— Non renseignée —</option>
+                    <option value="S/M">S/M</option>
+                    <option value="L/XL">L/XL</option>
+                    <option value="AJUSTABLE">Ajustable</option>
+                  </select>
+                </div>
+              </div>
+            </section>
+          )}
 
           {isFormateur && (
             <section id="profil-cni" className="space-y-3">
