@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAccess } from '../../context/AccessContext';
-import { notificationService } from '../../services/api';
+import { notificationService, discussionService } from '../../services/api';
 import { connectNotificationsSocket } from '../../services/notificationsSocket';
 import { LOGO_SRC, BRAND_TEAL } from '../../constants/branding';
 import { buildNavForRole, ROLE_LABELS } from '../../constants/roleAccess';
@@ -201,11 +201,20 @@ export default function DashboardLayout() {
         prevNotifsRef.current = data;
         const unread = data.filter((n) => !n.lu).length;
         setUnreadCount(unread);
-        setUnreadDiscussionCount(data.filter((n) => !n.lu && n.type === 'DISCUSSION').length);
         syncDocumentTitleAlert(unread);
       })
       .catch(() => {});
-  }, [handleNotificationInteract]);
+    // Badge discussion : le VRAI nombre de messages non lus (calcule a partir du dernier
+    // acces a chaque fil), distinct du nombre de notifications — lire les messages dans
+    // la conversation fait baisser ce badge meme sans toucher aux notifications.
+    // Uniquement pour les roles qui ont acces au module discussion (sinon l'API repond
+    // 403 a chaque cycle de polling, du bruit inutile cote serveur).
+    if (role === 'DIRECTEUR' || role === 'FORMATEUR' || role === 'COMPTABLE') {
+      discussionService.getNonLus()
+        .then((r) => setUnreadDiscussionCount(r.data.total))
+        .catch(() => {});
+    }
+  }, [handleNotificationInteract, role]);
 
   const navItems = (role ? buildNavForRole(role, hasFeature) : []).map((item) => ({
     ...item,

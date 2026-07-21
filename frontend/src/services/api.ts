@@ -837,6 +837,8 @@ export const banqueService = {
 // ============================================================
 export const discussionService = {
   getCanaux: () => api.get<import('../types').CanalDiscussionInfo[]>('/discussion/canaux'),
+  /** Nombre total de messages non lus (canaux + conversations) pour le badge topbar. */
+  getNonLus: () => api.get<{ total: number }>('/discussion/non-lus'),
   getMessages: (canal: string) =>
     api.get<import('../types').MessageGroupe[]>(`/discussion/${canal}/messages`),
   postMessage: (canal: string, contenu: string, reponseAId?: number | null) =>

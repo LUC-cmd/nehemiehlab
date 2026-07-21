@@ -3,11 +3,13 @@ package com.nehemiahlab.platform.controller;
 import com.nehemiahlab.platform.model.Centre;
 import com.nehemiahlab.platform.model.ConversationCiblee;
 import com.nehemiahlab.platform.model.MessageCible;
+import com.nehemiahlab.platform.model.Notification;
 import com.nehemiahlab.platform.model.Role;
 import com.nehemiahlab.platform.model.User;
 import com.nehemiahlab.platform.repository.CentreRepository;
 import com.nehemiahlab.platform.repository.ConversationCibleeRepository;
 import com.nehemiahlab.platform.repository.MessageCibleRepository;
+import com.nehemiahlab.platform.repository.NotificationRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
 import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.service.NotificationDispatchService;
@@ -64,6 +66,9 @@ public class ConversationCibleeController {
 
     @Autowired
     private ThreadLectureService threadLectureService;
+
+    @Autowired
+    private NotificationRepository notificationRepository;
 
     /** Liste des conversations ciblees auxquelles l'utilisateur connecte a acces. */
     @GetMapping
@@ -267,6 +272,16 @@ public class ConversationCibleeController {
             return ResponseEntity.status(403).body(Map.of("message", "Vous n'avez pas accès à cette conversation."));
         }
         threadLectureService.marquerLu("CONVERSATION", id.toString(), user);
+        // L'utilisateur vient de consulter cette conversation : ses notifications DISCUSSION
+        // liees a cette conversation (lienId = id) sont marquees lues automatiquement.
+        List<Notification> aMarquer = notificationRepository
+                .findByUserIdAndTypeAndLuFalse(user.getId(), "DISCUSSION").stream()
+                .filter(n -> id.equals(n.getLienId()))
+                .toList();
+        if (!aMarquer.isEmpty()) {
+            aMarquer.forEach(n -> n.setLu(true));
+            notificationRepository.saveAll(aMarquer);
+        }
         return ResponseEntity.ok().build();
     }
 
