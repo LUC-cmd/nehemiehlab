@@ -84,6 +84,12 @@ public class User {
     /** Pour RESPONSABLE_CLUSTER : nom du cluster assigné (doit correspondre à Centre.cluster) */
     private String assignedCluster;
 
+    /** Taille de vetement du formateur (XS, S, M, L, XL, XXL, 3XL, 4XL) pour les commandes d'habits. */
+    private String tailleHabit;
+
+    /** Taille de casquette du formateur (S/M, L/XL, AJUSTABLE) pour les commandes. */
+    private String tailleCasquette;
+
     /** Les anciens comptes parent basés sur le matricule restent bloqués jusqu'à activation. */
     @Builder.Default
     @Column(nullable = false)
