@@ -268,6 +268,22 @@ public class UserController {
         if (body.containsKey("rib")) user.setRib(InputSanitizer.clean(body.get("rib")).replaceAll("[^A-Za-z0-9 ]", "").trim());
         if (body.containsKey("codeAgence")) user.setCodeAgence(InputSanitizer.clean(body.get("codeAgence")).replaceAll("[^A-Za-z0-9-]", "").trim());
         if (body.containsKey("intituleCompte")) user.setIntituleCompte(InputSanitizer.clean(body.get("intituleCompte")).trim());
+        if (body.containsKey("tailleHabit")) {
+            String taille = body.get("tailleHabit") == null ? "" : body.get("tailleHabit").trim().toUpperCase();
+            List<String> taillesValides = List.of("XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL");
+            if (!taille.isEmpty() && !taillesValides.contains(taille)) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Taille d'habit invalide (XS a 4XL)."));
+            }
+            user.setTailleHabit(taille.isEmpty() ? null : taille);
+        }
+        if (body.containsKey("tailleCasquette")) {
+            String taille = body.get("tailleCasquette") == null ? "" : body.get("tailleCasquette").trim().toUpperCase();
+            List<String> taillesValides = List.of("S/M", "L/XL", "AJUSTABLE");
+            if (!taille.isEmpty() && !taillesValides.contains(taille)) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Taille de casquette invalide (S/M, L/XL ou Ajustable)."));
+            }
+            user.setTailleCasquette(taille.isEmpty() ? null : taille);
+        }
         if (body.containsKey("lieuNaissance")) user.setLieuNaissance(InputSanitizer.clean(body.get("lieuNaissance")));
         if (body.containsKey("adresse")) user.setAdresse(InputSanitizer.clean(body.get("adresse")));
         if (body.containsKey("dateNaissance") && body.get("dateNaissance") != null && !body.get("dateNaissance").isEmpty()) {

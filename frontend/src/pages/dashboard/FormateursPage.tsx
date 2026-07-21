@@ -791,6 +791,12 @@ export default function FormateursPage() {
                 <p className="font-medium text-slate-800 mt-0.5">{detailFormateur.telephone || '—'}</p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-xs text-slate-500">Taille habit / casquette</p>
+                <p className="font-medium text-slate-800 mt-0.5">
+                  {detailFormateur.tailleHabit || '—'} / {detailFormateur.tailleCasquette || '—'}
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                 <p className="text-xs text-slate-500 flex items-center gap-1"><Calendar className="w-3 h-3" /> Date de naissance</p>
                 <p className="font-medium text-slate-800 mt-0.5">{formatDate(detailFormateur.dateNaissance)}</p>
               </div>

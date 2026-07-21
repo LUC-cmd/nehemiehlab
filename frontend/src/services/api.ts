@@ -228,6 +228,7 @@ export const userService = {
     operateurMobileMoney: string; banqueNom: string; rib: string; codeAgence: string; intituleCompte: string;
     motDePasse: string; ancienMotDePasse: string;
     dateNaissance: string; lieuNaissance: string; adresse: string; dateEntree: string;
+    tailleHabit: string; tailleCasquette: string;
   }>) => api.put<User>(`/users/${id}`, data),
   uploadAvatar: (file: File) => {
     const formData = new FormData();
