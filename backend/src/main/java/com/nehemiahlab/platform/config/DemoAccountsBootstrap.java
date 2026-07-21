@@ -165,7 +165,7 @@ public class DemoAccountsBootstrap implements CommandLineRunner {
             log.warn("Centre « SKA Lomé Bè » absent — comptes parents démo non créés (lancez APP_SEED_ENABLED=true).");
             return 0;
         }
-        List<Eleve> eleves = eleveRepository.findByCentreId(centreOpt.get().getId());
+        List<Eleve> eleves = eleveRepository.findByCentreIdOrderByNomAscPrenomAsc(centreOpt.get().getId());
         if (eleves.isEmpty()) {
             return 0;
         }
