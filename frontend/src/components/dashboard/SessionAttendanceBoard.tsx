@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   UserCheck, UserX, Search, Clock, Star, MessageSquare,
   Briefcase, Users, TrendingUp, Award, FlaskConical,
@@ -50,6 +50,20 @@ function formatHMS(totalSeconds: number | null): string {
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+}
+
+/** Construit le payload d'enregistrement serveur à partir de l'état local courant d'un élève. */
+function buildEvaluationPayload(ev: EvaluationSession) {
+  return {
+    id: ev.id,
+    present: ev.present,
+    note: ev.present ? ev.note : undefined,
+    commentaire: ev.commentaire,
+    projetTravaille: ev.projetTravaille,
+    projetFinal: ev.present ? (ev.projetFinal ?? false) : false,
+    projetProbleme: ev.present && ev.projetFinal ? ev.projetProbleme : undefined,
+    projetSolution: ev.present && ev.projetFinal ? ev.projetSolution : undefined,
+  };
 }
 
 function noteLabel(note?: number | null): string {
@@ -104,6 +118,108 @@ export default function SessionAttendanceBoard({
     return () => window.clearInterval(id);
   }, [session.statut]);
 
+  // --- Enregistrement automatique côté serveur ---------------------------------
+  // Avant : les présences/notes/commentaires n'étaient sauvegardées que si le
+  // formateur cliquait sur "Enregistrer" avant de quitter la page. En quittant le
+  // lien plus tôt (ce qui arrive tout le temps sur le terrain), tout disparaissait.
+  // Maintenant chaque changement est envoyé au serveur automatiquement : la
+  // présence est enregistrée immédiatement au clic, et les autres champs (note,
+  // commentaire, projet) sont sauvegardés quelques instants après la saisie ou dès
+  // que le formateur quitte le champ. Rien ne dépend plus d'un clic manuel.
+  const evaluationsRef = useRef(evaluations);
+  useEffect(() => {
+    evaluationsRef.current = evaluations;
+  }, [evaluations]);
+
+  const saveTimers = useRef<Map<number, number>>(new Map());
+  const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
+  const [failedIds, setFailedIds] = useState<Set<number>>(new Set());
+
+  // persistEvaluation prend l'objet à jour directement (pas un lookup dans le state,
+  // qui n'est pas encore "commit" juste après un setState synchrone) : c'est ce qui
+  // garantit qu'on envoie bien la toute dernière valeur cliquée/tapée, jamais une
+  // valeur en retard d'un cran.
+  const persistEvaluation = async (ev: EvaluationSession, opts: { syncResponse?: boolean } = {}) => {
+    if (!sessionId) return; // brouillon hors ligne : géré par la sauvegarde locale existante
+    setSavingIds((prev) => new Set(prev).add(ev.id));
+    try {
+      const { data } = await sessionService.updateEvaluations(sessionId, [buildEvaluationPayload(ev)]);
+      setFailedIds((prev) => {
+        if (!prev.has(ev.id)) return prev;
+        const next = new Set(prev);
+        next.delete(ev.id);
+        return next;
+      });
+      if (opts.syncResponse && data?.evaluations) {
+        // On ne resynchronise QUE la ligne qu'on vient d'enregistrer (heure
+        // d'arrivée, durée...) — surtout ne pas remplacer tout le tableau, ça
+        // écraserait une saisie en cours (non encore sauvegardée) sur une autre
+        // ligne pendant que ce toggle était en vol.
+        const fresh = (data.evaluations as EvaluationSession[]).find((u) => u.id === ev.id);
+        if (fresh) {
+          onEvaluationsChange((prev) => prev.map((p) => (p.id === ev.id ? fresh : p)));
+        }
+      }
+    } catch {
+      setFailedIds((prev) => new Set(prev).add(ev.id));
+      toast.error("Échec de l'enregistrement — vérifiez votre connexion et réessayez.");
+    } finally {
+      setSavingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(ev.id);
+        return next;
+      });
+    }
+  };
+
+  // Pour la sauvegarde différée (saisie de texte) : on relit l'état le plus frais
+  // dans evaluationsRef au moment où le minuteur se déclenche, ce qui laisse le
+  // temps au re-rendu React de s'être produit entre-temps.
+  const persistFromRef = (evalId: number) => {
+    const ev = evaluationsRef.current.find((e) => e.id === evalId);
+    if (ev) void persistEvaluation(ev);
+  };
+
+  const scheduleSave = (evalId: number) => {
+    const existing = saveTimers.current.get(evalId);
+    if (existing) window.clearTimeout(existing);
+    const timer = window.setTimeout(() => {
+      saveTimers.current.delete(evalId);
+      persistFromRef(evalId);
+    }, 700);
+    saveTimers.current.set(evalId, timer);
+  };
+
+  const flushSave = (evalId: number) => {
+    const existing = saveTimers.current.get(evalId);
+    if (existing) {
+      window.clearTimeout(existing);
+      saveTimers.current.delete(evalId);
+      persistFromRef(evalId);
+    }
+  };
+
+  const cancelScheduledSave = (evalId: number) => {
+    const existing = saveTimers.current.get(evalId);
+    if (existing) {
+      window.clearTimeout(existing);
+      saveTimers.current.delete(evalId);
+    }
+  };
+
+  // Si le formateur quitte l'écran (change de page dans l'app) pendant qu'une
+  // saisie était en attente de sauvegarde, on la pousse quand même immédiatement.
+  useEffect(() => {
+    return () => {
+      saveTimers.current.forEach((timer, evalId) => {
+        window.clearTimeout(timer);
+        persistFromRef(evalId);
+      });
+      saveTimers.current.clear();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const stats = useMemo(() => {
     const total = evaluations.length;
     const present = evaluations.filter((e) => e.present).length;
@@ -134,26 +250,24 @@ export default function SessionAttendanceBoard({
 
   const togglePresence = (ev: EvaluationSession) => {
     if (readOnly) return;
-    onEvaluationsChange((prev) =>
-      prev.map((p) =>
-        p.id === ev.id
-          ? {
-              ...p,
-              present: !p.present,
-              note: !p.present ? p.note : undefined,
-              heureArrivee: !p.present
-                ? p.heureArrivee || new Date().toISOString()
-                : undefined,
-              dureeMinutes: !p.present ? p.dureeMinutes : undefined,
-              dureeSecondes: !p.present ? p.dureeSecondes : undefined,
-              projetFinal: !p.present ? p.projetFinal : false,
-              projetProbleme: !p.present ? p.projetProbleme : undefined,
-              projetSolution: !p.present ? p.projetSolution : undefined,
-            }
-          : p,
-      ),
-    );
+    const updated: EvaluationSession = {
+      ...ev,
+      present: !ev.present,
+      note: !ev.present ? ev.note : undefined,
+      heureArrivee: !ev.present ? ev.heureArrivee || new Date().toISOString() : undefined,
+      dureeMinutes: !ev.present ? ev.dureeMinutes : undefined,
+      dureeSecondes: !ev.present ? ev.dureeSecondes : undefined,
+      projetFinal: !ev.present ? ev.projetFinal : false,
+      projetProbleme: !ev.present ? ev.projetProbleme : undefined,
+      projetSolution: !ev.present ? ev.projetSolution : undefined,
+    };
+    onEvaluationsChange((prev) => prev.map((p) => (p.id === ev.id ? updated : p)));
     if (!ev.present) setExpandedId(null);
+    // Le bouton de présence doit être un vrai bouton d'activation : la présence est
+    // enregistrée côté serveur tout de suite, pas seulement en mémoire locale, et
+    // pas via l'objet potentiellement pas encore à jour dans le state React.
+    cancelScheduledSave(ev.id);
+    void persistEvaluation(updated, { syncResponse: true });
   };
 
   const [uploadingEvalId, setUploadingEvalId] = useState<number | null>(null);
@@ -451,6 +565,21 @@ export default function SessionAttendanceBoard({
                               depuis {new Date(ev.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                             </p>
                           )}
+                          {savingIds.has(ev.id) && (
+                            <p className="text-[9px] text-sky-400 mt-1 flex items-center justify-center gap-1">
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" /> Enregistrement…
+                            </p>
+                          )}
+                          {!savingIds.has(ev.id) && failedIds.has(ev.id) && (
+                            <button
+                              type="button"
+                              onClick={() => void persistEvaluation(ev)}
+                              className="text-[9px] text-rose-400 mt-1 underline decoration-dotted"
+                              title="Cliquer pour réessayer l'enregistrement"
+                            >
+                              ⚠ Non enregistré — réessayer
+                            </button>
+                          )}
                         </td>
 
                         <td className="px-3 py-2 align-top text-center">
@@ -479,7 +608,11 @@ export default function SessionAttendanceBoard({
                               className="input-field text-center text-xs py-1.5 px-1 w-16 mx-auto"
                               placeholder="—"
                               value={noteVal}
-                              onChange={(e) => onNoteChange(ev.id, e.target.value)}
+                              onChange={(e) => {
+                                onNoteChange(ev.id, e.target.value);
+                                scheduleSave(ev.id);
+                              }}
+                              onBlur={() => flushSave(ev.id)}
                             />
                           )}
                           {ev.present && (
@@ -498,13 +631,15 @@ export default function SessionAttendanceBoard({
                               className="input-field text-sm py-1.5"
                               placeholder={ev.eleve.projet?.nom || 'Projet du jour…'}
                               value={ev.projetTravaille || ''}
-                              onChange={(e) =>
+                              onChange={(e) => {
                                 onEvaluationsChange((prev) =>
                                   prev.map((p) =>
                                     p.id === ev.id ? { ...p, projetTravaille: e.target.value } : p,
                                   ),
-                                )
-                              }
+                                );
+                                scheduleSave(ev.id);
+                              }}
+                              onBlur={() => flushSave(ev.id)}
                             />
                           )}
                         </td>
@@ -577,13 +712,15 @@ export default function SessionAttendanceBoard({
                               className="input-field text-sm py-1.5"
                               placeholder="Observation…"
                               value={ev.commentaire || ''}
-                              onChange={(e) =>
+                              onChange={(e) => {
                                 onEvaluationsChange((prev) =>
                                   prev.map((p) =>
                                     p.id === ev.id ? { ...p, commentaire: e.target.value } : p,
                                   ),
-                                )
-                              }
+                                );
+                                scheduleSave(ev.id);
+                              }}
+                              onBlur={() => flushSave(ev.id)}
                             />
                           )}
                         </td>
@@ -642,15 +779,17 @@ export default function SessionAttendanceBoard({
                                   <div className="inline-flex rounded-xl border border-dark-700 p-0.5 bg-dark-900/60">
                                     <button
                                       type="button"
-                                      onClick={() =>
-                                        onEvaluationsChange((prev) =>
-                                          prev.map((p) =>
-                                            p.id === ev.id
-                                              ? { ...p, projetFinal: false, projetProbleme: undefined, projetSolution: undefined }
-                                              : p,
-                                          ),
-                                        )
-                                      }
+                                      onClick={() => {
+                                        const updated: EvaluationSession = {
+                                          ...ev,
+                                          projetFinal: false,
+                                          projetProbleme: undefined,
+                                          projetSolution: undefined,
+                                        };
+                                        onEvaluationsChange((prev) => prev.map((p) => (p.id === ev.id ? updated : p)));
+                                        cancelScheduledSave(ev.id);
+                                        void persistEvaluation(updated);
+                                      }}
                                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                                         !ev.projetFinal
                                           ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
@@ -662,13 +801,12 @@ export default function SessionAttendanceBoard({
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() =>
-                                        onEvaluationsChange((prev) =>
-                                          prev.map((p) =>
-                                            p.id === ev.id ? { ...p, projetFinal: true } : p,
-                                          ),
-                                        )
-                                      }
+                                      onClick={() => {
+                                        const updated: EvaluationSession = { ...ev, projetFinal: true };
+                                        onEvaluationsChange((prev) => prev.map((p) => (p.id === ev.id ? updated : p)));
+                                        cancelScheduledSave(ev.id);
+                                        void persistEvaluation(updated);
+                                      }}
                                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                                         ev.projetFinal
                                           ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
@@ -695,13 +833,15 @@ export default function SessionAttendanceBoard({
                                         rows={2}
                                         className="input-field text-sm py-2 resize-y min-h-[4rem]"
                                         value={ev.projetProbleme || ''}
-                                        onChange={(e) =>
+                                        onChange={(e) => {
                                           onEvaluationsChange((prev) =>
                                             prev.map((p) =>
                                               p.id === ev.id ? { ...p, projetProbleme: e.target.value } : p,
                                             ),
-                                          )
-                                        }
+                                          );
+                                          scheduleSave(ev.id);
+                                        }}
+                                        onBlur={() => flushSave(ev.id)}
                                       />
                                     )}
                                   </div>
@@ -716,13 +856,15 @@ export default function SessionAttendanceBoard({
                                         rows={2}
                                         className="input-field text-sm py-2 resize-y min-h-[4rem]"
                                         value={ev.projetSolution || ''}
-                                        onChange={(e) =>
+                                        onChange={(e) => {
                                           onEvaluationsChange((prev) =>
                                             prev.map((p) =>
                                               p.id === ev.id ? { ...p, projetSolution: e.target.value } : p,
                                             ),
-                                          )
-                                        }
+                                          );
+                                          scheduleSave(ev.id);
+                                        }}
+                                        onBlur={() => flushSave(ev.id)}
                                       />
                                     )}
                                   </div>
