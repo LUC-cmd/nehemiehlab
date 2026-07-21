@@ -50,6 +50,21 @@ export interface User {
   createdAt: string;
 }
 
+// --- Document formateur (contrat, projet .sb3, presentation) ---
+export type FormateurDocumentType = 'CONTRAT' | 'PROJET' | 'PRESENTATION';
+
+export interface FormateurDocument {
+  id: number;
+  type: FormateurDocumentType;
+  titre?: string;
+  url: string;
+  nomFichierOriginal?: string;
+  createdAt: string;
+  formateurId?: number;
+  formateurNom?: string;
+  formateurPrenom?: string;
+}
+
 // --- Centre ---
 export interface Centre {
   id: number;
