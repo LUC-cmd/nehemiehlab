@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { NavLink, useNavigate, Outlet } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Building2, Users, BookOpen, CreditCard,
@@ -167,6 +167,7 @@ export default function DashboardLayout() {
   const { user, role, logout } = useAuth();
   const { hasFeature } = useAccess();
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -257,6 +258,24 @@ export default function DashboardLayout() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
+  }, []);
+
+  // Ferme le menu mobile dès que la route change (ex: on tape sur "Mes Élèves"
+  // depuis le téléphone) : on ne dépend plus uniquement du onClick du lien,
+  // qui pouvait laisser le panneau ouvert par-dessus la page tant qu'on ne
+  // rafraîchissait pas manuellement.
+  useEffect(() => {
+    setMobileSidebar(false);
+  }, [location.pathname]);
+
+  // Si l'écran repasse en largeur desktop (rotation, redimensionnement),
+  // on referme le panneau mobile pour qu'il ne reste pas figé à l'écran.
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) setMobileSidebar(false);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const requestLogout = () => {
