@@ -167,6 +167,10 @@ export interface EvaluationSession {
   heureDepart?: string;
   /** Minutes réellement effectuées */
   dureeMinutes?: number;
+  /** Fichier optionnel prouvant le projet réalisé (photo, vidéo, .sb3) */
+  projetFichierUrl?: string;
+  /** Nom original du fichier envoyé */
+  projetFichierNom?: string;
 }
 
 // --- Projet élève ---
