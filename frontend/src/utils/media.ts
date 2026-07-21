@@ -44,6 +44,9 @@ export function mediaUrl(path?: string | null): string {
   if (path.startsWith('/uploads/rapports/')) {
     return `${API_BASE}/secure-files/rapports/${path.slice('/uploads/rapports/'.length)}`;
   }
+  if (path.startsWith('/uploads/formateur-documents/')) {
+    return `${API_BASE}/secure-files/formateur-documents/${path.slice('/uploads/formateur-documents/'.length)}`;
+  }
 
   return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
 
@@ -63,13 +66,15 @@ export function isSecureMediaPath(path?: string | null): boolean {
     || path.startsWith('/uploads/enfants/')
     || path.startsWith('/uploads/projets-enfants/')
     || path.startsWith('/uploads/rapports/')
+    || path.startsWith('/uploads/formateur-documents/')
 
     || path.includes('/secure-files/identite/')
 
     || path.includes('/secure-files/transactions/')
     || path.includes('/secure-files/enfants/')
     || path.includes('/secure-files/projets-enfants/')
-    || path.includes('/secure-files/rapports/');
+    || path.includes('/secure-files/rapports/')
+    || path.includes('/secure-files/formateur-documents/');
 
 }
 
