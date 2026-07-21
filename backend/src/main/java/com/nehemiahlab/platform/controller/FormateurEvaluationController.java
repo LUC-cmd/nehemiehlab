@@ -95,7 +95,7 @@ public class FormateurEvaluationController {
             }
             try {
                 scratchUrl = secureFileStorage.store(
-                        scratchFile, "formateur-scratch", "scratch", MAX_SCRATCH_BYTES, "scratch");
+                        scratchFile, "formateur-scratch", "media", MAX_SCRATCH_BYTES, "scratch");
                 scratchNom = original;
             } catch (Exception e) {
                 return ResponseEntity.internalServerError().body(Map.of(
