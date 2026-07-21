@@ -133,7 +133,7 @@ export default function EvaluationFormateurPage() {
                 <option value="">Sélectionner…</option>
                 {modules.map((m) => (
                   <option key={m.id} value={m.id}>
-                    #{m.numeroOrdre} — {m.titre}
+                    {m.numeroOrdre} — {m.titre}
                   </option>
                 ))}
               </select>

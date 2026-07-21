@@ -1,6 +1,6 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import type { User, Transaction, ModuleCours, FormateurEvaluation, ChildSessionRow, RapportSyntheseCentre, ApercuRapportFormateur } from '../types';
+import type { User, Transaction, ModuleCours, FormateurEvaluation, ChildSessionRow, RapportSyntheseCentre, ApercuRapportFormateur, FormateurDocument, FormateurDocumentType } from '../types';
 import {
   clearAuthSession,
   getAuthToken,
@@ -257,6 +257,29 @@ export const userService = {
     api.put('/users/inscriptions-formateurs/statut', { ouverte }),
   validerFormateur: (id: number) => api.put(`/users/${id}/valider-formateur`),
   supprimerCompteEnAttente: (id: number) => api.delete(`/users/${id}`),
+};
+
+// ============================================================
+//  Documents formateur (contrat, projets .sb3, presentations)
+// ============================================================
+export const formateurDocumentService = {
+  uploadMine: (type: FormateurDocumentType, file: File, titre?: string) => {
+    const formData = new FormData();
+    formData.append('type', type);
+    formData.append('file', file);
+    if (titre) formData.append('titre', titre);
+    return api.post<FormateurDocument>('/formateur-documents/me', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  listMine: (type?: FormateurDocumentType) =>
+    api.get<FormateurDocument[]>('/formateur-documents/me', { params: type ? { type } : undefined }),
+  deleteMine: (id: number) => api.delete(`/formateur-documents/me/${id}`),
+  listForFormateur: (formateurId: number, type?: FormateurDocumentType) =>
+    api.get<FormateurDocument[]>(`/formateur-documents/formateur/${formateurId}`, {
+      params: type ? { type } : undefined,
+    }),
+  deleteAsDirecteur: (id: number) => api.delete(`/formateur-documents/${id}`),
 };
 
 // ============================================================

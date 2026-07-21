@@ -20,7 +20,9 @@ abstract class AbstractSecureFileStorage implements SecureFileStorage {
                     "application/msword",
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    "application/vnd.ms-excel"
+                    "application/vnd.ms-excel",
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    "application/vnd.ms-powerpoint"
             ),
             "media", Set.of(
                     "image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif",
@@ -31,7 +33,7 @@ abstract class AbstractSecureFileStorage implements SecureFileStorage {
 
     private static final Set<String> SAFE_EXT = Set.of(
             ".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf",
-            ".xlsx", ".xls", ".doc", ".docx", ".mp4", ".webm", ".sb3"
+            ".xlsx", ".xls", ".doc", ".docx", ".ppt", ".pptx", ".mp4", ".webm", ".sb3"
     );
 
     @Override
@@ -74,6 +76,7 @@ abstract class AbstractSecureFileStorage implements SecureFileStorage {
             else if (contentType.contains("gif")) extension = ".gif";
             else if (contentType.contains("pdf")) extension = ".pdf";
             else if (contentType.contains("sheet") || contentType.contains("excel")) extension = ".xlsx";
+            else if (contentType.contains("presentation") || contentType.contains("powerpoint")) extension = ".pptx";
             else throw new IllegalArgumentException("Extension de fichier non autorisée.");
         }
 

@@ -3,11 +3,13 @@ package com.nehemiahlab.platform.controller;
 import com.nehemiahlab.platform.model.Role;
 import com.nehemiahlab.platform.model.EnfantProfile;
 import com.nehemiahlab.platform.model.EnfantProject;
+import com.nehemiahlab.platform.model.FormateurDocument;
 import com.nehemiahlab.platform.model.SessionCours;
 import com.nehemiahlab.platform.model.Transaction;
 import com.nehemiahlab.platform.model.User;
 import com.nehemiahlab.platform.repository.EnfantProfileRepository;
 import com.nehemiahlab.platform.repository.EnfantProjectRepository;
+import com.nehemiahlab.platform.repository.FormateurDocumentRepository;
 import com.nehemiahlab.platform.repository.SessionCoursRepository;
 import com.nehemiahlab.platform.repository.TransactionRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
@@ -42,6 +44,9 @@ public class SecureFileController {
 
     @Autowired
     private EnfantProjectRepository enfantProjectRepository;
+
+    @Autowired
+    private FormateurDocumentRepository formateurDocumentRepository;
 
     @Autowired
     private SessionCoursRepository sessionCoursRepository;
@@ -148,6 +153,25 @@ public class SecureFileController {
 
         EnfantProject owner = enfantProjectRepository.findByMediaUrl(relative).orElse(null);
         if (owner == null || !centreAccessService.canAccessEnfant(current, owner.getEnfant())) {
+            return ResponseEntity.status(403).body(Map.of("message", "Accès refusé."));
+        }
+        return resolveAndServe(relative);
+    }
+
+    @GetMapping("/formateur-documents/**")
+    public ResponseEntity<?> getFormateurDocument(Authentication auth, jakarta.servlet.http.HttpServletRequest request) {
+        if (auth == null || !(auth.getPrincipal() instanceof User current)) {
+            return ResponseEntity.status(401).body(Map.of("message", "Authentification requise."));
+        }
+        String relative = extractRelative(
+                request.getRequestURI(), "/secure-files/formateur-documents/", "/uploads/formateur-documents/");
+        if (relative == null) return ResponseEntity.badRequest().body(Map.of("message", "Chemin invalide."));
+
+        FormateurDocument owner = formateurDocumentRepository.findByUrl(relative).orElse(null);
+        boolean isOwner = owner != null && owner.getFormateur() != null
+                && owner.getFormateur().getId().equals(current.getId());
+        boolean isDirecteur = current.getRole() == Role.DIRECTEUR;
+        if (owner == null || !(isOwner || isDirecteur)) {
             return ResponseEntity.status(403).body(Map.of("message", "Accès refusé."));
         }
         return resolveAndServe(relative);

@@ -3,13 +3,14 @@ import { useAuth } from '../../context/AuthContext';
 import { banqueService, userService } from '../../services/api';
 import type { Banque } from '../../types';
 import {
-  Building2, Camera, CreditCard, FileImage, Loader2, Lock, Mail, MapPin, Phone, Smartphone, Trash2, User,
+  Building2, Camera, CreditCard, FileImage, FolderOpen, Loader2, Lock, Mail, MapPin, Phone, Smartphone, Trash2, User,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import UserAvatar from '../../components/ui/UserAvatar';
 import SecureImage from '../../components/ui/SecureImage';
 import MediaDropZone from '../../components/ui/MediaDropZone';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import FormateurDocumentsPanel from '../../components/dashboard/FormateurDocumentsPanel';
 import {
   cleanNameInput,
   cleanPhoneInput,
@@ -497,6 +498,18 @@ export default function ProfilPage() {
                   </div>
                 ))}
               </div>
+            </section>
+          )}
+
+          {isFormateur && (
+            <section id="profil-documents" className="space-y-3">
+              <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                <FolderOpen className="w-4 h-4 text-[#004b57]" /> Mes documents
+              </h2>
+              <p className="text-xs text-slate-500 -mt-1">
+                Déposez votre contrat, vos projets réalisés et vos présentations. Le Directeur peut les consulter à tout moment.
+              </p>
+              <FormateurDocumentsPanel mode="own" />
             </section>
           )}
 
