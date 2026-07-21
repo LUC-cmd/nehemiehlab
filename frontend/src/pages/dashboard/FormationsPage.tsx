@@ -376,7 +376,7 @@ export default function FormationsPage() {
               <option value="">Tous les modules</option>
               {modulesCatalog.map((m) => (
                 <option key={m.id} value={m.id}>
-                  #{m.numeroOrdre} — {m.titre}
+                  {m.numeroOrdre} — {m.titre}
                 </option>
               ))}
             </select>
@@ -507,7 +507,7 @@ export default function FormationsPage() {
               <option value="">Choisir un module...</option>
               {modulesCatalog.map((m) => (
                 <option key={m.id} value={m.id}>
-                  #{m.numeroOrdre} — {m.titre}
+                  {m.numeroOrdre} — {m.titre}
                 </option>
               ))}
             </select>

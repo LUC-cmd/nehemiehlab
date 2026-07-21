@@ -397,7 +397,7 @@ export default function SupportsCoursPage() {
                         checked={checked}
                         onChange={() => toggleSerieModule(m.id)}
                       />
-                      #{m.numeroOrdre} {m.titre}
+                      {m.numeroOrdre} {m.titre}
                     </label>
                   );
                 })
@@ -502,7 +502,7 @@ export default function SupportsCoursPage() {
                           key={m.id}
                           className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600"
                         >
-                          #{m.numeroOrdre} {m.titre}
+                          {m.numeroOrdre} {m.titre}
                         </span>
                       ))}
                     </div>
@@ -666,7 +666,7 @@ export default function SupportsCoursPage() {
             >
               <div className="flex justify-between gap-2 mb-1">
                 <span className="text-xs font-bold text-primary-700 bg-primary-50 px-2 py-0.5 rounded">
-                  #{module.numeroOrdre}
+                  {module.numeroOrdre}
                 </span>
                 {isDirector && (
                   <div className="flex gap-1">

@@ -6,7 +6,7 @@ import type { Centre, User } from '../../types';
 import {
   Mail, Phone, Shield, Search, CheckCircle2,
   Building2, Clock, Calendar, MapPin, FileImage, Eye,
-  Trash2, Play, Filter, Pencil, FileSpreadsheet, FileText,
+  Trash2, Play, Filter, Pencil, FileSpreadsheet, FileText, FolderOpen,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageLoadingSkeleton } from '../../components/ui/DashboardSkeletons';
@@ -17,6 +17,7 @@ import { formatFullName } from '../../utils/displayName';
 import { computeFormateurExperience } from '../../utils/formateurExperience';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import FormateurDocumentsPanel from '../../components/dashboard/FormateurDocumentsPanel';
 import SecureImage from '../../components/ui/SecureImage';
 import ValidationActionButton from '../../components/ui/ValidationActionButton';
 import { ancienneteDate, formatAnciennete } from '../../utils/anciennete';
@@ -879,6 +880,14 @@ export default function FormateursPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                <FolderOpen className="w-4 h-4 text-[#004b57]" />
+                Documents (contrat, projets, présentations)
+              </h3>
+              <FormateurDocumentsPanel mode="readonly" formateurId={detailFormateur.id} />
             </div>
           </div>
         )}

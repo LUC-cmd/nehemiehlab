@@ -70,7 +70,7 @@ export default function SessionsPage() {
   const moduleSelectLabel = (id: string | number | undefined) => {
     if (!id) return '';
     const mod = modulesCatalog.find((m) => m.id === Number(id));
-    return mod ? `#${mod.numeroOrdre} — ${mod.titre}` : '';
+    return mod ? `${mod.numeroOrdre} — ${mod.titre}` : '';
   };
 
   const isFormateur = hasRole('FORMATEUR');
@@ -1243,7 +1243,7 @@ export default function SessionsPage() {
               <option value="">Sélectionner un module…</option>
               {modulesCatalog.map((m) => (
                 <option key={m.id} value={m.id}>
-                  #{m.numeroOrdre} — {m.titre}
+                  {m.numeroOrdre} — {m.titre}
                 </option>
               ))}
             </select>
@@ -1466,7 +1466,7 @@ export default function SessionsPage() {
                       <option value="">Sélectionner un module…</option>
                       {modulesCatalog.map((m) => (
                         <option key={m.id} value={m.id}>
-                          #{m.numeroOrdre} — {m.titre}
+                          {m.numeroOrdre} — {m.titre}
                         </option>
                       ))}
                     </select>
