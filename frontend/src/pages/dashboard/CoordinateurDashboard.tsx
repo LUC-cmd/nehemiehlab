@@ -7,6 +7,7 @@ import { centreService, dashboardService, formationService, signalementService }
 import type { Centre, ModuleFormation, Signalement } from '../../types';
 import { fetchWithOfflineCache } from '../../utils/offlineCache';
 import EnfantsProfilesShowcase from '../../components/dashboard/EnfantsProfilesShowcase';
+import CentreElevesPanel from '../../components/dashboard/CentreElevesPanel';
 import LocalisationDashboardSection from '../../components/dashboard/LocalisationDashboardSection';
 
 export default function CoordinateurDashboard() {
@@ -91,6 +92,12 @@ export default function CoordinateurDashboard() {
         onCentresRefresh={() => {
           centreService.getMesCentres().then((r) => setMesCentres(r.data || [])).catch(() => {});
         }}
+      />
+
+      <CentreElevesPanel
+        centres={monCentre}
+        title="Élèves du centre"
+        subtitle="Effectif et liste complète, classée de A à Z."
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
