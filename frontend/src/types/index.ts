@@ -146,6 +146,12 @@ export interface SessionCours {
   nbPresents?: number;
   nbTotalEleves?: number;
   createdAt: string;
+  /** Séance saisie manuellement a posteriori (sans géolocalisation), plutôt que démarrée en direct. */
+  manuelle?: boolean;
+  /** Date/heure de la dernière modification (horaires, contexte...) après la création. */
+  modifieLe?: string;
+  /** Nom de la personne ayant fait la dernière modification. */
+  modifieParNom?: string;
 }
 
 // --- Evaluation Session ---
