@@ -16,7 +16,7 @@ import {
 } from '../../utils/offlineSessions';
 import {
   Plus, Timer, Clock, User as UserIcon, Save, Lock, UploadCloud, FileText, DownloadCloud,
-  Calendar, MapPin, Radio, CheckCircle2, XCircle, Users, X, Navigation,
+  Calendar, MapPin, Radio, CheckCircle2, XCircle, Users, X, Navigation, Loader2, Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ModalContentSkeleton, TableSkeleton } from '../../components/ui/DashboardSkeletons';
@@ -58,6 +58,8 @@ export default function SessionsPage() {
   const [newSession, setNewSession] = useState({
     titre: '', centreId: '', duree: '120', moduleCoursId: '', etatEquipements: '', defisSession: '',
     heureDebut: nowForDatetimeLocal(),
+    // Séance déjà terminée qu'on saisit après coup (pas de géolocalisation requise).
+    manuelle: false,
   });
   
   const [selectedSession, setSelectedSession] = useState<SessionCours | null>(null);
@@ -93,6 +95,14 @@ export default function SessionsPage() {
   const [selectedFormateurId, setSelectedFormateurId] = useState<string>('');
   const [selectedCentreId, setSelectedCentreId] = useState<string>('');
   const [confirmClotureId, setConfirmClotureId] = useState<number | string | null>(null);
+  // Empêche le double-clic sur "Lancer le chrono" : avant ce correctif, rien
+  // n'indiquait que la demande était en cours (la géolocalisation peut prendre
+  // plusieurs secondes), donc les formateurs cliquaient plusieurs fois et
+  // plusieurs séances étaient créées pour un seul démarrage voulu.
+  const [creatingSession, setCreatingSession] = useState(false);
+  // Suppression définitive d'une séance : pour éviter un clic accidentel, le
+  // formateur doit retaper le nom exact du module avant que "Supprimer" s'active.
+  const [deleteSessionTarget, setDeleteSessionTarget] = useState<SessionCours | null>(null);
   const [geoModal, setGeoModal] = useState<{
     open: boolean;
     phase: 'debut' | 'fin';
@@ -284,17 +294,26 @@ export default function SessionsPage() {
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (creatingSession) return;
     if (!newSession.moduleCoursId && isFormateur) {
       toast.error('Sélectionnez un module du catalogue Directeur.');
       return;
     }
+    setCreatingSession(true);
 
-    const runCreate = async (geo: { latitude: number; longitude: number; precisionMetres?: number }) => {
+    const resetNewSessionForm = () => setNewSession({
+      titre: '', centreId: '', duree: '120', moduleCoursId: '', etatEquipements: '', defisSession: '',
+      heureDebut: nowForDatetimeLocal(), manuelle: false,
+    });
+
+    const runCreate = async (
+      geo: { latitude: number; longitude: number; precisionMetres?: number } | null,
+    ) => {
       const centreId = Number(newSession.centreId);
       const moduleCoursId = newSession.moduleCoursId ? Number(newSession.moduleCoursId) : undefined;
       const moduleFaitLabel = moduleSelectLabel(newSession.moduleCoursId);
 
-      if (!navigator.onLine) {
+      if (geo && !navigator.onLine) {
         const eleves = await loadCentreEleves(centreId);
         const centre = centres.find((item) => item.id === centreId);
         const draft: OfflineSessionDraft = {
@@ -328,7 +347,7 @@ export default function SessionsPage() {
         setOfflineDrafts(listOfflineSessionDrafts());
         toast.success('Session enregistrée hors ligne (GPS capturé). Synchronisation à la reconnexion.');
         setShowAddModal(false);
-        setNewSession({ titre: '', centreId: '', duree: '120', moduleCoursId: '', etatEquipements: '', defisSession: '', heureDebut: nowForDatetimeLocal() });
+        resetNewSessionForm();
         await fetchInitialData();
         return;
       }
@@ -338,32 +357,53 @@ export default function SessionsPage() {
         centre: { id: centreId },
         dureePrevueMinutes: Number(newSession.duree),
         heureDebut: datetimeLocalToIso(newSession.heureDebut),
-        latitudeDebut: geo.latitude,
-        longitudeDebut: geo.longitude,
-        precisionDebutMetres: geo.precisionMetres,
+        ...(geo
+          ? {
+              latitudeDebut: geo.latitude,
+              longitudeDebut: geo.longitude,
+              precisionDebutMetres: geo.precisionMetres,
+            }
+          : {}),
         moduleCoursId,
         etatEquipements: newSession.etatEquipements || undefined,
         defisSession: newSession.defisSession || undefined,
+        manuelle: newSession.manuelle,
       });
       toast.success(
         response.data?.queuedOffline
           ? 'Session mise en attente hors ligne. Elle sera synchronisée automatiquement.'
+          : newSession.manuelle
+          ? 'Séance ajoutée. Marquez les présences puis clôturez-la.'
           : 'Session démarrée avec localisation !',
       );
       setShowAddModal(false);
-      setNewSession({ titre: '', centreId: '', duree: '120', moduleCoursId: '', etatEquipements: '', defisSession: '', heureDebut: nowForDatetimeLocal() });
+      resetNewSessionForm();
       fetchInitialData();
     };
 
     try {
-      const geo = await captureSessionGeo('debut', true);
-      await runCreate(geo);
+      if (newSession.manuelle) {
+        // Séance déjà terminée saisie a posteriori : aucune géolocalisation à demander.
+        await runCreate(null);
+      } else {
+        const geo = await captureSessionGeo('debut', true);
+        await runCreate(geo);
+      }
     } catch (err) {
-      promptGeoRequired(
-        'debut',
-        err instanceof Error ? err.message : 'Localisation obligatoire pour démarrer.',
-        (geo) => { void runCreate(geo); },
-      );
+      if (newSession.manuelle) {
+        toast.error(
+          (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+            || (err instanceof Error ? err.message : 'Erreur lors de la création de la séance.'),
+        );
+      } else {
+        promptGeoRequired(
+          'debut',
+          err instanceof Error ? err.message : 'Localisation obligatoire pour démarrer.',
+          (geo) => { setCreatingSession(true); void runCreate(geo).finally(() => setCreatingSession(false)); },
+        );
+      }
+    } finally {
+      setCreatingSession(false);
     }
   };
 
@@ -550,11 +590,19 @@ export default function SessionsPage() {
       return;
     }
 
-    setConfirmClotureId(null);
+    // On NE ferme PAS la boîte de dialogue tout de suite : elle reste affichée avec
+    // son bouton "Clôturer" désactivé/en chargement tant que la clôture n'est pas
+    // terminée (ConfirmDialog gère déjà ça via son état interne "submitting", tant
+    // qu'on ne referme pas confirmClotureId avant la fin). Avant ce correctif, la
+    // boîte se fermait immédiatement, ce qui laissait le bouton "Clôturer la
+    // session" redevenir cliquable et permettait de relancer une deuxième clôture
+    // en parallèle pendant que la première était encore en cours.
     try {
       await handleUpdateEvaluations();
 
-      const finishClose = async (geoFin: { latitude: number; longitude: number; precisionMetres?: number }) => {
+      const finishClose = async (
+        geoFin: { latitude: number; longitude: number; precisionMetres?: number } | null,
+      ) => {
         if (selectedOfflineDraftId) {
           const draft = getOfflineSessionDraft(selectedOfflineDraftId);
           if (!draft) throw new Error('OFFLINE_DRAFT_NOT_FOUND');
@@ -563,9 +611,9 @@ export default function SessionsPage() {
             statut: 'CLOTUREE',
             closedAt: Date.now(),
             heureFin: new Date().toISOString(),
-            latitudeFin: geoFin.latitude,
-            longitudeFin: geoFin.longitude,
-            precisionFinMetres: geoFin.precisionMetres,
+            latitudeFin: geoFin?.latitude,
+            longitudeFin: geoFin?.longitude,
+            precisionFinMetres: geoFin?.precisionMetres,
             moduleCoursId: contextForm.moduleCoursId ? Number(contextForm.moduleCoursId) : draft.moduleCoursId,
             moduleFait: moduleSelectLabel(contextForm.moduleCoursId) || draft.moduleFait,
             etatEquipements: contextForm.etatEquipements || undefined,
@@ -573,6 +621,7 @@ export default function SessionsPage() {
           });
           setOfflineDrafts(listOfflineSessionDrafts());
           toast.success('Session clôturée hors ligne (GPS fin enregistré).');
+          setConfirmClotureId(null);
           setShowSessionDetail(false);
           return;
         }
@@ -581,26 +630,57 @@ export default function SessionsPage() {
           etatEquipements: contextForm.etatEquipements,
           defisSession: contextForm.defisSession,
         });
-        await sessionService.localiserFin(selectedSession.id, geoFin);
+        if (geoFin) {
+          await sessionService.localiserFin(selectedSession.id, geoFin);
+        }
         await sessionService.cloturer(selectedSession.id);
-        toast.success('Session clôturée avec localisation de fin.');
+        toast.success(
+          geoFin ? 'Session clôturée avec localisation de fin.' : 'Séance manuelle clôturée.',
+        );
+        setConfirmClotureId(null);
         setShowSessionDetail(false);
         fetchInitialData();
       };
 
-      try {
-        const geoFin = await captureSessionGeo('fin');
-        await finishClose(geoFin);
-      } catch (err) {
-        promptGeoRequired(
-          'fin',
-          err instanceof Error ? err.message : 'Localisation obligatoire pour clôturer.',
-          (geo) => { void finishClose(geo); },
-        );
+      if (!selectedOfflineDraftId && selectedSession.manuelle) {
+        // Séance saisie manuellement (a posteriori) : pas de géolocalisation à
+        // capturer, la localisation n'aurait aucun sens pour une séance déjà
+        // terminée. L'heure de fin précise se règle via « Horaires ».
+        await finishClose(null);
+      } else {
+        try {
+          const geoFin = await captureSessionGeo('fin');
+          await finishClose(geoFin);
+        } catch (err) {
+          // On bascule vers la modale de géolocalisation : celle-ci a son propre
+          // bouton "Réessayer" déjà protégé contre le double-clic.
+          setConfirmClotureId(null);
+          promptGeoRequired(
+            'fin',
+            err instanceof Error ? err.message : 'Localisation obligatoire pour clôturer.',
+            (geo) => { void finishClose(geo); },
+          );
+        }
       }
     } catch (err: unknown) {
+      setConfirmClotureId(null);
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
         || 'Erreur lors de la clôture.';
+      toast.error(msg);
+    }
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!deleteSessionTarget || selectedOfflineDraftId) return;
+    try {
+      await sessionService.delete(deleteSessionTarget.id);
+      toast.success('Séance supprimée définitivement.');
+      setDeleteSessionTarget(null);
+      setShowSessionDetail(false);
+      fetchInitialData();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        || 'Erreur lors de la suppression.';
       toast.error(msg);
     }
   };
@@ -1190,11 +1270,27 @@ export default function SessionsPage() {
         onClose={() => setShowAddModal(false)}
         footer={
           <>
-            <button type="button" onClick={() => setShowAddModal(false)} className="btn-ghost w-full sm:w-auto justify-center">
+            <button
+              type="button"
+              onClick={() => setShowAddModal(false)}
+              disabled={creatingSession}
+              className="btn-ghost w-full sm:w-auto justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               Annuler
             </button>
-            <button type="submit" form="create-session-form" className="btn-primary w-full sm:w-auto justify-center">
-              Lancer le chrono
+            <button
+              type="submit"
+              form="create-session-form"
+              disabled={creatingSession}
+              className="btn-primary w-full sm:w-auto justify-center disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {creatingSession ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Démarrage…
+                </>
+              ) : (
+                'Lancer le chrono'
+              )}
             </button>
           </>
         }
@@ -1258,17 +1354,36 @@ export default function SessionsPage() {
               </div>
             )}
           </div>
+          <div className="rounded-xl border border-dark-700 bg-dark-900/40 p-3">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={newSession.manuelle}
+                onChange={(e) => setNewSession({ ...newSession, manuelle: e.target.checked })}
+              />
+              <span className="text-sm text-dark-200">
+                <span className="font-medium text-white">Cette séance a déjà eu lieu</span>
+                <span className="block text-xs text-dark-500 mt-0.5">
+                  Saisie a posteriori (dates/heures précises) — pas de géolocalisation demandée.
+                </span>
+              </span>
+            </label>
+          </div>
           <div>
             <label className="label">Heure de début *</label>
             <input
               type="datetime-local"
               required
+              max={nowForDatetimeLocal()}
               className="input-field"
               value={newSession.heureDebut}
               onChange={(e) => setNewSession({ ...newSession, heureDebut: e.target.value })}
             />
             <p className="text-xs text-dark-500 mt-1">
-              Ajustez si la séance a commencé plus tôt. La position GPS sera capturée au lancement.
+              {newSession.manuelle
+                ? 'Séance déjà terminée : indiquez sa date et heure de début réelles.'
+                : 'Ajustez si la séance a commencé plus tôt. La position GPS sera capturée au lancement.'}
             </p>
           </div>
           <div>
@@ -1332,15 +1447,26 @@ export default function SessionsPage() {
             </div>
             
             {selectedSession?.statut === 'EN_COURS' && isDirecteur && !detailLoading && (
-              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-sm">
-                <Radio className="w-4 h-4 animate-pulse" />
-                Consultation en direct — actualisation auto
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-sm">
+                  <Radio className="w-4 h-4 animate-pulse" />
+                  Consultation en direct — actualisation auto
+                </span>
+                {!selectedOfflineDraftId && (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteSessionTarget(selectedSession)}
+                    className="btn-ghost flex items-center gap-2 text-rose-400 hover:bg-rose-500/10"
+                  >
+                    <Trash2 className="w-4 h-4" /> Supprimer
+                  </button>
+                )}
+              </div>
             )}
 
             {selectedSession?.statut === 'EN_COURS' && canEditTerrain && !detailLoading && (
               <div className="flex items-center gap-3">
-                {!selectedOfflineDraftId && (!selectedSession.latitudeDebut || !selectedSession.longitudeDebut) ? (
+                {!selectedOfflineDraftId && !selectedSession.manuelle && (!selectedSession.latitudeDebut || !selectedSession.longitudeDebut) ? (
                   <button onClick={markStartLocation} className="btn-ghost flex items-center gap-2 text-amber-400 hover:bg-amber-500/10">
                     <Navigation className="w-4 h-4" /> Capturer debut (manuel)
                   </button>
@@ -1351,6 +1477,16 @@ export default function SessionsPage() {
                 <button onClick={handleSaveContexte} className="btn-ghost flex items-center gap-2 text-amber-300 hover:bg-amber-500/10">
                   <Save className="w-4 h-4" /> Sauvegarder contexte
                 </button>
+                {!selectedOfflineDraftId && (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteSessionTarget(selectedSession)}
+                    className="btn-ghost flex items-center gap-2 text-rose-400 hover:bg-rose-500/10"
+                    title="Supprimer définitivement cette séance"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
                 <button onClick={handleCloturer} className="btn-danger">
                   <Lock className="w-4 h-4" /> Clôturer la session
                 </button>
@@ -1359,6 +1495,15 @@ export default function SessionsPage() {
             
             {selectedSession?.statut === 'CLOTUREE' && !detailLoading && (
               <div className="flex flex-wrap items-center gap-3">
+                {(canEditTerrain || isDirecteur) && !selectedOfflineDraftId && (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteSessionTarget(selectedSession)}
+                    className="btn-ghost flex items-center gap-2 text-rose-400 hover:bg-rose-500/10"
+                  >
+                    <Trash2 className="w-4 h-4" /> Supprimer
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => void downloadExecutionReport()}
@@ -1524,11 +1669,26 @@ export default function SessionsPage() {
       <ConfirmDialog
         open={confirmClotureId != null}
         title="Clôturer la session ?"
-        message="La localisation de fin sera capturée (obligatoire). La session sera définitivement clôturée."
+        message={
+          selectedSession?.manuelle
+            ? "Séance manuelle : aucune géolocalisation n'est nécessaire. La session sera définitivement clôturée."
+            : 'La localisation de fin sera capturée (obligatoire). La session sera définitivement clôturée.'
+        }
         confirmLabel="Clôturer"
         danger
         onConfirm={confirmCloturer}
         onCancel={() => setConfirmClotureId(null)}
+      />
+
+      <ConfirmDialog
+        open={deleteSessionTarget != null}
+        title="Supprimer cette séance ?"
+        message="Cette action est définitive : la séance et toutes les présences/notes associées seront supprimées. Pour confirmer, retapez le nom du module de cette séance."
+        confirmLabel="Supprimer définitivement"
+        danger
+        requireTypedConfirmation={deleteSessionTarget ? resolveModuleLabel(deleteSessionTarget) : ''}
+        onConfirm={confirmDeleteSession}
+        onCancel={() => setDeleteSessionTarget(null)}
       />
 
       <GeolocationRequiredModal
