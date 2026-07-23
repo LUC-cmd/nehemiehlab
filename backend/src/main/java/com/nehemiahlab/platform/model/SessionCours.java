@@ -67,6 +67,16 @@ public class SessionCours {
     @Column(columnDefinition = "TEXT")
     private String defisSession;
 
+    /** Séance saisie manuellement a posteriori (sans géolocalisation), plutôt que démarrée en direct. */
+    @Builder.Default
+    private boolean manuelle = false;
+
+    /** Date/heure de la dernière modification (horaires, contexte...) après la création. */
+    private LocalDateTime modifieLe;
+
+    /** Nom de la personne ayant fait la dernière modification, pour affichage direct sans jointure. */
+    private String modifieParNom;
+
     @Transient
     private Long nbPresents;
 

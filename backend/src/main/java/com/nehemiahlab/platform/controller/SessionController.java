@@ -132,16 +132,32 @@ public class SessionController {
                     "message", "Veuillez sélectionner le module enseigné."));
         }
 
+        boolean manuelle = request.isManuelle();
+        LocalDateTime heureDebut = request.getHeureDebut() != null ? request.getHeureDebut() : LocalDateTime.now();
+        if (manuelle) {
+            // Saisie a posteriori d'une séance déjà terminée : pas de géolocalisation
+            // exigée, mais une heure de début précise et non future est obligatoire.
+            if (request.getHeureDebut() == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", "Indiquez la date et l'heure de début de la séance."));
+            }
+            if (heureDebut.isAfter(LocalDateTime.now().plusMinutes(2))) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", "La séance saisie manuellement ne peut pas commencer dans le futur."));
+            }
+        }
+
         SessionCours session = SessionCours.builder()
                 .titre(InputSanitizer.clean(request.getTitre()))
                 .dureePrevueMinutes(request.getDureePrevueMinutes())
-                .heureDebut(request.getHeureDebut() != null ? request.getHeureDebut() : LocalDateTime.now())
+                .heureDebut(heureDebut)
                 .statut("EN_COURS")
                 .centre(centre)
                 .formateur(user)
-                .latitudeDebut(request.getLatitudeDebut())
-                .longitudeDebut(request.getLongitudeDebut())
-                .precisionDebutMetres(request.getPrecisionDebutMetres())
+                .manuelle(manuelle)
+                .latitudeDebut(manuelle ? null : request.getLatitudeDebut())
+                .longitudeDebut(manuelle ? null : request.getLongitudeDebut())
+                .precisionDebutMetres(manuelle ? null : request.getPrecisionDebutMetres())
                 .moduleFait(moduleLabel)
                 .moduleCoursId(moduleCoursId)
                 .etatEquipements(InputSanitizer.cleanNullable(request.getEtatEquipements()))
@@ -472,6 +488,7 @@ public class SessionController {
         }
         session.setEtatEquipements(InputSanitizer.cleanNullable(request.getEtatEquipements()));
         session.setDefisSession(InputSanitizer.cleanNullable(request.getDefisSession()));
+        stampModification(session, user);
         sessionCoursRepository.save(session);
         return ResponseEntity.ok(session);
     }
@@ -514,8 +531,33 @@ public class SessionController {
             long minutes = Math.max(0, Duration.between(session.getHeureDebut(), session.getHeureFin()).toMinutes());
             session.setDureeReelleMinutes(minutes);
         }
+        stampModification(session, user);
         sessionCoursRepository.save(session);
         return ResponseEntity.ok(session);
+    }
+
+    /** Trace qui a modifié une séance existante et quand, pour affichage direct côté formateur/directeur. */
+    private static void stampModification(SessionCours session, User user) {
+        session.setModifieLe(LocalDateTime.now());
+        String prenom = user.getPrenom() != null ? user.getPrenom() : "";
+        String nom = user.getNom() != null ? user.getNom() : "";
+        String fullName = (prenom + " " + nom).trim();
+        session.setModifieParNom(fullName.isBlank() ? user.getEmail() : fullName);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR')")
+    public ResponseEntity<?> deleteSession(@PathVariable Long id, Authentication auth) {
+        User user = (User) auth.getPrincipal();
+        SessionCours session = sessionCoursRepository.findById(id).orElse(null);
+        if (session == null) return ResponseEntity.notFound().build();
+        if (!canModifySession(user, session) && user.getRole() != Role.DIRECTEUR) {
+            return ResponseEntity.status(403).body(Map.of("message", "Action non autorisée."));
+        }
+        List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(id);
+        evaluationSessionRepository.deleteAll(evals);
+        sessionCoursRepository.delete(session);
+        return ResponseEntity.ok(Map.of("message", "Séance supprimée définitivement."));
     }
 
     private static LocalDateTime parseDateTime(Object raw) {

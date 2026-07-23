@@ -47,6 +47,11 @@ export default function SessionDetailHero({
                 {isLive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
                 {isLive ? 'En cours' : 'Clôturée'}
               </span>
+              {session.manuelle && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-violet-500/15 text-violet-300 border border-violet-500/30">
+                  Saisie manuelle
+                </span>
+              )}
               <span className="text-xs text-dark-500 flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" />
                 {new Date(session.heureDebut).toLocaleDateString('fr-FR', {
@@ -61,6 +66,15 @@ export default function SessionDetailHero({
               <Building2 className="w-4 h-4 shrink-0 text-primary-400" />
               {centreLabel(session.centre)}
             </p>
+            {session.modifieLe && (
+              <p className="text-[11px] text-dark-500">
+                Modifié le{' '}
+                {new Date(session.modifieLe).toLocaleString('fr-FR', {
+                  day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+                })}
+                {session.modifieParNom ? ` par ${session.modifieParNom}` : ''}
+              </p>
+            )}
           </div>
 
           <div className="flex gap-3 shrink-0">
