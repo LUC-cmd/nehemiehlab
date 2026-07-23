@@ -33,7 +33,7 @@ export default function SessionHorairesCard({ session, readOnly = false, onUpdat
     try {
       await sessionService.updateHoraires(session.id, {
         heureDebut: new Date(heureDebut).toISOString(),
-        ...(session.statut === 'CLOTUREE' || session.heureFin
+        ...(session.statut === 'CLOTUREE' || session.heureFin || session.manuelle
           ? { heureFin: new Date(heureFin).toISOString() }
           : {}),
       });
@@ -72,11 +72,16 @@ export default function SessionHorairesCard({ session, readOnly = false, onUpdat
               type="datetime-local"
               className="input-field"
               value={heureFin}
-              disabled={!isClosed && !session.heureFin}
+              disabled={!isClosed && !session.heureFin && !session.manuelle}
               onChange={(e) => setHeureFin(e.target.value)}
             />
-            {!isClosed && (
+            {!isClosed && !session.manuelle && (
               <p className="text-[11px] text-dark-500 mt-1">Renseignée automatiquement à la clôture.</p>
+            )}
+            {!isClosed && session.manuelle && (
+              <p className="text-[11px] text-dark-500 mt-1">
+                Séance manuelle : vous pouvez indiquer l'heure de fin précise dès maintenant.
+              </p>
             )}
           </div>
           <div className="sm:col-span-2">
