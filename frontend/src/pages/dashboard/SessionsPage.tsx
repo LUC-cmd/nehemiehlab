@@ -42,6 +42,24 @@ function formatElapsed(totalMinutes: number) {
   return `${h} h ${min.toString().padStart(2, '0')}`;
 }
 
+/**
+ * Message d'erreur pour un échec d'appel serveur (démarrer/clôturer/enregistrer...).
+ * A ne PAS utiliser pour les erreurs de géolocalisation (celles-ci ont leur propre
+ * modale dédiée) : ceci sert uniquement pour les erreurs venant de l'API, afin de
+ * ne plus afficher par erreur « Localisation obligatoire » quand le vrai problème
+ * est par exemple une session expirée (401) ou une erreur serveur.
+ */
+function describeApiError(err: unknown, fallback: string): string {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  if (status === 401) {
+    return 'Votre session a expiré. Reconnectez-vous puis réessayez.';
+  }
+  const serverMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+  if (serverMessage) return serverMessage;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
 export default function SessionsPage() {
   const { hasRole } = useAuth();
   const { hasFeature } = useAccess();
@@ -108,7 +126,7 @@ export default function SessionsPage() {
     phase: 'debut' | 'fin';
     message?: string;
     retrying?: boolean;
-    onSuccess?: (geo: { latitude: number; longitude: number; precisionMetres?: number }) => void;
+    onSuccess?: (geo: { latitude: number; longitude: number; precisionMetres?: number }) => void | Promise<void>;
   }>({ open: false, phase: 'debut' });
 
   const captureSessionGeo = async (
@@ -128,17 +146,28 @@ export default function SessionsPage() {
 
   const handleGeoRetry = async () => {
     if (!geoModal.onSuccess) return;
+    const onSuccess = geoModal.onSuccess;
     setGeoModal((prev) => ({ ...prev, retrying: true, message: undefined }));
+    let geo: { latitude: number; longitude: number; precisionMetres?: number };
     try {
-      const geo = await captureSessionGeo(geoModal.phase, geoModal.phase === 'debut');
-      geoModal.onSuccess(geo);
-      setGeoModal({ open: false, phase: 'debut' });
+      geo = await captureSessionGeo(geoModal.phase, geoModal.phase === 'debut');
     } catch (err) {
       setGeoModal((prev) => ({
         ...prev,
         retrying: false,
         message: err instanceof Error ? err.message : 'Localisation refusée.',
       }));
+      return;
+    }
+    // La position est obtenue : on ferme la modale de géolocalisation et on
+    // relance l'action d'origine. Si celle-ci échoue à son tour (ex: session
+    // expirée, erreur serveur), ce n'est plus un problème de localisation —
+    // on l'affiche via un toast plutôt que de rouvrir cette modale.
+    setGeoModal({ open: false, phase: 'debut' });
+    try {
+      await onSuccess(geo);
+    } catch (err) {
+      toast.error(describeApiError(err, 'Erreur lors de l’enregistrement.'));
     }
   };
 
@@ -381,27 +410,35 @@ export default function SessionsPage() {
       fetchInitialData();
     };
 
-    try {
-      if (newSession.manuelle) {
-        // Séance déjà terminée saisie a posteriori : aucune géolocalisation à demander.
-        await runCreate(null);
-      } else {
-        const geo = await captureSessionGeo('debut', true);
-        await runCreate(geo);
-      }
-    } catch (err) {
-      if (newSession.manuelle) {
-        toast.error(
-          (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-            || (err instanceof Error ? err.message : 'Erreur lors de la création de la séance.'),
-        );
-      } else {
+    let geo: { latitude: number; longitude: number; precisionMetres?: number } | null = null;
+    if (!newSession.manuelle) {
+      try {
+        geo = await captureSessionGeo('debut', true);
+      } catch (geoErr) {
         promptGeoRequired(
           'debut',
-          err instanceof Error ? err.message : 'Localisation obligatoire pour démarrer.',
-          (geo) => { setCreatingSession(true); void runCreate(geo).finally(() => setCreatingSession(false)); },
+          geoErr instanceof Error ? geoErr.message : 'Localisation obligatoire pour démarrer.',
+          async (g) => {
+            setCreatingSession(true);
+            try {
+              await runCreate(g);
+            } finally {
+              setCreatingSession(false);
+            }
+          },
         );
+        setCreatingSession(false);
+        return;
       }
+    }
+
+    try {
+      await runCreate(geo);
+    } catch (err) {
+      // La géolocalisation (si demandée) a déjà été obtenue à ce stade : une erreur
+      // ici vient de l'API (session expirée, erreur serveur...), pas d'un problème
+      // de localisation — on ne doit donc plus afficher la modale de géolocalisation.
+      toast.error(describeApiError(err, 'Erreur lors de la création de la séance.'));
     } finally {
       setCreatingSession(false);
     }
@@ -642,31 +679,33 @@ export default function SessionsPage() {
         fetchInitialData();
       };
 
+      let geoFin: { latitude: number; longitude: number; precisionMetres?: number } | null = null;
       if (!selectedOfflineDraftId && selectedSession.manuelle) {
         // Séance saisie manuellement (a posteriori) : pas de géolocalisation à
         // capturer, la localisation n'aurait aucun sens pour une séance déjà
         // terminée. L'heure de fin précise se règle via « Horaires ».
-        await finishClose(null);
       } else {
         try {
-          const geoFin = await captureSessionGeo('fin');
-          await finishClose(geoFin);
-        } catch (err) {
+          geoFin = await captureSessionGeo('fin');
+        } catch (geoErr) {
           // On bascule vers la modale de géolocalisation : celle-ci a son propre
           // bouton "Réessayer" déjà protégé contre le double-clic.
           setConfirmClotureId(null);
           promptGeoRequired(
             'fin',
-            err instanceof Error ? err.message : 'Localisation obligatoire pour clôturer.',
-            (geo) => { void finishClose(geo); },
+            geoErr instanceof Error ? geoErr.message : 'Localisation obligatoire pour clôturer.',
+            (geo) => finishClose(geo),
           );
+          return;
         }
       }
+      // La géolocalisation (si demandée) a déjà été obtenue à ce stade : une erreur
+      // de finishClose vient forcément de l'API (session expirée, erreur serveur...),
+      // pas d'un problème de localisation.
+      await finishClose(geoFin);
     } catch (err: unknown) {
       setConfirmClotureId(null);
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        || 'Erreur lors de la clôture.';
-      toast.error(msg);
+      toast.error(describeApiError(err, 'Erreur lors de la clôture.'));
     }
   };
 
@@ -687,23 +726,29 @@ export default function SessionsPage() {
 
   const markStartLocation = async () => {
     if (!selectedSession || selectedOfflineDraftId) return;
-    try {
-      const geo = await captureSessionGeo('debut');
+    const applyLocaliserDebut = async (geo: { latitude: number; longitude: number; precisionMetres?: number }) => {
       await sessionService.localiserDebut(selectedSession.id, geo);
       toast.success('Début géolocalisé avec succès.');
       openSessionDetail(selectedSession);
       fetchInitialData();
-    } catch (err) {
+    };
+    let geo: { latitude: number; longitude: number; precisionMetres?: number };
+    try {
+      geo = await captureSessionGeo('debut');
+    } catch (geoErr) {
       promptGeoRequired(
         'debut',
-        err instanceof Error ? err.message : 'Localisation obligatoire.',
-        async (geo) => {
-          await sessionService.localiserDebut(selectedSession.id, geo);
-          toast.success('Début géolocalisé avec succès.');
-          openSessionDetail(selectedSession);
-          fetchInitialData();
-        },
+        geoErr instanceof Error ? geoErr.message : 'Localisation obligatoire.',
+        (g) => applyLocaliserDebut(g),
       );
+      return;
+    }
+    try {
+      await applyLocaliserDebut(geo);
+    } catch (err) {
+      // La position a déjà été obtenue : une erreur ici vient de l'API, pas
+      // d'un problème de localisation.
+      toast.error(describeApiError(err, 'Erreur lors de l’enregistrement de la localisation.'));
     }
   };
 
