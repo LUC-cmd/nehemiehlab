@@ -27,6 +27,43 @@ const api = axios.create({
 
 const OFFLINE_QUEUE_KEY = 'nehemiah_offline_queue';
 
+// Rafraîchissement du token : un seul appel /auth/refresh en vol à la fois.
+// Sans ce partage, plusieurs requêtes qui échouent en 401 en même temps
+// (fréquent juste après la connexion, quand le tableau de bord charge
+// plusieurs sections en parallèle) déclenchaient chacune leur propre appel
+// de rafraîchissement avec le MÊME refresh token. Comme le refresh token est
+// à usage unique côté serveur, un seul de ces appels réussissait — les autres
+// recevaient un « jeton invalide » et déconnectaient l'utilisateur quelques
+// secondes après une connexion pourtant réussie, même sur un compte valide.
+let refreshInFlight: Promise<{ token: string; refreshToken: string }> | null = null;
+
+function refreshAccessToken(): Promise<{ token: string; refreshToken: string }> {
+  if (refreshInFlight) return refreshInFlight;
+
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    return Promise.reject(new Error('NO_REFRESH_TOKEN'));
+  }
+
+  refreshInFlight = axios
+    .post(`${API_BASE}/auth/refresh`, { refreshToken })
+    .then(({ data }) => {
+      persistAuthSession(data.token, data.refreshToken || getRefreshToken() || '', getAuthUserRaw() || '');
+      return { token: data.token as string, refreshToken: data.refreshToken as string };
+    });
+
+  // Une fois l'appel terminé (succès ou échec), on libère le verrou pour la
+  // prochaine expiration de token — sans laisser de rejet non géré ici, il
+  // est déjà propagé aux appelants via la promesse retournée ci-dessus.
+  refreshInFlight
+    .catch(() => {})
+    .finally(() => {
+      refreshInFlight = null;
+    });
+
+  return refreshInFlight;
+}
+
 export const syncOfflineQueue = async () => {
   // Les mutations contiennent souvent des données d'enfants ou financières:
   // elles ne sont jamais conservées en clair dans localStorage.
@@ -114,26 +151,23 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Token expiré → tentative de refresh (hors appels auth publics)
+    // Token expiré → tentative de refresh (hors appels auth publics).
+    // refreshAccessToken() mutualise les rafraîchissements concurrents (voir
+    // plus haut) pour éviter qu'une rafale de requêtes en 401 ne déconnecte
+    // l'utilisateur à tort.
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      const refreshToken = getRefreshToken();
 
-      if (refreshToken) {
-        try {
-          const { data } = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken });
-          persistAuthSession(data.token, data.refreshToken || getRefreshToken() || '', getAuthUserRaw() || '');
-          originalRequest.headers = originalRequest.headers || {};
-          originalRequest.headers.Authorization = `Bearer ${data.token}`;
-          return api(originalRequest);
-        } catch {
-          clearAuthSession();
-          if (!window.location.pathname.startsWith('/connexion')) {
-            window.location.href = '/connexion';
-          }
+      try {
+        const { token } = await refreshAccessToken();
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers.Authorization = `Bearer ${token}`;
+        return api(originalRequest);
+      } catch {
+        clearAuthSession();
+        if (!window.location.pathname.startsWith('/connexion')) {
+          window.location.href = '/connexion';
         }
-      } else if (!window.location.pathname.startsWith('/connexion')) {
-        window.location.href = '/connexion';
       }
     }
 
