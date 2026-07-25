@@ -158,6 +158,21 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
+      // Le token courant dans le stockage local a peut-être déjà été
+      // renouvelé pendant que cette requête était en vol — par un autre
+      // onglet ouvert sur le même compte (localStorage est partagé entre
+      // onglets), ou par un rafraîchissement précédent dans cet onglet.
+      // Dans ce cas on relance directement avec le token à jour, sans
+      // rappeler /auth/refresh (qui échouerait de toute façon, le refresh
+      // token d'origine ayant déjà été consommé ailleurs).
+      const failedAuthHeader = String(originalRequest.headers?.Authorization || '');
+      const currentToken = getAuthToken();
+      if (currentToken && failedAuthHeader && failedAuthHeader !== `Bearer ${currentToken}`) {
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers.Authorization = `Bearer ${currentToken}`;
+        return api(originalRequest);
+      }
+
       try {
         const { token } = await refreshAccessToken();
         originalRequest.headers = originalRequest.headers || {};
