@@ -362,33 +362,43 @@ export default function DashboardLayout() {
           {SidebarContent()}
         </aside>
 
-        {/* Sidebar Mobile */}
-        <AnimatePresence>
-          {mobileSidebar && (
-            <>
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden"
-                onClick={() => setMobileSidebar(false)} />
-              <motion.aside
-                initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
-                transition={{ type: 'spring', damping: 25 }}
-                className="fixed left-0 top-0 bottom-0 w-[min(18rem,88vw)] border-r border-slate-200 z-50 lg:hidden flex flex-col bg-white pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 lg:hidden">
-                  <p className="text-sm font-semibold text-slate-800">Menu</p>
-                  <button
-                    type="button"
-                    onClick={() => setMobileSidebar(false)}
-                    className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 touch-target"
-                    aria-label="Fermer le menu"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-                {SidebarContent()}
-              </motion.aside>
-            </>
-          )}
-        </AnimatePresence>
+        {/* Sidebar Mobile — reste toujours montee dans le DOM (jamais demontee/remontee
+            par AnimatePresence) : on anime seulement l'opacite et la position, et on
+            coupe les clics avec pointer-events quand elle est fermee. Certains navigateurs
+            mobiles (WebKit/iOS) laissent parfois un residu visuel d'un element en
+            position fixed qui vient d'etre retire du DOM tant que la page n'est pas
+            repeinte (symptome observe : le panneau reste affiche apres avoir tape sur la
+            croix, et seul un rafraichissement manuel le fait disparaitre). Garder
+            l'element monté en permanence evite ce probleme de repaint. */}
+        <motion.div
+          initial={false}
+          animate={{ opacity: mobileSidebar ? 1 : 0 }}
+          transition={{ duration: 0.2 }}
+          className={`fixed inset-0 bg-slate-900/40 z-40 lg:hidden ${mobileSidebar ? '' : 'pointer-events-none'}`}
+          aria-hidden={!mobileSidebar}
+          onClick={() => setMobileSidebar(false)}
+        />
+        <motion.aside
+          initial={false}
+          animate={{ x: mobileSidebar ? 0 : '-100%' }}
+          transition={{ type: 'spring', damping: 25 }}
+          className={`fixed left-0 top-0 bottom-0 w-[min(18rem,88vw)] border-r border-slate-200 z-50 lg:hidden flex flex-col bg-white pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] ${mobileSidebar ? '' : 'pointer-events-none'}`}
+          aria-hidden={!mobileSidebar}
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 lg:hidden">
+            <p className="text-sm font-semibold text-slate-800">Menu</p>
+            <button
+              type="button"
+              onClick={() => setMobileSidebar(false)}
+              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 touch-target"
+              aria-label="Fermer le menu"
+              tabIndex={mobileSidebar ? 0 : -1}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          {SidebarContent()}
+        </motion.aside>
 
         {/* Zone principale */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
