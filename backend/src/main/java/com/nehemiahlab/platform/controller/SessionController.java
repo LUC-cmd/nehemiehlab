@@ -208,7 +208,19 @@ public class SessionController {
                 }
             }
             LocalDateTime fin = parseDateTime(body != null ? body.get("heureFin") : null);
-            if (fin == null) fin = LocalDateTime.now();
+            if (fin == null) {
+                // Une seance manuelle (saisie a posteriori, ex: hier) n'a pas de
+                // sens a cloturer "maintenant" : ca fausserait completement la
+                // duree ainsi que les heures cumulees du formateur et des enfants,
+                // calculees entre le debut (potentiellement il y a plusieurs
+                // jours) et l'heure de fin retenue. Le client doit fournir une
+                // heure de fin explicite pour ce cas (bloc "Horaires").
+                if (session.isManuelle()) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                            "message", "Indiquez l'heure de fin de la séance avant de clôturer une saisie manuelle."));
+                }
+                fin = LocalDateTime.now();
+            }
             if (session.getHeureDebut() != null && fin.isBefore(session.getHeureDebut())) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "message", "L'heure de fin doit être postérieure à l'heure de début."
