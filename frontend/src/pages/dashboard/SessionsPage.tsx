@@ -284,7 +284,12 @@ export default function SessionsPage() {
               precisionMetres: draft.precisionFinMetres,
             });
           }
-          await sessionService.cloturer(realSession.id);
+          // La séance a été clôturée hors ligne à draft.heureFin (l'instant réel
+          // où le formateur a tapé sur "Clôturer"), qui peut être bien avant la
+          // synchronisation (ex: reconnexion le lendemain). Sans transmettre
+          // cette heure, le serveur clôturerait avec l'heure de synchronisation,
+          // ce qui fausserait la durée et les heures cumulées.
+          await sessionService.cloturer(realSession.id, { heureFin: draft.heureFin });
         }
         removeOfflineSessionDraft(draft.localId);
         syncedCount += 1;
@@ -670,7 +675,15 @@ export default function SessionsPage() {
         if (geoFin) {
           await sessionService.localiserFin(selectedSession.id, geoFin);
         }
-        await sessionService.cloturer(selectedSession.id);
+        // Pour une séance manuelle (saisie a posteriori), on doit transmettre
+        // l'heure de fin déjà enregistrée via le bloc « Horaires » : sans ça, le
+        // serveur clôturerait avec l'heure actuelle, ce qui fausserait
+        // complètement la durée et les heures cumulées (calculées entre le
+        // début — potentiellement il y a plusieurs jours — et « maintenant »).
+        await sessionService.cloturer(
+          selectedSession.id,
+          selectedSession.manuelle ? { heureFin: selectedSession.heureFin } : undefined,
+        );
         toast.success(
           geoFin ? 'Session clôturée avec localisation de fin.' : 'Séance manuelle clôturée.',
         );
@@ -684,6 +697,19 @@ export default function SessionsPage() {
         // Séance saisie manuellement (a posteriori) : pas de géolocalisation à
         // capturer, la localisation n'aurait aucun sens pour une séance déjà
         // terminée. L'heure de fin précise se règle via « Horaires ».
+        //
+        // Sans heure de fin déjà enregistrée, le serveur clôturerait avec
+        // l'heure actuelle, faussant la durée et les heures cumulées de la
+        // séance (ex: séance d'hier clôturée aujourd'hui → des jours de durée
+        // comptabilisés). On bloque donc la clôture tant qu'elle n'a pas été
+        // renseignée via le bloc « Horaires & localisation ».
+        if (!selectedSession.heureFin) {
+          setConfirmClotureId(null);
+          toast.error(
+            "Indiquez l'heure de fin de la séance (bloc « Horaires & localisation ») avant de clôturer une saisie manuelle.",
+          );
+          return;
+        }
       } else {
         try {
           geoFin = await captureSessionGeo('fin');
