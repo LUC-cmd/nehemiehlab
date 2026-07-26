@@ -7,7 +7,7 @@ import { centreService, dashboardService, formationService, sessionService } fro
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { Centre, ModuleFormation, SessionCours } from '../../types';
 import { formatFullName } from '../../utils/displayName';
-import { fetchWithOfflineCache } from '../../utils/offlineCache';
+import { fetchWithOfflineCache, describeDataLoadIssue } from '../../utils/offlineCache';
 import EnfantsProfilesShowcase from '../../components/dashboard/EnfantsProfilesShowcase';
 import CentreElevesPanel from '../../components/dashboard/CentreElevesPanel';
 import LocalisationDashboardSection from '../../components/dashboard/LocalisationDashboardSection';
@@ -17,7 +17,7 @@ const chartTooltipStyle = { background: '#18152c', border: '1px solid #282343', 
 export default function FormateurDashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<Record<string, number>>({});
-  const [usingOfflineCache, setUsingOfflineCache] = useState(false);
+  const [dataLoadIssue, setDataLoadIssue] = useState<{ offline: boolean; message: string } | null>(null);
   const [recentFormations, setRecentFormations] = useState<ModuleFormation[]>([]);
   const [openSessions, setOpenSessions] = useState<SessionCours[]>([]);
   const [mesCentres, setMesCentres] = useState<Centre[]>([]);
@@ -37,15 +37,13 @@ export default function FormateurDashboard() {
         const userId = user?.id;
         const filtered = sessionsResult.data.filter((s) => s.formateur?.id === userId && s.statut === 'EN_COURS');
         setOpenSessions(filtered.slice(0, 5));
-        setUsingOfflineCache(
-          statsResult.fromCache ||
-            formationsResult.fromCache ||
-            sessionsResult.fromCache ||
-            centresResult.fromCache ||
-            !navigator.onLine,
-        );
+        setDataLoadIssue(describeDataLoadIssue([statsResult, formationsResult, sessionsResult, centresResult]));
       } catch {
-        setUsingOfflineCache(!navigator.onLine);
+        setDataLoadIssue(
+          navigator.onLine
+            ? { offline: false, message: "Erreur de chargement : affichage des dernières données enregistrées. Réessayez." }
+            : { offline: true, message: 'Mode hors ligne : affichage des dernières données enregistrées.' },
+        );
       }
     };
     load();
@@ -93,8 +91,8 @@ export default function FormateurDashboard() {
       <div>
         <h1 className="text-2xl font-bold text-white">Bienvenue, {formatFullName(user?.prenom, user?.nom) || user?.prenom}</h1>
         <p className="text-dark-400 mt-1">Voici un résumé de votre activité de formation.</p>
-        {usingOfflineCache && (
-          <p className="text-xs text-amber-400 mt-2">Mode hors ligne: affichage des dernières données enregistrées.</p>
+        {dataLoadIssue && (
+          <p className={`text-xs mt-2 ${dataLoadIssue.offline ? 'text-amber-400' : 'text-rose-400'}`}>{dataLoadIssue.message}</p>
         )}
       </div>
 

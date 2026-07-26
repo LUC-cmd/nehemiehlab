@@ -5,7 +5,7 @@ import { Users, AlertTriangle, BookOpen, TrendingUp, ArrowUpRight, Clock, Buildi
 import { useAuth } from '../../context/AuthContext';
 import { centreService, dashboardService, formationService, signalementService } from '../../services/api';
 import type { Centre, ModuleFormation, Signalement } from '../../types';
-import { fetchWithOfflineCache } from '../../utils/offlineCache';
+import { fetchWithOfflineCache, describeDataLoadIssue } from '../../utils/offlineCache';
 import EnfantsProfilesShowcase from '../../components/dashboard/EnfantsProfilesShowcase';
 import LocalisationDashboardSection from '../../components/dashboard/LocalisationDashboardSection';
 
@@ -15,16 +15,18 @@ export default function ResponsableClusterDashboard() {
   const [recentSignalements, setRecentSignalements] = useState<Signalement[]>([]);
   const [recentFormations, setRecentFormations] = useState<ModuleFormation[]>([]);
   const [mesCentres, setMesCentres] = useState<Centre[]>([]);
-  const [usingOfflineCache, setUsingOfflineCache] = useState(false);
+  const [dataLoadIssue, setDataLoadIssue] = useState<{ offline: boolean; message: string } | null>(null);
 
   useEffect(() => {
     const load = async () => {
+      const loadResults: Array<{ fromCache: boolean; error?: unknown }> = [];
       try {
         const [statsResult, sigResult, centresResult] = await Promise.all([
           fetchWithOfflineCache('resp:stats', async () => (await dashboardService.getStats()).data),
           fetchWithOfflineCache('resp:signalements', async () => (await signalementService.getAll()).data as Signalement[]),
           fetchWithOfflineCache('resp:centres', async () => (await centreService.getMesCentres()).data),
         ]);
+        loadResults.push(statsResult, sigResult, centresResult);
         setStats(statsResult.data);
         setMesCentres(centresResult.data || []);
         setRecentSignalements(sigResult.data.filter((s) => s.statut === 'EN_ATTENTE').slice(0, 5));
@@ -35,14 +37,17 @@ export default function ResponsableClusterDashboard() {
             `resp:formations:${centre.id}`,
             async () => (await formationService.getByCentre(centre.id)).data as ModuleFormation[],
           );
+          loadResults.push(f);
           formations.push(...f.data);
         }
         setRecentFormations(formations.slice(0, 5));
-        setUsingOfflineCache(
-          statsResult.fromCache || sigResult.fromCache || centresResult.fromCache || !navigator.onLine,
-        );
+        setDataLoadIssue(describeDataLoadIssue(loadResults));
       } catch {
-        setUsingOfflineCache(!navigator.onLine);
+        setDataLoadIssue(
+          navigator.onLine
+            ? { offline: false, message: "Erreur de chargement : affichage des dernières données enregistrées. Réessayez." }
+            : { offline: true, message: 'Mode hors ligne : affichage des dernières données enregistrées.' },
+        );
       }
     };
     load();
@@ -69,8 +74,8 @@ export default function ResponsableClusterDashboard() {
         <p className="text-dark-400 mt-1">
           Suivi du cluster {user?.assignedCluster ? `« ${user.assignedCluster} »` : ''} — {mesCentres.length} centre(s).
         </p>
-        {usingOfflineCache && (
-          <p className="text-xs text-amber-400 mt-2">Mode hors ligne: affichage des dernières données enregistrées.</p>
+        {dataLoadIssue && (
+          <p className={`text-xs mt-2 ${dataLoadIssue.offline ? 'text-amber-400' : 'text-rose-400'}`}>{dataLoadIssue.message}</p>
         )}
       </div>
 
