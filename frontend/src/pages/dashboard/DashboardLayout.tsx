@@ -268,6 +268,20 @@ export default function DashboardLayout() {
     setMobileSidebar(false);
   }, [location.pathname]);
 
+  // Utilisee a la fois en onClick (souris / lecteurs d'ecran) et en onPointerUp
+  // (doigt) pour la croix de fermeture et le fond assombri : onPointerUp se
+  // declenche des le relachement du doigt, sans attendre le "click" synthetique
+  // que certains navigateurs mobiles retardent ou desynchronisent de quelques
+  // centaines de ms par rapport a l'etat reellement affiche a l'ecran (c'est ce
+  // decalage qui pouvait faire atterrir le tap sur un element de la page situe
+  // en dessous plutot que sur le bouton). Appeler setMobileSidebar(false) deux
+  // fois pour un seul tap (onPointerUp puis onClick) est sans effet de bord.
+  const closeMobileSidebar = useCallback((e: React.SyntheticEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMobileSidebar(false);
+  }, []);
+
   // Si l'écran repasse en largeur desktop (rotation, redimensionnement),
   // on referme le panneau mobile pour qu'il ne reste pas figé à l'écran.
   useEffect(() => {
@@ -354,7 +368,7 @@ export default function DashboardLayout() {
 
   return (
     <>
-      <div className="dashboard-page flex h-screen h-[100dvh] overflow-hidden bg-transparent">
+      <div className="dashboard-page flex h-[100dvh] overflow-hidden bg-transparent">
         {/* Sidebar Desktop */}
         <aside className={`hidden lg:flex flex-col border-r border-slate-200 transition-all duration-300 bg-white ${
           sidebarOpen ? 'w-64' : 'w-20'
@@ -374,14 +388,17 @@ export default function DashboardLayout() {
           initial={false}
           animate={{ opacity: mobileSidebar ? 1 : 0 }}
           transition={{ duration: 0.2 }}
+          style={{ pointerEvents: mobileSidebar ? 'auto' : 'none', touchAction: 'manipulation' }}
           className={`fixed inset-0 bg-slate-900/40 z-40 lg:hidden ${mobileSidebar ? '' : 'pointer-events-none'}`}
           aria-hidden={!mobileSidebar}
-          onClick={() => setMobileSidebar(false)}
+          onClick={closeMobileSidebar}
+          onPointerUp={closeMobileSidebar}
         />
         <motion.aside
           initial={false}
           animate={{ x: mobileSidebar ? 0 : '-100%' }}
-          transition={{ type: 'spring', damping: 25 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
+          style={{ pointerEvents: mobileSidebar ? 'auto' : 'none' }}
           className={`fixed left-0 top-0 bottom-0 w-[min(18rem,88vw)] border-r border-slate-200 z-50 lg:hidden flex flex-col bg-white pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] ${mobileSidebar ? '' : 'pointer-events-none'}`}
           aria-hidden={!mobileSidebar}
         >
@@ -389,8 +406,10 @@ export default function DashboardLayout() {
             <p className="text-sm font-semibold text-slate-800">Menu</p>
             <button
               type="button"
-              onClick={() => setMobileSidebar(false)}
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 touch-target"
+              onClick={closeMobileSidebar}
+              onPointerUp={closeMobileSidebar}
+              style={{ touchAction: 'manipulation' }}
+              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 touch-target relative z-10"
               aria-label="Fermer le menu"
               tabIndex={mobileSidebar ? 0 : -1}
             >
