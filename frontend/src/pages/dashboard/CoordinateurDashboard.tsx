@@ -5,7 +5,7 @@ import { Users, AlertTriangle, BookOpen, TrendingUp, ArrowUpRight, Clock } from 
 import { useAuth } from '../../context/AuthContext';
 import { centreService, dashboardService, formationService, signalementService } from '../../services/api';
 import type { Centre, ModuleFormation, Signalement } from '../../types';
-import { fetchWithOfflineCache } from '../../utils/offlineCache';
+import { fetchWithOfflineCache, describeDataLoadIssue } from '../../utils/offlineCache';
 import EnfantsProfilesShowcase from '../../components/dashboard/EnfantsProfilesShowcase';
 import CentreElevesPanel from '../../components/dashboard/CentreElevesPanel';
 import LocalisationDashboardSection from '../../components/dashboard/LocalisationDashboardSection';
@@ -16,7 +16,7 @@ export default function CoordinateurDashboard() {
   const [recentSignalements, setRecentSignalements] = useState<Signalement[]>([]);
   const [recentFormations, setRecentFormations] = useState<ModuleFormation[]>([]);
   const [mesCentres, setMesCentres] = useState<Centre[]>([]);
-  const [usingOfflineCache, setUsingOfflineCache] = useState(false);
+  const [dataLoadIssue, setDataLoadIssue] = useState<{ offline: boolean; message: string } | null>(null);
 
   const monCentre = role === 'COORDINATEUR' ? mesCentres.slice(0, 1) : mesCentres;
 
@@ -36,13 +36,17 @@ export default function CoordinateurDashboard() {
         if (firstCentre?.id) {
           const f = await fetchWithOfflineCache(`coord:formations:${firstCentre.id}`, async () => (await formationService.getByCentre(firstCentre.id)).data as ModuleFormation[]);
           setRecentFormations(f.data.slice(0, 5));
-          setUsingOfflineCache(statsResult.fromCache || sigResult.fromCache || centresResult.fromCache || f.fromCache || !navigator.onLine);
+          setDataLoadIssue(describeDataLoadIssue([statsResult, sigResult, centresResult, f]));
         } else {
           setRecentFormations([]);
-          setUsingOfflineCache(statsResult.fromCache || sigResult.fromCache || centresResult.fromCache || !navigator.onLine);
+          setDataLoadIssue(describeDataLoadIssue([statsResult, sigResult, centresResult]));
         }
       } catch {
-        setUsingOfflineCache(!navigator.onLine);
+        setDataLoadIssue(
+          navigator.onLine
+            ? { offline: false, message: "Erreur de chargement : affichage des dernières données enregistrées. Réessayez." }
+            : { offline: true, message: 'Mode hors ligne : affichage des dernières données enregistrées.' },
+        );
       }
     };
     load();
@@ -71,8 +75,8 @@ export default function CoordinateurDashboard() {
             ? <>Suivi de votre centre : <span className="text-white font-medium">{monCentre[0].nom}</span></>
             : 'Suivi de votre centre de formation.'}
         </p>
-        {usingOfflineCache && (
-          <p className="text-xs text-amber-400 mt-2">Mode hors ligne: affichage des dernières données enregistrées.</p>
+        {dataLoadIssue && (
+          <p className={`text-xs mt-2 ${dataLoadIssue.offline ? 'text-amber-400' : 'text-rose-400'}`}>{dataLoadIssue.message}</p>
         )}
       </div>
 

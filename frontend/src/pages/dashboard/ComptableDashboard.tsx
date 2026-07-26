@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { banqueService, dashboardService, transactionService } from '../../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { Banque, Transaction } from '../../types';
-import { fetchWithOfflineCache } from '../../utils/offlineCache';
+import { fetchWithOfflineCache, describeDataLoadIssue } from '../../utils/offlineCache';
 import toast from 'react-hot-toast';
 
 const chartTooltipStyle = { background: '#18152c', border: '1px solid #282343', borderRadius: '12px', color: '#fff' };
@@ -15,7 +15,7 @@ export default function ComptableDashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<Record<string, number>>({});
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
-  const [usingOfflineCache, setUsingOfflineCache] = useState(false);
+  const [dataLoadIssue, setDataLoadIssue] = useState<{ offline: boolean; message: string } | null>(null);
   const [banques, setBanques] = useState<Banque[]>([]);
   const [newBanque, setNewBanque] = useState('');
   const [banqueLoading, setBanqueLoading] = useState(false);
@@ -64,9 +64,13 @@ export default function ComptableDashboard() {
         ]);
         setStats(statsResult.data);
         setPendingTransactions(txResult.data.slice(0, 6));
-        setUsingOfflineCache(statsResult.fromCache || txResult.fromCache || !navigator.onLine);
+        setDataLoadIssue(describeDataLoadIssue([statsResult, txResult]));
       } catch {
-        setUsingOfflineCache(!navigator.onLine);
+        setDataLoadIssue(
+          navigator.onLine
+            ? { offline: false, message: "Erreur de chargement : affichage des dernières données enregistrées. Réessayez." }
+            : { offline: true, message: 'Mode hors ligne : affichage des dernières données enregistrées.' },
+        );
       }
     };
     load();
@@ -146,8 +150,8 @@ export default function ComptableDashboard() {
       <div>
         <h1 className="text-2xl font-bold text-white">Bonjour, {user?.prenom}</h1>
         <p className="text-dark-400 mt-1">Tableau de bord de la comptabilité Nehemiah Lab.</p>
-        {usingOfflineCache && (
-          <p className="text-xs text-amber-400 mt-2">Mode hors ligne: affichage des dernières données enregistrées.</p>
+        {dataLoadIssue && (
+          <p className={`text-xs mt-2 ${dataLoadIssue.offline ? 'text-amber-400' : 'text-rose-400'}`}>{dataLoadIssue.message}</p>
         )}
       </div>
 

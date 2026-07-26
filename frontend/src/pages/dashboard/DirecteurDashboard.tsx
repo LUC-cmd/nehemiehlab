@@ -10,7 +10,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import type { DashboardStats, Centre, Signalement, Transaction } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { formatFullName } from '../../utils/displayName';
-import { fetchWithOfflineCache } from '../../utils/offlineCache';
+import { fetchWithOfflineCache, describeDataLoadIssue } from '../../utils/offlineCache';
 import EnfantsProfilesShowcase from '../../components/dashboard/EnfantsProfilesShowcase';
 import CentreElevesPanel from '../../components/dashboard/CentreElevesPanel';
 import LocalisationDashboardSection from '../../components/dashboard/LocalisationDashboardSection';
@@ -19,7 +19,7 @@ const chartTooltipStyle = { background: '#18152c', border: '1px solid #282343', 
 
 export default function DirecteurDashboard() {
   const { user } = useAuth();
-  const [usingOfflineCache, setUsingOfflineCache] = useState(false);
+  const [dataLoadIssue, setDataLoadIssue] = useState<{ offline: boolean; message: string } | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalCentres: 0, totalFormateurs: 0, totalEleves: 0,
     totalHeuresFormation: 0, transactionsEnAttente: 0,
@@ -32,7 +32,7 @@ export default function DirecteurDashboard() {
 
   useEffect(() => {
     const load = async () => {
-      let cached = false;
+      const loadResults: Array<{ fromCache: boolean; error?: unknown }> = [];
       try {
         const [statsResult, centresResult, sigResult, txResult] = await Promise.all([
           fetchWithOfflineCache('dir:stats', async () => (await dashboardService.getStats()).data),
@@ -40,7 +40,7 @@ export default function DirecteurDashboard() {
           fetchWithOfflineCache('dir:signalements:pending', async () => (await signalementService.getAll()).data as Signalement[]),
           fetchWithOfflineCache('dir:transactions:pending', async () => (await transactionService.getAll({ statut: 'EN_ATTENTE' })).data as Transaction[]),
         ]);
-        cached = statsResult.fromCache || centresResult.fromCache || sigResult.fromCache || txResult.fromCache;
+        loadResults.push(statsResult, centresResult, sigResult, txResult);
         setStats(statsResult.data);
         setCentres(centresResult.data || []);
         setPendingSignalements(sigResult.data.filter((s) => s.statut === 'EN_ATTENTE').slice(0, 5));
@@ -50,7 +50,7 @@ export default function DirecteurDashboard() {
           centresResult.data.map(async (c: Centre) => {
             try {
               const byCentre = await fetchWithOfflineCache(`dir:eleves:centre:${c.id}`, async () => (await eleveService.getByCentre(c.id)).data);
-              if (byCentre.fromCache) cached = true;
+              loadResults.push(byCentre);
               return { centre: c.nom.length > 12 ? c.nom.slice(0, 12) + '…' : c.nom, eleves: byCentre.data.length };
             } catch {
               return { centre: c.nom, eleves: 0 };
@@ -61,7 +61,12 @@ export default function DirecteurDashboard() {
       } catch {
         // keep defaults
       } finally {
-        setUsingOfflineCache(cached || !navigator.onLine);
+        setDataLoadIssue(
+          describeDataLoadIssue(loadResults) ??
+            (!navigator.onLine
+              ? { offline: true, message: 'Mode hors ligne : affichage des dernières données enregistrées.' }
+              : null),
+        );
       }
     };
 
@@ -106,8 +111,8 @@ export default function DirecteurDashboard() {
           Bonjour, {formatFullName(user?.prenom, user?.nom) || user?.prenom}
         </h1>
         <p className="text-dark-400 mt-1">Voici l'état de la plateforme Nehemiah Lab aujourd'hui.</p>
-        {usingOfflineCache && (
-          <p className="text-xs text-amber-400 mt-2">Mode hors ligne: affichage des dernières données enregistrées.</p>
+        {dataLoadIssue && (
+          <p className={`text-xs mt-2 ${dataLoadIssue.offline ? 'text-amber-400' : 'text-rose-400'}`}>{dataLoadIssue.message}</p>
         )}
       </div>
 
