@@ -15,6 +15,21 @@ import UserAvatar from '../../components/ui/UserAvatar';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
+// Extrait le message d'erreur precis renvoye par le backend (ex: "Cet email est
+// deja utilise.", "Le centre est obligatoire pour un coordinateur.") au lieu
+// d'afficher un message generique qui ne dit pas au directeur quel champ poser
+// probleme ni comment le corriger.
+function describeApiError(err: unknown, fallback: string): string {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  if (status === 401) {
+    return 'Votre session a expiré. Reconnectez-vous puis réessayez.';
+  }
+  const serverMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+  if (serverMessage) return serverMessage;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
 export default function UtilisateursPage() {
   const { hasRole } = useAuth();
   
@@ -106,8 +121,8 @@ export default function UtilisateursPage() {
         role: 'RESPONSABLE_CLUSTER', centreId: '', cluster: '', motDePasse: '',
       });
       fetchUsers();
-    } catch {
-      toast.error('Erreur lors de la création du compte.');
+    } catch (err) {
+      toast.error(describeApiError(err, 'Erreur lors de la création du compte.'));
     }
   };
 
@@ -123,8 +138,8 @@ export default function UtilisateursPage() {
       await userService.desactiver(id);
       toast.success('Compte désactivé.');
       fetchUsers();
-    } catch {
-      toast.error('Erreur lors de la désactivation.');
+    } catch (err) {
+      toast.error(describeApiError(err, 'Erreur lors de la désactivation.'));
     }
   };
 
@@ -141,8 +156,8 @@ export default function UtilisateursPage() {
       toast.success('Ancienneté mise à jour.');
       setEditAncienneteUser(null);
       fetchUsers();
-    } catch {
-      toast.error("Erreur lors de la mise à jour de l'ancienneté.");
+    } catch (err) {
+      toast.error(describeApiError(err, "Erreur lors de la mise à jour de l'ancienneté."));
     } finally {
       setSavingAnciennete(false);
     }
