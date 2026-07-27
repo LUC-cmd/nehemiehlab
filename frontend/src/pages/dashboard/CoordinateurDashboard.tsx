@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, AlertTriangle, BookOpen, TrendingUp, ArrowUpRight, Clock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useAccess } from '../../context/AccessContext';
 import { centreService, dashboardService, formationService, signalementService } from '../../services/api';
 import type { Centre, ModuleFormation, Signalement } from '../../types';
 import { fetchWithOfflineCache, describeDataLoadIssue } from '../../utils/offlineCache';
@@ -12,6 +13,7 @@ import LocalisationDashboardSection from '../../components/dashboard/Localisatio
 
 export default function CoordinateurDashboard() {
   const { user, role } = useAuth();
+  const { hasFeature } = useAccess();
   const [stats, setStats] = useState<Record<string, number>>({});
   const [recentSignalements, setRecentSignalements] = useState<Signalement[]>([]);
   const [recentFormations, setRecentFormations] = useState<ModuleFormation[]>([]);
@@ -33,7 +35,7 @@ export default function CoordinateurDashboard() {
         setRecentSignalements(sigResult.data.filter((s) => s.statut === 'EN_ATTENTE').slice(0, 5));
 
         const firstCentre = centresResult.data?.[0];
-        if (firstCentre?.id) {
+        if (firstCentre?.id && hasFeature('formations')) {
           const f = await fetchWithOfflineCache(`coord:formations:${firstCentre.id}`, async () => (await formationService.getByCentre(firstCentre.id)).data as ModuleFormation[]);
           setRecentFormations(f.data.slice(0, 5));
           setDataLoadIssue(describeDataLoadIssue([statsResult, sigResult, centresResult, f]));
@@ -60,11 +62,11 @@ export default function CoordinateurDashboard() {
   ];
 
   const actions = [
-    { label: 'Profils & projets enfants', href: '/dashboard/profils-enfants', color: 'text-[#5ED9FF]' },
-    { label: 'Voir les élèves du centre', href: '/dashboard/eleves', color: 'text-emerald-400' },
-    { label: 'Consulter les signalements', href: '/dashboard/signalements', color: 'text-red-400' },
-    { label: 'Journal des formations', href: '/dashboard/formations', color: 'text-blue-400' },
-  ];
+    { label: 'Profils & projets enfants', href: '/dashboard/profils-enfants', color: 'text-[#5ED9FF]', feature: 'profils-enfants' as const },
+    { label: 'Voir les élèves du centre', href: '/dashboard/eleves', color: 'text-emerald-400', feature: 'eleves' as const },
+    { label: 'Consulter les signalements', href: '/dashboard/signalements', color: 'text-red-400', feature: 'signalements' as const },
+    { label: 'Journal des formations', href: '/dashboard/formations', color: 'text-blue-400', feature: 'formations' as const },
+  ].filter((a) => hasFeature(a.feature));
 
   return (
     <div className="space-y-8">
@@ -159,24 +161,26 @@ export default function CoordinateurDashboard() {
           )}
         </div>
 
-        <div className="card">
-          <h3 className="text-white font-semibold mb-4">Dernières formations</h3>
-          {recentFormations.length === 0 ? (
-            <p className="text-sm text-dark-400">Aucune formation récente.</p>
-          ) : (
-            <div className="space-y-3">
-              {recentFormations.map((f) => (
-                <div key={f.id} className="p-3 rounded-xl bg-dark-800 border border-dark-700">
-                  <p className="text-sm text-white font-medium">{f.titre}</p>
-                  <p className="text-xs text-dark-400 mt-1">{new Date(f.date).toLocaleDateString('fr-FR')} • {f.dureeHeures} h</p>
-                </div>
-              ))}
-              <Link to="/dashboard/formations" className="btn-secondary w-full justify-center text-sm">
-                Voir toutes les formations
-              </Link>
-            </div>
-          )}
-        </div>
+        {hasFeature('formations') && (
+          <div className="card">
+            <h3 className="text-white font-semibold mb-4">Dernières formations</h3>
+            {recentFormations.length === 0 ? (
+              <p className="text-sm text-dark-400">Aucune formation récente.</p>
+            ) : (
+              <div className="space-y-3">
+                {recentFormations.map((f) => (
+                  <div key={f.id} className="p-3 rounded-xl bg-dark-800 border border-dark-700">
+                    <p className="text-sm text-white font-medium">{f.titre}</p>
+                    <p className="text-xs text-dark-400 mt-1">{new Date(f.date).toLocaleDateString('fr-FR')} • {f.dureeHeures} h</p>
+                  </div>
+                ))}
+                <Link to="/dashboard/formations" className="btn-secondary w-full justify-center text-sm">
+                  Voir toutes les formations
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
