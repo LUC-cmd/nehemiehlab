@@ -86,6 +86,15 @@ public class EmailNotificationService {
         return sendBranded(from, email, subject, plain, html);
     }
 
+    public boolean sendCompteCredentials(String email, String prenom, String nom, String roleLabel, String motDePasse) {
+        String name = fullName(prenom, nom);
+        String subject = "Smart Kids Academy — votre compte " + roleLabel + " est prêt";
+        boolean capitalWarning = motDePasse != null && !motDePasse.isEmpty() && Character.isUpperCase(motDePasse.charAt(0));
+        String plain = EmailHtmlTemplates.credentialsPlain(name, roleLabel, email, motDePasse, capitalWarning);
+        String html = EmailHtmlTemplates.wrapHtml("Votre compte est prêt", EmailHtmlTemplates.credentialsHtml(name, roleLabel, email, motDePasse, capitalWarning));
+        return sendBranded(from, email, subject, plain, html);
+    }
+
     private boolean sendBranded(String fromAddress, String to, String subject, String plainBody, String htmlBody) {
         if (to == null || to.isBlank()) return false;
         if (!isConfigured()) {
