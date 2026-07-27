@@ -473,6 +473,30 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "Compte désactivé."));
     }
 
+    /**
+     * Reactive un compte precedemment desactive (tout role sauf Directeur). Contrepartie de
+     * {@link #desactiver} : sans cet endpoint, un compte coordinateur/comptable/etc. desactive par
+     * erreur (ex: confondu avec un doublon a supprimer) n'avait aucun moyen d'etre reactive dans
+     * l'interface — seul un formateur "en attente" pouvait etre valide via {@link #validerFormateur}.
+     */
+    @PutMapping("/{id}/activer")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<?> activer(@PathVariable Long id) {
+        Optional<User> userOpt = userRepository.findById(id);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        User user = userOpt.get();
+        if (user.getRole() == Role.DIRECTEUR) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Le compte Directeur est déjà actif."));
+        }
+
+        user.setActif(true);
+        userRepository.save(user);
+        return ResponseEntity.ok(Map.of("message", "Compte réactivé."));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('DIRECTEUR')")
     public ResponseEntity<?> supprimerCompteEnAttente(@PathVariable Long id) {
