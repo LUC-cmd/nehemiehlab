@@ -297,6 +297,10 @@ export const userService = {
   deleteCarteIdentite: (face: 'recto' | 'verso') =>
     api.delete<User>(`/users/me/carte-identite/${face}`),
   desactiver: (id: number) => api.put(`/users/${id}/desactiver`),
+  reinitialiserMotsDePasseCoordinateurs: () =>
+    api.post<{ comptesMisAJour: number; comptes: { email: string; motDePasse: string; nom: string }[] }>(
+      '/users/coordinateurs/reinitialiser-mots-de-passe',
+    ),
   getFormateurs: () => api.get('/users/formateurs'),
   getFormateursEnAttente: () => api.get('/users/formateurs/en-attente'),
   getCoordinateurs: () => api.get('/users/coordinateurs'),
@@ -352,16 +356,16 @@ export const centreService = {
     nom: string; codeCdej?: string; adresse: string; ville: string; region?: string; cluster?: string;
     latitude?: number; longitude?: number;
     telephoneResponsable?: string; telephoneCoordinateur?: string; telephoneFormateur?: string;
-    coordinateurNom?: string; coordinateurPrenom?: string;
+    coordinateurNom?: string; coordinateurPrenom?: string; coordinateurEmail?: string;
     emails?: string[]; telephones?: string[];
-  }) => api.post('/centres', data),
+  }) => api.post<{ centre: import('../types').Centre; coordinateurCompteCree?: boolean; coordinateurMotDePasseInitial?: string }>('/centres', data),
   update: (id: number, data: {
     nom?: string; codeCdej?: string; adresse?: string; ville?: string; region?: string; cluster?: string;
     latitude?: number; longitude?: number;
     telephoneResponsable?: string; telephoneCoordinateur?: string; telephoneFormateur?: string;
-    coordinateurNom?: string; coordinateurPrenom?: string;
+    coordinateurNom?: string; coordinateurPrenom?: string; coordinateurEmail?: string;
     emails?: string[]; telephones?: string[];
-  }) => api.put(`/centres/${id}`, data),
+  }) => api.put<{ centre: import('../types').Centre; coordinateurCompteCree?: boolean; coordinateurMotDePasseInitial?: string }>(`/centres/${id}`, data),
   delete: (id: number) => api.delete(`/centres/${id}`),
   assignerFormateur: (centreId: number, formateurId: number) =>
     api.post(`/centres/${centreId}/formateurs/${formateurId}`),
