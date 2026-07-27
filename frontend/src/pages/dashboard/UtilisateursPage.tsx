@@ -6,7 +6,7 @@ import { ROLE_LABELS, ROLES_CREABLES_PAR_DIRECTEUR, ROLE_ACCESS_SUMMARY } from '
 import type { User, Centre, Role } from '../../types';
 import { centreLabel } from '../../utils/centreLabel';
 import { ancienneteDate, formatAnciennete } from '../../utils/anciennete';
-import { Plus, Search, Shield, UserCheck, UserX, Pencil, FileSpreadsheet, FileText } from 'lucide-react';
+import { Plus, Search, Shield, UserCheck, UserX, Pencil, FileSpreadsheet, FileText, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cleanNameInput, cleanPhoneInput, FIRSTNAME_EXAMPLE, NAME_EXAMPLE } from '../../utils/formInputs';
 import { PageLoadingSkeleton, TableSkeleton } from '../../components/ui/DashboardSkeletons';
@@ -42,6 +42,11 @@ export default function UtilisateursPage() {
   const [confirmDesactiverId, setConfirmDesactiverId] = useState<number | null>(null);
   const [editAncienneteUser, setEditAncienneteUser] = useState<User | null>(null);
   const [ancienneteValue, setAncienneteValue] = useState('');
+  const [confirmResetCoordinateurs, setConfirmResetCoordinateurs] = useState(false);
+  const [resettingCoordinateurs, setResettingCoordinateurs] = useState(false);
+  const [coordinateurResetResults, setCoordinateurResetResults] = useState<
+    { email: string; motDePasse: string; nom: string }[] | null
+  >(null);
   const [savingAnciennete, setSavingAnciennete] = useState(false);
   const [exportingUsers, setExportingUsers] = useState<'xlsx' | 'pdf' | null>(null);
   const skeletonLoading = useMinDelayLoading(loading, 220);
@@ -146,6 +151,23 @@ export default function UtilisateursPage() {
   const openEditAnciennete = (u: User) => {
     setEditAncienneteUser(u);
     setAncienneteValue(u.dateEntree || '');
+  };
+
+  // Reinitialise le mot de passe de TOUS les comptes coordinateur (email avec la
+  // premiere lettre en majuscule), y compris les comptes crees avant l'automatisation
+  // (ex-mot de passe par defaut "password123" qui ne respectait pas cette regle).
+  const handleResetCoordinateurPasswords = async () => {
+    setConfirmResetCoordinateurs(false);
+    setResettingCoordinateurs(true);
+    try {
+      const { data } = await userService.reinitialiserMotsDePasseCoordinateurs();
+      setCoordinateurResetResults(data.comptes);
+      toast.success(`${data.comptesMisAJour} compte(s) coordinateur mis à jour.`);
+    } catch (err) {
+      toast.error(describeApiError(err, 'Erreur lors de la réinitialisation des mots de passe.'));
+    } finally {
+      setResettingCoordinateurs(false);
+    }
   };
 
   const saveAnciennete = async () => {
@@ -253,6 +275,15 @@ export default function UtilisateursPage() {
             >
               <FileText className="w-4 h-4" />
               {exportingUsers === 'pdf' ? 'Téléchargement…' : 'PDF'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmResetCoordinateurs(true)}
+              disabled={resettingCoordinateurs}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-dark-600 bg-dark-800 text-dark-200 hover:bg-dark-700 disabled:opacity-60"
+            >
+              <KeyRound className="w-4 h-4" />
+              {resettingCoordinateurs ? 'Réinitialisation…' : 'Mots de passe coordinateurs'}
             </button>
             <button onClick={() => setShowAddModal(true)} className="btn-primary">
               <Plus className="w-4 h-4" />
@@ -505,6 +536,45 @@ export default function UtilisateursPage() {
         onConfirm={confirmDesactiver}
         onCancel={() => setConfirmDesactiverId(null)}
       />
+
+      <ConfirmDialog
+        open={confirmResetCoordinateurs}
+        title="Réinitialiser tous les mots de passe coordinateur ?"
+        message="Chaque compte coordinateur (existant et créé automatiquement) aura pour nouveau mot de passe son email, avec la première lettre en majuscule. Les anciens mots de passe ne fonctionneront plus."
+        confirmLabel="Réinitialiser"
+        danger
+        onConfirm={handleResetCoordinateurPasswords}
+        onCancel={() => setConfirmResetCoordinateurs(false)}
+      />
+
+      <Modal
+        open={coordinateurResetResults != null}
+        title="Mots de passe coordinateurs réinitialisés"
+        subtitle={coordinateurResetResults ? `${coordinateurResetResults.length} compte(s)` : undefined}
+        onClose={() => setCoordinateurResetResults(null)}
+        footer={
+          <button
+            type="button"
+            onClick={() => setCoordinateurResetResults(null)}
+            className="btn-primary w-full sm:w-auto justify-center"
+          >
+            Fermer
+          </button>
+        }
+      >
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {coordinateurResetResults?.length === 0 && (
+            <p className="text-sm text-dark-400">Aucun compte coordinateur trouvé.</p>
+          )}
+          {coordinateurResetResults?.map((c) => (
+            <div key={c.email} className="rounded-lg border border-dark-600 bg-dark-800 px-3 py-2 text-sm">
+              <p className="font-semibold text-white">{c.nom || c.email}</p>
+              <p className="text-dark-300">Email : {c.email}</p>
+              <p className="text-dark-300">Mot de passe : {c.motDePasse}</p>
+            </div>
+          ))}
+        </div>
+      </Modal>
 
       <Modal
         open={editAncienneteUser != null}

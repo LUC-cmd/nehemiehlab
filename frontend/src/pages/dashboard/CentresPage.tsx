@@ -34,6 +34,20 @@ import {
 } from '../../utils/geo';
 import { cleanPhoneInput } from '../../utils/formInputs';
 
+// Extrait le message d'erreur precis renvoye par le backend (ex: "Ce coordinateur
+// gere deja le centre X.") au lieu d'un texte generique qui ne dit pas au directeur
+// quel champ corriger.
+function describeApiError(err: unknown, fallback: string): string {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  if (status === 401) {
+    return 'Votre session a expiré. Reconnectez-vous puis réessayez.';
+  }
+  const serverMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+  if (serverMessage) return serverMessage;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
 function MultiValueField({
   label,
   values,
@@ -113,6 +127,7 @@ const emptyCentreForm = {
   telephoneResponsable: '',
   coordinateurNom: '',
   coordinateurPrenom: '',
+  coordinateurEmail: '',
   telephoneCoordinateur: '',
   telephoneFormateur: '',
   emails: [''] as string[],
@@ -176,6 +191,7 @@ export default function CentresPage() {
     telephoneResponsable: '',
     coordinateurNom: '',
     coordinateurPrenom: '',
+    coordinateurEmail: '',
     telephoneCoordinateur: '',
     telephoneFormateur: '',
     emails: [''] as string[],
@@ -269,7 +285,7 @@ export default function CentresPage() {
       const lat = newCentre.latitude ? Number(newCentre.latitude) : undefined;
       const lng = newCentre.longitude ? Number(newCentre.longitude) : undefined;
       const hasGps = Number.isFinite(lat) && Number.isFinite(lng);
-      await centreService.create({
+      const { data } = await centreService.create({
         nom: newCentre.nom,
         codeCdej: newCentre.codeCdej || undefined,
         adresse: newCentre.adresse,
@@ -279,6 +295,7 @@ export default function CentresPage() {
         telephoneResponsable: cleanPhoneInput(newCentre.telephoneResponsable) || undefined,
         coordinateurNom: newCentre.coordinateurNom.trim() || undefined,
         coordinateurPrenom: newCentre.coordinateurPrenom.trim() || undefined,
+        coordinateurEmail: newCentre.coordinateurEmail.trim() || undefined,
         telephoneCoordinateur: cleanPhoneInput(newCentre.telephoneCoordinateur) || undefined,
         telephoneFormateur: cleanPhoneInput(newCentre.telephoneFormateur) || undefined,
         emails: newCentre.emails.map((v) => v.trim()).filter(Boolean),
@@ -294,12 +311,20 @@ export default function CentresPage() {
           { duration: 6000 },
         );
       }
+      if (data?.coordinateurCompteCree && data.coordinateurMotDePasseInitial) {
+        toast.success(
+          `Compte coordinateur créé — email : ${newCentre.coordinateurEmail.trim()}, mot de passe initial : ${data.coordinateurMotDePasseInitial}`,
+          { duration: 12000 },
+        );
+      } else if (data?.coordinateurCompteCree === false) {
+        toast.success('Coordinateur relié au centre (compte existant).');
+      }
       setShowAddModal(false);
       setNewCentre(emptyCentreForm);
       setReminderShownForLoad(false);
       fetchData();
-    } catch {
-      toast.error('Erreur lors de la création du centre.');
+    } catch (err) {
+      toast.error(describeApiError(err, 'Erreur lors de la création du centre.'));
     }
   };
 
@@ -377,6 +402,7 @@ export default function CentresPage() {
       telephoneResponsable: centre.telephoneResponsable || '',
       coordinateurNom: centre.coordinateurNom || centre.coordinateur?.nom || '',
       coordinateurPrenom: centre.coordinateurPrenom || centre.coordinateur?.prenom || '',
+      coordinateurEmail: centre.coordinateur?.email || '',
       telephoneCoordinateur: centre.telephoneCoordinateur || centre.coordinateur?.telephone || '',
       telephoneFormateur: centre.telephoneFormateur || centre.formateurs?.[0]?.telephone || '',
       emails: centre.emails && centre.emails.length > 0 ? centre.emails : [''],
@@ -389,7 +415,12 @@ export default function CentresPage() {
     if (!contactsCentre) return;
     setSavingContacts(true);
     try {
-      await centreService.update(contactsCentre.id, {
+      // On ne renvoie l'email coordinateur que s'il a ete saisi/modifie : ca evite de re-tenter une
+      // creation/liaison de compte a chaque simple modification de telephone ou d'adresse du centre.
+      const coordinateurEmailChanged =
+        contactsForm.coordinateurEmail.trim() &&
+        contactsForm.coordinateurEmail.trim().toLowerCase() !== (contactsCentre.coordinateur?.email || '').toLowerCase();
+      const { data } = await centreService.update(contactsCentre.id, {
         nom: contactsForm.nom.trim() || contactsCentre.nom,
         codeCdej: contactsForm.codeCdej.trim() || undefined,
         adresse: contactsForm.adresse.trim() || contactsCentre.adresse,
@@ -401,16 +432,25 @@ export default function CentresPage() {
         telephoneResponsable: cleanPhoneInput(contactsForm.telephoneResponsable),
         coordinateurNom: contactsForm.coordinateurNom.trim(),
         coordinateurPrenom: contactsForm.coordinateurPrenom.trim(),
+        coordinateurEmail: coordinateurEmailChanged ? contactsForm.coordinateurEmail.trim() : undefined,
         telephoneCoordinateur: cleanPhoneInput(contactsForm.telephoneCoordinateur),
         telephoneFormateur: cleanPhoneInput(contactsForm.telephoneFormateur),
         emails: contactsForm.emails.map((v) => v.trim()).filter(Boolean),
         telephones: contactsForm.telephones.map((v) => cleanPhoneInput(v)).filter(Boolean),
       });
       toast.success('Centre mis à jour.');
+      if (data?.coordinateurCompteCree && data.coordinateurMotDePasseInitial) {
+        toast.success(
+          `Compte coordinateur créé — email : ${contactsForm.coordinateurEmail.trim()}, mot de passe initial : ${data.coordinateurMotDePasseInitial}`,
+          { duration: 12000 },
+        );
+      } else if (coordinateurEmailChanged && data?.coordinateurCompteCree === false) {
+        toast.success('Coordinateur relié au centre (compte existant).');
+      }
       setContactsCentre(null);
       await fetchData();
-    } catch {
-      toast.error('Impossible d’enregistrer les modifications.');
+    } catch (err) {
+      toast.error(describeApiError(err, 'Impossible d’enregistrer les modifications.'));
     } finally {
       setSavingContacts(false);
     }
@@ -1396,9 +1436,21 @@ export default function CentresPage() {
                 })}
               />
             </div>
+            <div>
+              <label className="label">Email coordinateur (optionnel)</label>
+              <input
+                type="email"
+                className="input-field"
+                placeholder="coordinateur@exemple.com"
+                value={newCentre.coordinateurEmail}
+                onChange={(e) => setNewCentre({ ...newCentre, coordinateurEmail: e.target.value })}
+              />
+            </div>
             <p className="text-xs text-slate-400">
-              Enregistré comme contact du centre (nom + téléphone), sans créer de compte utilisateur. Le numéro du
-              formateur n'est pas demandé ici : il suit automatiquement le formateur affecté au centre.
+              Nom et téléphone sont enregistrés comme contact du centre. Si un email est renseigné, un compte
+              coordinateur est créé automatiquement (mot de passe initial affiché après la création) — ou relié au
+              centre s'il existe déjà. Le numéro du formateur n'est pas demandé ici : il suit automatiquement le
+              formateur affecté au centre.
             </p>
           </div>
 
@@ -1587,7 +1639,8 @@ export default function CentresPage() {
             />
           </div>
           <p className="text-xs text-slate-500 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
-            Le coordinateur est enregistré comme contact du centre (nom + téléphone), sans créer de compte.
+            Nom et téléphone sont enregistrés comme contact du centre. L'email crée (ou relie) automatiquement un
+            compte de connexion coordinateur — mot de passe initial affiché après l'enregistrement.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -1606,6 +1659,18 @@ export default function CentresPage() {
                 onChange={(e) => setContactsForm({ ...contactsForm, coordinateurNom: e.target.value })}
               />
             </div>
+          </div>
+          <div>
+            <label className="label">
+              Email coordinateur {contactsCentre?.coordinateur ? '(compte existant)' : '(optionnel — crée un compte)'}
+            </label>
+            <input
+              type="email"
+              className="input-field"
+              placeholder="coordinateur@exemple.com"
+              value={contactsForm.coordinateurEmail}
+              onChange={(e) => setContactsForm({ ...contactsForm, coordinateurEmail: e.target.value })}
+            />
           </div>
           {([
             ['telephoneResponsable', 'Téléphone du responsable'],
