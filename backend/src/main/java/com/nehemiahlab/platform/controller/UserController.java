@@ -7,6 +7,7 @@ import com.nehemiahlab.platform.repository.CentreRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
 import com.nehemiahlab.platform.service.EmailNotificationService;
 import com.nehemiahlab.platform.service.InscriptionSettingsService;
+import com.nehemiahlab.platform.service.CentreAccessService;
 import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.security.SecureFileStorage;
 import org.slf4j.Logger;
@@ -48,6 +49,9 @@ public class UserController {
     private InscriptionSettingsService inscriptionSettingsService;
 
     @Autowired
+    private CentreAccessService centreAccessService;
+
+    @Autowired
     private SecureFileStorage secureFileStorage;
 
     @Autowired
@@ -61,8 +65,21 @@ public class UserController {
 
     @GetMapping("/formateurs")
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'COORDINATEUR', 'COMPTABLE', 'FORMATEUR')")
-    public ResponseEntity<List<User>> getFormateurs() {
-        return ResponseEntity.ok(userRepository.findByRoleOrderByCreatedAtDesc(Role.FORMATEUR));
+    public ResponseEntity<List<User>> getFormateurs(Authentication auth) {
+        List<User> tous = userRepository.findByRoleOrderByCreatedAtDesc(Role.FORMATEUR);
+        User appelant = (User) auth.getPrincipal();
+        // Le Directeur et le Comptable voient tous les formateurs (y compris ceux pas
+        // encore assignes a un centre, ex : en attente de validation).
+        if (appelant.getRole() == Role.DIRECTEUR || appelant.getRole() == Role.COMPTABLE) {
+            return ResponseEntity.ok(tous);
+        }
+        // Un coordinateur ou un formateur ne doit voir que les formateurs de son/ses
+        // propre(s) centre(s), jamais ceux des autres centres.
+        List<Long> centresAccessibles = centreAccessService.accessibleCentreIds(appelant);
+        List<User> scoped = tous.stream()
+                .filter(f -> f.getCentres().stream().anyMatch(c -> centresAccessibles.contains(c.getId())))
+                .toList();
+        return ResponseEntity.ok(scoped);
     }
 
     @GetMapping("/formateurs/en-attente")
