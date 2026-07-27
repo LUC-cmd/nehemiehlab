@@ -515,14 +515,21 @@ public class UserController {
             ));
         }
 
+        // Un compte coordinateur desactive peut rester lie a un centre (ex: cree par erreur puis
+        // desactive par le Directeur). Plutot que de bloquer la suppression et forcer une etape
+        // manuelle separee, on retire automatiquement le lien avant de supprimer le compte : la
+        // suppression est de toute facon definitive, garder le lien n'aurait aucun sens.
         List<Centre> centresLies = centreRepository.findByCoordinateur(user);
-        if (!centresLies.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Ce compte est lié à un centre en tant que coordinateur. Retirez ce lien avant de le supprimer."
-            ));
+        for (Centre c : centresLies) {
+            c.setCoordinateur(null);
+            centreRepository.save(c);
         }
 
         userRepository.delete(user);
-        return ResponseEntity.ok(Map.of("message", "Compte supprimé définitivement."));
+        String message = centresLies.isEmpty()
+                ? "Compte supprimé définitivement."
+                : "Compte supprimé définitivement. Retiré comme coordinateur de : "
+                        + centresLies.stream().map(Centre::getNom).collect(java.util.stream.Collectors.joining(", ")) + ".";
+        return ResponseEntity.ok(Map.of("message", message));
     }
 }
