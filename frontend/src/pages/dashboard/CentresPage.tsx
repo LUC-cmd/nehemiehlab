@@ -34,6 +34,20 @@ import {
 } from '../../utils/geo';
 import { cleanPhoneInput } from '../../utils/formInputs';
 
+// Extrait le message d'erreur precis renvoye par le backend (ex: "Ce coordinateur
+// gere deja le centre X.") au lieu d'un texte generique qui ne dit pas au directeur
+// quel champ corriger.
+function describeApiError(err: unknown, fallback: string): string {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  if (status === 401) {
+    return 'Votre session a expiré. Reconnectez-vous puis réessayez.';
+  }
+  const serverMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+  if (serverMessage) return serverMessage;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
 function MultiValueField({
   label,
   values,
@@ -113,6 +127,7 @@ const emptyCentreForm = {
   telephoneResponsable: '',
   coordinateurNom: '',
   coordinateurPrenom: '',
+  coordinateurEmail: '',
   telephoneCoordinateur: '',
   telephoneFormateur: '',
   emails: [''] as string[],
@@ -269,7 +284,7 @@ export default function CentresPage() {
       const lat = newCentre.latitude ? Number(newCentre.latitude) : undefined;
       const lng = newCentre.longitude ? Number(newCentre.longitude) : undefined;
       const hasGps = Number.isFinite(lat) && Number.isFinite(lng);
-      await centreService.create({
+      const { data } = await centreService.create({
         nom: newCentre.nom,
         codeCdej: newCentre.codeCdej || undefined,
         adresse: newCentre.adresse,
@@ -279,6 +294,7 @@ export default function CentresPage() {
         telephoneResponsable: cleanPhoneInput(newCentre.telephoneResponsable) || undefined,
         coordinateurNom: newCentre.coordinateurNom.trim() || undefined,
         coordinateurPrenom: newCentre.coordinateurPrenom.trim() || undefined,
+        coordinateurEmail: newCentre.coordinateurEmail.trim() || undefined,
         telephoneCoordinateur: cleanPhoneInput(newCentre.telephoneCoordinateur) || undefined,
         telephoneFormateur: cleanPhoneInput(newCentre.telephoneFormateur) || undefined,
         emails: newCentre.emails.map((v) => v.trim()).filter(Boolean),
@@ -294,12 +310,20 @@ export default function CentresPage() {
           { duration: 6000 },
         );
       }
+      if (data?.coordinateurCompteCree && data.coordinateurMotDePasseInitial) {
+        toast.success(
+          `Compte coordinateur créé — email : ${newCentre.coordinateurEmail.trim()}, mot de passe initial : ${data.coordinateurMotDePasseInitial}`,
+          { duration: 12000 },
+        );
+      } else if (data?.coordinateurCompteCree === false) {
+        toast.success('Coordinateur relié au centre (compte existant).');
+      }
       setShowAddModal(false);
       setNewCentre(emptyCentreForm);
       setReminderShownForLoad(false);
       fetchData();
-    } catch {
-      toast.error('Erreur lors de la création du centre.');
+    } catch (err) {
+      toast.error(describeApiError(err, 'Erreur lors de la création du centre.'));
     }
   };
 
@@ -1396,9 +1420,21 @@ export default function CentresPage() {
                 })}
               />
             </div>
+            <div>
+              <label className="label">Email coordinateur (optionnel)</label>
+              <input
+                type="email"
+                className="input-field"
+                placeholder="coordinateur@exemple.com"
+                value={newCentre.coordinateurEmail}
+                onChange={(e) => setNewCentre({ ...newCentre, coordinateurEmail: e.target.value })}
+              />
+            </div>
             <p className="text-xs text-slate-400">
-              Enregistré comme contact du centre (nom + téléphone), sans créer de compte utilisateur. Le numéro du
-              formateur n'est pas demandé ici : il suit automatiquement le formateur affecté au centre.
+              Nom et téléphone sont enregistrés comme contact du centre. Si un email est renseigné, un compte
+              coordinateur est créé automatiquement (mot de passe initial affiché après la création) — ou relié au
+              centre s'il existe déjà. Le numéro du formateur n'est pas demandé ici : il suit automatiquement le
+              formateur affecté au centre.
             </p>
           </div>
 
