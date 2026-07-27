@@ -5,6 +5,7 @@ import com.nehemiahlab.platform.model.Role;
 import com.nehemiahlab.platform.model.User;
 import com.nehemiahlab.platform.repository.CentreRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
+import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.service.CentreAccessService;
 import com.nehemiahlab.platform.service.CentreExcelService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,9 +14,11 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,6 +38,9 @@ public class CentreController {
 
     @Autowired
     private CentreAccessService centreAccessService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'COMPTABLE', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER')")
@@ -60,7 +66,7 @@ public class CentreController {
 
     @PostMapping
     @PreAuthorize("hasRole('DIRECTEUR')")
-    public ResponseEntity<Centre> create(@RequestBody Centre centre) {
+    public ResponseEntity<?> create(@RequestBody Centre centre) {
         centre.setTelephoneResponsable(cleanPhone(centre.getTelephoneResponsable()));
         centre.setTelephoneCoordinateur(cleanPhone(centre.getTelephoneCoordinateur()));
         centre.setTelephoneFormateur(cleanPhone(centre.getTelephoneFormateur()));
@@ -72,7 +78,76 @@ public class CentreController {
         }
         centre.setEmails(cleanList(centre.getEmails()));
         centre.setTelephones(cleanPhoneList(centre.getTelephones()));
-        return ResponseEntity.ok(centreRepository.save(centre));
+
+        // Si un email coordinateur est fourni, on cree (ou relie) automatiquement le
+        // compte de connexion correspondant, au lieu de se limiter a un simple contact
+        // texte comme avant : sans ca, le Directeur devait toujours passer par un
+        // deuxieme ecran ("Gerer les comptes") pour donner au coordinateur un moyen
+        // de se connecter, ce qui menait a des centres "orphelins" (coordinateur note
+        // en texte mais jamais capable de se connecter).
+        String motDePasseInitial = null;
+        Boolean coordinateurCompteCree = null;
+        String rawCoordinateurEmail = centre.getCoordinateurEmail();
+        if (rawCoordinateurEmail != null && !rawCoordinateurEmail.isBlank()) {
+            String email = rawCoordinateurEmail.trim().toLowerCase();
+            if (!InputSanitizer.isSafeEmail(email)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", "Format d'email invalide pour le coordinateur."));
+            }
+            Optional<User> existingOpt = userRepository.findByEmailIgnoreCase(email);
+            User coordinateurUser;
+            if (existingOpt.isPresent()) {
+                User existing = existingOpt.get();
+                if (existing.getRole() != Role.COORDINATEUR) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                            "message", "Un compte existe déjà avec cet email, mais ce n'est pas un compte coordinateur."));
+                }
+                List<Centre> deja = centreRepository.findByCoordinateur(existing);
+                if (!deja.isEmpty()) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                            "message", "Ce coordinateur gère déjà le centre « " + deja.get(0).getNom() + " »."));
+                }
+                coordinateurUser = existing;
+                coordinateurCompteCree = false;
+            } else {
+                String motDePasse = capitalizeFirst(email);
+                coordinateurUser = User.builder()
+                        .nom(centre.getCoordinateurNom() != null ? centre.getCoordinateurNom() : "")
+                        .prenom(centre.getCoordinateurPrenom() != null ? centre.getCoordinateurPrenom() : "")
+                        .email(email)
+                        .motDePasse(passwordEncoder.encode(motDePasse))
+                        .role(Role.COORDINATEUR)
+                        .telephone(centre.getTelephoneCoordinateur())
+                        .actif(true)
+                        .build();
+                userRepository.save(coordinateurUser);
+                motDePasseInitial = motDePasse;
+                coordinateurCompteCree = true;
+            }
+            centre.setCoordinateur(coordinateurUser);
+        }
+
+        Centre saved = centreRepository.save(centre);
+        // Forme de reponse toujours la meme (objet avec une cle "centre"), qu'un
+        // coordinateur ait ete cree ou non, pour que le frontend n'ait pas a deviner
+        // si res.data EST le centre ou le CONTIENT selon le cas.
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("centre", saved);
+        if (coordinateurCompteCree != null) {
+            body.put("coordinateurCompteCree", coordinateurCompteCree);
+        }
+        if (motDePasseInitial != null) {
+            body.put("coordinateurMotDePasseInitial", motDePasseInitial);
+        }
+        return ResponseEntity.ok(body);
+    }
+
+    /** "coordinateur@ex.com" -> "Coordinateur@ex.com" : utilise comme mot de passe
+     *  initial simple et memorisable pour un compte coordinateur cree automatiquement
+     *  a la creation d'un centre. */
+    private static String capitalizeFirst(String value) {
+        if (value == null || value.isEmpty()) return value;
+        return Character.toUpperCase(value.charAt(0)) + value.substring(1);
     }
 
     @PutMapping("/{id}")
