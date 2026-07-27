@@ -297,6 +297,7 @@ export const userService = {
   deleteCarteIdentite: (face: 'recto' | 'verso') =>
     api.delete<User>(`/users/me/carte-identite/${face}`),
   desactiver: (id: number) => api.put(`/users/${id}/desactiver`),
+  activer: (id: number) => api.put(`/users/${id}/activer`),
   reinitialiserMotsDePasseCoordinateurs: () =>
     api.post<{ comptesMisAJour: number; comptes: { email: string; motDePasse: string; nom: string }[] }>(
       '/users/coordinateurs/reinitialiser-mots-de-passe',
