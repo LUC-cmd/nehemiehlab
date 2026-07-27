@@ -313,7 +313,7 @@ export default function CentresPage() {
       }
       if (data?.coordinateurCompteCree && data.coordinateurMotDePasseInitial) {
         toast.success(
-          `Compte coordinateur créé — email : ${newCentre.coordinateurEmail.trim()}, mot de passe initial : ${data.coordinateurMotDePasseInitial}`,
+          `Compte coordinateur créé — email : ${newCentre.coordinateurEmail.trim()}, mot de passe initial : ${data.coordinateurMotDePasseInitial}. Un email avec ces identifiants lui a été envoyé.`,
           { duration: 12000 },
         );
       } else if (data?.coordinateurCompteCree === false) {
@@ -441,7 +441,7 @@ export default function CentresPage() {
       toast.success('Centre mis à jour.');
       if (data?.coordinateurCompteCree && data.coordinateurMotDePasseInitial) {
         toast.success(
-          `Compte coordinateur créé — email : ${contactsForm.coordinateurEmail.trim()}, mot de passe initial : ${data.coordinateurMotDePasseInitial}`,
+          `Compte coordinateur créé — email : ${contactsForm.coordinateurEmail.trim()}, mot de passe initial : ${data.coordinateurMotDePasseInitial}. Un email avec ces identifiants lui a été envoyé.`,
           { duration: 12000 },
         );
       } else if (coordinateurEmailChanged && data?.coordinateurCompteCree === false) {

@@ -115,7 +115,10 @@ export default function UtilisateursPage() {
         motDePasse: newAccount.motDePasse.trim() || undefined,
       });
       const pwd = res?.data?.motDePasseInitial;
-      if (pwd) {
+      const message = res?.data?.message;
+      if (message) {
+        toast.success(message);
+      } else if (pwd) {
         toast.success(`Compte créé. Mot de passe initial: ${pwd}`);
       } else {
         toast.success('Compte créé avec succès.');
@@ -196,7 +199,7 @@ export default function UtilisateursPage() {
     try {
       const { data } = await userService.reinitialiserMotsDePasseCoordinateurs();
       setCoordinateurResetResults(data.comptes);
-      toast.success(`${data.comptesMisAJour} compte(s) coordinateur mis à jour.`);
+      toast.success(`${data.comptesMisAJour} compte(s) coordinateur mis à jour — ${data.emailsEnvoyes ?? 0} email(s) envoyé(s).`);
     } catch (err) {
       toast.error(describeApiError(err, 'Erreur lors de la réinitialisation des mots de passe.'));
     } finally {

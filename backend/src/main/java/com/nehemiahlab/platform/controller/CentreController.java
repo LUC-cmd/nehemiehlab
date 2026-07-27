@@ -2,12 +2,14 @@ package com.nehemiahlab.platform.controller;
 
 import com.nehemiahlab.platform.model.Centre;
 import com.nehemiahlab.platform.model.Role;
+import com.nehemiahlab.platform.model.RoleLabels;
 import com.nehemiahlab.platform.model.User;
 import com.nehemiahlab.platform.repository.CentreRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
 import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.service.CentreAccessService;
 import com.nehemiahlab.platform.service.CentreExcelService;
+import com.nehemiahlab.platform.service.EmailNotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -41,6 +43,9 @@ public class CentreController {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private EmailNotificationService emailNotificationService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'COMPTABLE', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER')")
@@ -215,6 +220,11 @@ public class CentreController {
             result.coordinateurUser = coordinateurUser;
             result.compteCree = true;
             result.motDePasseInitial = motDePasse;
+            // Le coordinateur doit recevoir ses identifiants par email : sans ce compte
+            // le Directeur devait les lui communiquer lui-meme un par un.
+            emailNotificationService.sendCompteCredentials(
+                    email, coordinateurUser.getPrenom(), coordinateurUser.getNom(),
+                    RoleLabels.fr(Role.COORDINATEUR), motDePasse);
         }
         return result;
     }

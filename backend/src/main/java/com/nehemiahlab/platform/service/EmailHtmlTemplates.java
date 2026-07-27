@@ -87,6 +87,41 @@ final class EmailHtmlTemplates {
                 + FOOTER;
     }
 
+    static String credentialsHtml(String name, String roleLabel, String email, String motDePasse, boolean capitalWarning) {
+        String warning = capitalWarning
+                ? "<p style=\"margin:12px 0 0;color:#b45309;font-size:13px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;\">"
+                        + "&#9888;&#65039; Attention : la <strong>premiere lettre</strong> du mot de passe est en <strong>MAJUSCULE</strong>, "
+                        + "tout le reste en minuscules. Respectez bien cette casse en le saisissant.</p>"
+                : "";
+        return """
+                <p style="margin:0 0 12px;">Bonjour <strong>%s</strong>,</p>
+                <p style="margin:0 0 12px;">Votre compte <strong>%s</strong> sur Smart Kids Academy est prêt. Vous pouvez vous connecter dès maintenant sur <strong>ska-management.com</strong> avec les identifiants suivants :</p>
+                <table role="presentation" style="width:100%%;margin:0 0 12px;border-collapse:collapse;">
+                  <tr><td style="padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px 8px 0 0;font-size:13px;color:#64748b;">Identifiant (email)</td></tr>
+                  <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;border-top:none;font-size:16px;font-weight:600;color:#004b57;">%s</td></tr>
+                  <tr><td style="padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-top:none;font-size:13px;color:#64748b;">Mot de passe</td></tr>
+                  <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;font-size:16px;font-weight:600;color:#004b57;">%s</td></tr>
+                </table>
+                %s
+                <p style="margin:12px 0 0;color:#64748b;font-size:14px;">Pour votre sécurité, nous vous recommandons de changer ce mot de passe après votre première connexion (menu Mon profil).</p>
+                """.formatted(escape(name), escape(roleLabel), escape(email), escape(motDePasse), warning);
+    }
+
+    static String credentialsPlain(String name, String roleLabel, String email, String motDePasse, boolean capitalWarning) {
+        String warning = capitalWarning
+                ? "\nAttention : la premiere lettre du mot de passe est en MAJUSCULE, tout le reste en minuscules. "
+                        + "Respectez bien cette casse en le saisissant.\n"
+                : "";
+        return "Bonjour " + name + ",\n\n"
+                + "Votre compte " + roleLabel + " sur Smart Kids Academy est pret. "
+                + "Vous pouvez vous connecter des maintenant sur ska-management.com avec les identifiants suivants :\n\n"
+                + "Identifiant (email) : " + email + "\n"
+                + "Mot de passe : " + motDePasse + "\n"
+                + warning + "\n"
+                + "Pour votre securite, nous vous recommandons de changer ce mot de passe apres votre premiere connexion (menu Mon profil).\n\n"
+                + FOOTER;
+    }
+
     static String notificationPlain(String message) {
         return message + "\n\n" + FOOTER;
     }

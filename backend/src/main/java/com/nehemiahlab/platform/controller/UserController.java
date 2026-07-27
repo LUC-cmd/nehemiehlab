@@ -2,6 +2,7 @@ package com.nehemiahlab.platform.controller;
 
 import com.nehemiahlab.platform.model.Centre;
 import com.nehemiahlab.platform.model.Role;
+import com.nehemiahlab.platform.model.RoleLabels;
 import com.nehemiahlab.platform.model.User;
 import com.nehemiahlab.platform.repository.CentreRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
@@ -247,10 +248,16 @@ public class UserController {
             userRepository.save(user);
         }
 
+        boolean emailEnvoye = emailNotificationService.sendCompteCredentials(
+                email, prenom, nom, RoleLabels.fr(role), motDePasseInitial);
+
         return ResponseEntity.ok(Map.of(
-                "message", "Compte créé avec succès.",
+                "message", emailEnvoye
+                        ? "Compte créé avec succès. Un email avec les identifiants a été envoyé à " + email + " (vérifiez aussi les spams)."
+                        : "Compte créé avec succès, mais l'email n'a pas pu être envoyé. Communiquez le mot de passe vous-même.",
                 "motDePasseInitial", motDePasseInitial,
-                "motDePasseTemporaire", motDePassePropose.isEmpty()
+                "motDePasseTemporaire", motDePassePropose.isEmpty(),
+                "emailEnvoye", emailEnvoye
         ));
     }
 
@@ -454,7 +461,8 @@ public class UserController {
     @PreAuthorize("hasRole('DIRECTEUR')")
     public ResponseEntity<?> reinitialiserMotsDePasseCoordinateurs() {
         List<User> coordinateurs = userRepository.findByRole(Role.COORDINATEUR);
-        List<Map<String, String>> resultats = new ArrayList<>();
+        List<Map<String, Object>> resultats = new ArrayList<>();
+        int emailsEnvoyes = 0;
         for (User u : coordinateurs) {
             if (u.getEmail() == null || u.getEmail().isBlank()) {
                 continue;
@@ -463,13 +471,23 @@ public class UserController {
             u.setMotDePasse(passwordEncoder.encode(motDePasse));
             userRepository.save(u);
             String nomComplet = ((u.getPrenom() != null ? u.getPrenom() : "") + " " + (u.getNom() != null ? u.getNom() : "")).trim();
+            // On previent chaque coordinateur par email avec ses identifiants a jour,
+            // y compris ceux dont le compte existait deja avant l'automatisation.
+            boolean envoye = emailNotificationService.sendCompteCredentials(
+                    u.getEmail(), u.getPrenom(), u.getNom(), RoleLabels.fr(Role.COORDINATEUR), motDePasse);
+            if (envoye) emailsEnvoyes++;
             resultats.add(Map.of(
                     "email", u.getEmail(),
                     "motDePasse", motDePasse,
-                    "nom", nomComplet
+                    "nom", nomComplet,
+                    "emailEnvoye", envoye
             ));
         }
-        return ResponseEntity.ok(Map.of("comptesMisAJour", resultats.size(), "comptes", resultats));
+        return ResponseEntity.ok(Map.of(
+                "comptesMisAJour", resultats.size(),
+                "emailsEnvoyes", emailsEnvoyes,
+                "comptes", resultats
+        ));
     }
 
     @PutMapping("/{id}/desactiver")

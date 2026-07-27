@@ -299,7 +299,11 @@ export const userService = {
   desactiver: (id: number) => api.put(`/users/${id}/desactiver`),
   activer: (id: number) => api.put(`/users/${id}/activer`),
   reinitialiserMotsDePasseCoordinateurs: () =>
-    api.post<{ comptesMisAJour: number; comptes: { email: string; motDePasse: string; nom: string }[] }>(
+    api.post<{
+      comptesMisAJour: number;
+      emailsEnvoyes: number;
+      comptes: { email: string; motDePasse: string; nom: string; emailEnvoye: boolean }[];
+    }>(
       '/users/coordinateurs/reinitialiser-mots-de-passe',
     ),
   getFormateurs: () => api.get('/users/formateurs'),
