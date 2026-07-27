@@ -352,9 +352,9 @@ export const centreService = {
     nom: string; codeCdej?: string; adresse: string; ville: string; region?: string; cluster?: string;
     latitude?: number; longitude?: number;
     telephoneResponsable?: string; telephoneCoordinateur?: string; telephoneFormateur?: string;
-    coordinateurNom?: string; coordinateurPrenom?: string;
+    coordinateurNom?: string; coordinateurPrenom?: string; coordinateurEmail?: string;
     emails?: string[]; telephones?: string[];
-  }) => api.post('/centres', data),
+  }) => api.post<{ centre: import('../types').Centre; coordinateurCompteCree?: boolean; coordinateurMotDePasseInitial?: string }>('/centres', data),
   update: (id: number, data: {
     nom?: string; codeCdej?: string; adresse?: string; ville?: string; region?: string; cluster?: string;
     latitude?: number; longitude?: number;
