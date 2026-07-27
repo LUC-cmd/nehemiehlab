@@ -369,7 +369,7 @@ export default function ElevesPage() {
                   <th className="p-4 font-semibold text-dark-200">Classe</th>
                   <th className="p-4 font-semibold text-dark-200">Perf. Globale</th>
                   <th className="p-4 font-semibold text-dark-200">Projet</th>
-                  <th className="p-4 font-semibold text-dark-200 text-right">Actions</th>
+                  <th className="p-4 font-semibold text-dark-200 text-right sticky right-0 bg-dark-800 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.35)] z-10">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-800">
@@ -444,7 +444,7 @@ export default function ElevesPage() {
                         <span className="text-dark-500 italic text-xs">Aucun projet</span>
                       )}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4 sticky right-0 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.15)]">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleOpenSeances(eleve)}
