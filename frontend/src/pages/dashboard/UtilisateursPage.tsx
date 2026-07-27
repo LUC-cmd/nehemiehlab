@@ -6,7 +6,7 @@ import { ROLE_LABELS, ROLES_CREABLES_PAR_DIRECTEUR, ROLE_ACCESS_SUMMARY } from '
 import type { User, Centre, Role } from '../../types';
 import { centreLabel } from '../../utils/centreLabel';
 import { ancienneteDate, formatAnciennete } from '../../utils/anciennete';
-import { Plus, Search, Shield, UserCheck, UserX, Pencil, FileSpreadsheet, FileText, KeyRound } from 'lucide-react';
+import { Plus, Search, Shield, UserCheck, UserX, Pencil, FileSpreadsheet, FileText, KeyRound, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cleanNameInput, cleanPhoneInput, FIRSTNAME_EXAMPLE, NAME_EXAMPLE } from '../../utils/formInputs';
 import { PageLoadingSkeleton, TableSkeleton } from '../../components/ui/DashboardSkeletons';
@@ -160,6 +160,25 @@ export default function UtilisateursPage() {
       toast.error(describeApiError(err, 'Erreur lors de la réactivation.'));
     } finally {
       setActivatingId(null);
+    }
+  };
+
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<User | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+
+  const confirmDeleteUserAccount = async () => {
+    if (!confirmDeleteUser) return;
+    const id = confirmDeleteUser.id;
+    setConfirmDeleteUser(null);
+    setDeletingUserId(id);
+    try {
+      const { data } = await userService.supprimerCompteEnAttente(id);
+      toast.success((data as { message?: string })?.message || 'Compte supprimé définitivement.');
+      fetchUsers();
+    } catch (err) {
+      toast.error(describeApiError(err, 'Erreur lors de la suppression.'));
+    } finally {
+      setDeletingUserId(null);
     }
   };
 
@@ -397,12 +416,20 @@ export default function UtilisateursPage() {
                           Désactiver
                         </button>
                       ) : (
-                        <button onClick={() => handleActiver(u.id)}
-                          disabled={activatingId === u.id}
-                          className="btn-ghost p-1.5 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg inline-flex items-center gap-1 disabled:opacity-60">
-                          <UserCheck className="w-3.5 h-3.5" />
-                          {activatingId === u.id ? 'Réactivation…' : 'Réactiver'}
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button onClick={() => handleActiver(u.id)}
+                            disabled={activatingId === u.id}
+                            className="btn-ghost p-1.5 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg inline-flex items-center gap-1 disabled:opacity-60">
+                            <UserCheck className="w-3.5 h-3.5" />
+                            {activatingId === u.id ? 'Réactivation…' : 'Réactiver'}
+                          </button>
+                          <button onClick={() => setConfirmDeleteUser(u)}
+                            disabled={deletingUserId === u.id}
+                            className="btn-ghost p-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg inline-flex items-center gap-1 disabled:opacity-60">
+                            <Trash2 className="w-3.5 h-3.5" />
+                            {deletingUserId === u.id ? 'Suppression…' : 'Supprimer'}
+                          </button>
+                        </div>
                       )}
                     </td>
                   )}
@@ -548,6 +575,20 @@ export default function UtilisateursPage() {
           </p>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={confirmDeleteUser != null}
+        title="Supprimer ce compte définitivement ?"
+        message={
+          confirmDeleteUser
+            ? `Cette action est irréversible : le compte de ${confirmDeleteUser.prenom} ${confirmDeleteUser.nom} (${confirmDeleteUser.email}) sera supprimé de la base de données. S'il est encore lié à un centre en tant que coordinateur, ce lien sera aussi retiré.`
+            : ''
+        }
+        confirmLabel="Supprimer définitivement"
+        danger
+        onConfirm={confirmDeleteUserAccount}
+        onCancel={() => setConfirmDeleteUser(null)}
+      />
 
       <ConfirmDialog
         open={confirmDesactiverId != null}
