@@ -461,7 +461,7 @@ public class UserController {
     @PreAuthorize("hasRole('DIRECTEUR')")
     public ResponseEntity<?> reinitialiserMotsDePasseCoordinateurs() {
         List<User> coordinateurs = userRepository.findByRole(Role.COORDINATEUR);
-        List<Map<String, String>> resultats = new ArrayList<>();
+        List<Map<String, Object>> resultats = new ArrayList<>();
         int emailsEnvoyes = 0;
         for (User u : coordinateurs) {
             if (u.getEmail() == null || u.getEmail().isBlank()) {
