@@ -16,6 +16,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByRoleAndActifFalseOrderByCreatedAtDesc(Role role);
     List<User> findByRoleOrderByCreatedAtDesc(Role role);
     boolean existsByEmail(String email);
+    boolean existsByEmailIgnoreCase(String email);
     List<User> findByEleveId(Long eleveId);
     /** Utilisee pour empecher un meme formateur de creer deux comptes (nom+prenom identiques). */
     boolean existsByNomIgnoreCaseAndPrenomIgnoreCaseAndRole(String nom, String prenom, Role role);
