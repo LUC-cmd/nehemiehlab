@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -424,6 +425,34 @@ public class UserController {
         }
         userRepository.save(user);
         return ResponseEntity.ok(user);
+    }
+
+    /**
+     * Reinitialise le mot de passe de TOUS les comptes coordinateur (email avec la
+     * premiere lettre en majuscule), pour que chaque coordinateur puisse se connecter
+     * directement avec son email + ce mot de passe, meme pour les comptes crees avant
+     * l'automatisation (ex-mot de passe par defaut "password123").
+     */
+    @PostMapping("/coordinateurs/reinitialiser-mots-de-passe")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<?> reinitialiserMotsDePasseCoordinateurs() {
+        List<User> coordinateurs = userRepository.findByRole(Role.COORDINATEUR);
+        List<Map<String, String>> resultats = new ArrayList<>();
+        for (User u : coordinateurs) {
+            if (u.getEmail() == null || u.getEmail().isBlank()) {
+                continue;
+            }
+            String motDePasse = com.nehemiahlab.platform.controller.CentreController.capitalizeFirst(u.getEmail());
+            u.setMotDePasse(passwordEncoder.encode(motDePasse));
+            userRepository.save(u);
+            String nomComplet = ((u.getPrenom() != null ? u.getPrenom() : "") + " " + (u.getNom() != null ? u.getNom() : "")).trim();
+            resultats.add(Map.of(
+                    "email", u.getEmail(),
+                    "motDePasse", motDePasse,
+                    "nom", nomComplet
+            ));
+        }
+        return ResponseEntity.ok(Map.of("comptesMisAJour", resultats.size(), "comptes", resultats));
     }
 
     @PutMapping("/{id}/desactiver")

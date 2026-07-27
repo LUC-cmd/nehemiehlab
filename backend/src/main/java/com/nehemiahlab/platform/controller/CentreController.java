@@ -5,6 +5,7 @@ import com.nehemiahlab.platform.model.Role;
 import com.nehemiahlab.platform.model.User;
 import com.nehemiahlab.platform.repository.CentreRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
+import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.service.CentreAccessService;
 import com.nehemiahlab.platform.service.CentreExcelService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,9 +14,11 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,6 +38,9 @@ public class CentreController {
 
     @Autowired
     private CentreAccessService centreAccessService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'COMPTABLE', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER')")
@@ -60,7 +66,7 @@ public class CentreController {
 
     @PostMapping
     @PreAuthorize("hasRole('DIRECTEUR')")
-    public ResponseEntity<Centre> create(@RequestBody Centre centre) {
+    public ResponseEntity<?> create(@RequestBody Centre centre) {
         centre.setTelephoneResponsable(cleanPhone(centre.getTelephoneResponsable()));
         centre.setTelephoneCoordinateur(cleanPhone(centre.getTelephoneCoordinateur()));
         centre.setTelephoneFormateur(cleanPhone(centre.getTelephoneFormateur()));
@@ -72,48 +78,170 @@ public class CentreController {
         }
         centre.setEmails(cleanList(centre.getEmails()));
         centre.setTelephones(cleanPhoneList(centre.getTelephones()));
-        return ResponseEntity.ok(centreRepository.save(centre));
+
+        CoordinateurResolution resolution = resolveCoordinateur(centre.getCoordinateurEmail(), null, centre);
+        if (resolution.error != null) {
+            return resolution.error;
+        }
+        if (resolution.coordinateurUser != null) {
+            centre.setCoordinateur(resolution.coordinateurUser);
+        }
+
+        Centre saved = centreRepository.save(centre);
+        return ResponseEntity.ok(buildCentreResponse(saved, resolution));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('DIRECTEUR')")
-    public ResponseEntity<Centre> update(@PathVariable Long id, @RequestBody Centre updateData) {
-        return centreRepository.findById(id)
-                .map(centre -> {
-                    centre.setNom(updateData.getNom());
-                    centre.setAdresse(updateData.getAdresse());
-                    centre.setVille(updateData.getVille());
-                    centre.setRegion(updateData.getRegion());
-                    centre.setCluster(updateData.getCluster());
-                    centre.setLatitude(updateData.getLatitude());
-                    centre.setLongitude(updateData.getLongitude());
-                    if (updateData.getCodeCdej() != null) {
-                        centre.setCodeCdej(updateData.getCodeCdej().isBlank() ? null : updateData.getCodeCdej().trim());
-                    }
-                    if (updateData.getTelephoneResponsable() != null) {
-                        centre.setTelephoneResponsable(cleanPhone(updateData.getTelephoneResponsable()));
-                    }
-                    if (updateData.getTelephoneCoordinateur() != null) {
-                        centre.setTelephoneCoordinateur(cleanPhone(updateData.getTelephoneCoordinateur()));
-                    }
-                    if (updateData.getTelephoneFormateur() != null) {
-                        centre.setTelephoneFormateur(cleanPhone(updateData.getTelephoneFormateur()));
-                    }
-                    if (updateData.getCoordinateurNom() != null) {
-                        centre.setCoordinateurNom(updateData.getCoordinateurNom().trim());
-                    }
-                    if (updateData.getCoordinateurPrenom() != null) {
-                        centre.setCoordinateurPrenom(updateData.getCoordinateurPrenom().trim());
-                    }
-                    if (updateData.getEmails() != null) {
-                        centre.setEmails(cleanList(updateData.getEmails()));
-                    }
-                    if (updateData.getTelephones() != null) {
-                        centre.setTelephones(cleanPhoneList(updateData.getTelephones()));
-                    }
-                    return ResponseEntity.ok(centreRepository.save(centre));
-                })
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Centre updateData) {
+        Optional<Centre> centreOpt = centreRepository.findById(id);
+        if (centreOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Centre centre = centreOpt.get();
+        centre.setNom(updateData.getNom());
+        centre.setAdresse(updateData.getAdresse());
+        centre.setVille(updateData.getVille());
+        centre.setRegion(updateData.getRegion());
+        centre.setCluster(updateData.getCluster());
+        centre.setLatitude(updateData.getLatitude());
+        centre.setLongitude(updateData.getLongitude());
+        if (updateData.getCodeCdej() != null) {
+            centre.setCodeCdej(updateData.getCodeCdej().isBlank() ? null : updateData.getCodeCdej().trim());
+        }
+        if (updateData.getTelephoneResponsable() != null) {
+            centre.setTelephoneResponsable(cleanPhone(updateData.getTelephoneResponsable()));
+        }
+        if (updateData.getTelephoneCoordinateur() != null) {
+            centre.setTelephoneCoordinateur(cleanPhone(updateData.getTelephoneCoordinateur()));
+        }
+        if (updateData.getTelephoneFormateur() != null) {
+            centre.setTelephoneFormateur(cleanPhone(updateData.getTelephoneFormateur()));
+        }
+        if (updateData.getCoordinateurNom() != null) {
+            centre.setCoordinateurNom(updateData.getCoordinateurNom().trim());
+        }
+        if (updateData.getCoordinateurPrenom() != null) {
+            centre.setCoordinateurPrenom(updateData.getCoordinateurPrenom().trim());
+        }
+        if (updateData.getEmails() != null) {
+            centre.setEmails(cleanList(updateData.getEmails()));
+        }
+        if (updateData.getTelephones() != null) {
+            centre.setTelephones(cleanPhoneList(updateData.getTelephones()));
+        }
+
+        // L'email coordinateur n'est jamais stocke sur le centre (voir Centre#coordinateurEmail) :
+        // on ne tente de creer/relier un compte que si le Directeur en a saisi un sur CETTE requete.
+        CoordinateurResolution resolution = resolveCoordinateur(updateData.getCoordinateurEmail(), id, centre);
+        if (resolution.error != null) {
+            return resolution.error;
+        }
+        if (resolution.coordinateurUser != null) {
+            centre.setCoordinateur(resolution.coordinateurUser);
+        }
+
+        Centre saved = centreRepository.save(centre);
+        return ResponseEntity.ok(buildCentreResponse(saved, resolution));
+    }
+
+    /** Resultat de la resolution d'un email coordinateur saisi a la creation/modification d'un centre. */
+    private static class CoordinateurResolution {
+        ResponseEntity<?> error;
+        User coordinateurUser;
+        Boolean compteCree;
+        String motDePasseInitial;
+    }
+
+    /**
+     * Si un email coordinateur est fourni, cree (ou relie) automatiquement le compte de connexion
+     * correspondant, au lieu de se limiter a un simple contact texte : sans ca, le Directeur devait
+     * toujours passer par un second ecran ("Gerer les comptes") pour donner au coordinateur un moyen
+     * de se connecter, ce qui menait a des centres "orphelins" (coordinateur note en texte mais jamais
+     * capable de se connecter). Utilise aussi bien a la creation qu'a la modification d'un centre.
+     *
+     * @param excludeCentreId lors d'une modification, l'id du centre en cours d'edition (pour ne pas se
+     *                        signaler soi-meme comme "deja gere par un autre centre" si le coordinateur
+     *                        est deja celui de ce centre) ; null a la creation.
+     */
+    private CoordinateurResolution resolveCoordinateur(String rawEmail, Long excludeCentreId, Centre centreEnCours) {
+        CoordinateurResolution result = new CoordinateurResolution();
+        if (rawEmail == null || rawEmail.isBlank()) {
+            return result;
+        }
+        String email = rawEmail.trim().toLowerCase();
+        if (!InputSanitizer.isSafeEmail(email)) {
+            result.error = ResponseEntity.badRequest().body(Map.of(
+                    "message", "Format d'email invalide pour le coordinateur."));
+            return result;
+        }
+        // Deja le coordinateur de CE centre : rien a faire (evite un faux "gere deja un autre centre").
+        if (centreEnCours != null && centreEnCours.getCoordinateur() != null
+                && email.equalsIgnoreCase(centreEnCours.getCoordinateur().getEmail())) {
+            result.coordinateurUser = centreEnCours.getCoordinateur();
+            result.compteCree = false;
+            return result;
+        }
+        Optional<User> existingOpt = userRepository.findByEmailIgnoreCase(email);
+        if (existingOpt.isPresent()) {
+            User existing = existingOpt.get();
+            if (existing.getRole() != Role.COORDINATEUR) {
+                result.error = ResponseEntity.badRequest().body(Map.of(
+                        "message", "Un compte existe déjà avec cet email, mais ce n'est pas un compte coordinateur."));
+                return result;
+            }
+            List<Centre> deja = centreRepository.findByCoordinateur(existing);
+            boolean geresAilleurs = deja.stream()
+                    .anyMatch(c -> excludeCentreId == null || !c.getId().equals(excludeCentreId));
+            if (geresAilleurs) {
+                result.error = ResponseEntity.badRequest().body(Map.of(
+                        "message", "Ce coordinateur gère déjà le centre « " + deja.get(0).getNom() + " »."));
+                return result;
+            }
+            result.coordinateurUser = existing;
+            result.compteCree = false;
+        } else {
+            String motDePasse = capitalizeFirst(email);
+            User coordinateurUser = User.builder()
+                    .nom(centreEnCours.getCoordinateurNom() != null ? centreEnCours.getCoordinateurNom() : "")
+                    .prenom(centreEnCours.getCoordinateurPrenom() != null ? centreEnCours.getCoordinateurPrenom() : "")
+                    .email(email)
+                    .motDePasse(passwordEncoder.encode(motDePasse))
+                    .role(Role.COORDINATEUR)
+                    .telephone(centreEnCours.getTelephoneCoordinateur())
+                    .actif(true)
+                    .build();
+            userRepository.save(coordinateurUser);
+            result.coordinateurUser = coordinateurUser;
+            result.compteCree = true;
+            result.motDePasseInitial = motDePasse;
+        }
+        return result;
+    }
+
+    /**
+     * Forme de reponse toujours la meme (objet avec une cle "centre"), qu'un coordinateur ait ete
+     * cree/relie ou non, pour que le frontend n'ait pas a deviner si res.data EST le centre ou le
+     * CONTIENT selon le cas.
+     */
+    private static Map<String, Object> buildCentreResponse(Centre saved, CoordinateurResolution resolution) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("centre", saved);
+        if (resolution.compteCree != null) {
+            body.put("coordinateurCompteCree", resolution.compteCree);
+        }
+        if (resolution.motDePasseInitial != null) {
+            body.put("coordinateurMotDePasseInitial", resolution.motDePasseInitial);
+        }
+        return body;
+    }
+
+    /** "coordinateur@ex.com" -> "Coordinateur@ex.com" : utilise comme mot de passe
+     * initial simple et memorisable pour un compte coordinateur cree automatiquement
+     * a la creation/modification d'un centre (et par la reinitialisation groupee). */
+    static String capitalizeFirst(String value) {
+        if (value == null || value.isEmpty()) return value;
+        return Character.toUpperCase(value.charAt(0)) + value.substring(1);
     }
 
     private static String cleanPhone(String raw) {
