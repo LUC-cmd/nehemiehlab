@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, Clock, BookOpen, CreditCard, TrendingUp, Building2, ArrowUpRight, Phone, UserRound } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useAccess } from '../../context/AccessContext';
 import { centreService, dashboardService, formationService, sessionService } from '../../services/api';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { Centre, ModuleFormation, SessionCours } from '../../types';
@@ -16,6 +17,7 @@ const chartTooltipStyle = { background: '#18152c', border: '1px solid #282343', 
 
 export default function FormateurDashboard() {
   const { user } = useAuth();
+  const { hasFeature } = useAccess();
   const [stats, setStats] = useState<Record<string, number>>({});
   const [dataLoadIssue, setDataLoadIssue] = useState<{ offline: boolean; message: string } | null>(null);
   const [recentFormations, setRecentFormations] = useState<ModuleFormation[]>([]);
@@ -69,13 +71,13 @@ export default function FormateurDashboard() {
   ];
 
   const actions = [
-    { label: 'Profils & projets enfants', href: '/dashboard/profils-enfants', color: 'text-[#5ED9FF]' },
-    { label: 'Évaluation (quiz & Scratch)', href: '/dashboard/evaluation-formateur', color: 'text-violet-400' },
-    { label: 'Démarrer une session', href: '/dashboard/sessions', color: 'text-primary-400' },
-    { label: 'Saisir le module du jour', href: '/dashboard/formations', color: 'text-blue-400' },
-    { label: 'Gérer mes élèves', href: '/dashboard/eleves', color: 'text-amber-400' },
-    { label: 'Voir mes paiements', href: '/dashboard/transactions', color: 'text-emerald-400' },
-  ];
+    { label: 'Profils & projets enfants', href: '/dashboard/profils-enfants', color: 'text-[#5ED9FF]', feature: 'profils-enfants' as const },
+    { label: 'Évaluation (quiz & Scratch)', href: '/dashboard/evaluation-formateur', color: 'text-violet-400', feature: 'evaluation-formateur' as const },
+    { label: 'Démarrer une session', href: '/dashboard/sessions', color: 'text-primary-400', feature: 'sessions' as const },
+    { label: 'Saisir le module du jour', href: '/dashboard/formations', color: 'text-blue-400', feature: 'formations' as const },
+    { label: 'Gérer mes élèves', href: '/dashboard/eleves', color: 'text-amber-400', feature: 'eleves' as const },
+    { label: 'Voir mes paiements', href: '/dashboard/transactions', color: 'text-emerald-400', feature: 'transactions' as const },
+  ].filter((a) => hasFeature(a.feature));
 
   const dataPresence = [
     { jour: 'Lun', heures: Math.round((stats.totalHeuresFormation ?? 0) * 0.12) },

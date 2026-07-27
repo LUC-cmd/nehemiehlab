@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, AlertTriangle, BookOpen, TrendingUp, ArrowUpRight, Clock, Building2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useAccess } from '../../context/AccessContext';
 import { centreService, dashboardService, formationService, signalementService } from '../../services/api';
 import type { Centre, ModuleFormation, Signalement } from '../../types';
 import { fetchWithOfflineCache, describeDataLoadIssue } from '../../utils/offlineCache';
@@ -11,6 +12,7 @@ import LocalisationDashboardSection from '../../components/dashboard/Localisatio
 
 export default function ResponsableClusterDashboard() {
   const { user } = useAuth();
+  const { hasFeature } = useAccess();
   const [stats, setStats] = useState<Record<string, number>>({});
   const [recentSignalements, setRecentSignalements] = useState<Signalement[]>([]);
   const [recentFormations, setRecentFormations] = useState<ModuleFormation[]>([]);
@@ -32,13 +34,15 @@ export default function ResponsableClusterDashboard() {
         setRecentSignalements(sigResult.data.filter((s) => s.statut === 'EN_ATTENTE').slice(0, 5));
 
         const formations: ModuleFormation[] = [];
-        for (const centre of (centresResult.data || []).slice(0, 3)) {
-          const f = await fetchWithOfflineCache(
-            `resp:formations:${centre.id}`,
-            async () => (await formationService.getByCentre(centre.id)).data as ModuleFormation[],
-          );
-          loadResults.push(f);
-          formations.push(...f.data);
+        if (hasFeature('formations')) {
+          for (const centre of (centresResult.data || []).slice(0, 3)) {
+            const f = await fetchWithOfflineCache(
+              `resp:formations:${centre.id}`,
+              async () => (await formationService.getByCentre(centre.id)).data as ModuleFormation[],
+            );
+            loadResults.push(f);
+            formations.push(...f.data);
+          }
         }
         setRecentFormations(formations.slice(0, 5));
         setDataLoadIssue(describeDataLoadIssue(loadResults));
@@ -61,11 +65,11 @@ export default function ResponsableClusterDashboard() {
   ];
 
   const actions = [
-    { label: 'Voir les centres du cluster', href: '/dashboard/mes-centres', color: 'text-violet-400' },
-    { label: 'Profils & projets enfants', href: '/dashboard/profils-enfants', color: 'text-[#5ED9FF]' },
-    { label: 'Consulter les signalements', href: '/dashboard/signalements', color: 'text-red-400' },
-    { label: 'Journal des formations', href: '/dashboard/formations', color: 'text-blue-400' },
-  ];
+    { label: 'Voir les centres du cluster', href: '/dashboard/mes-centres', color: 'text-violet-400', feature: 'mes-centres' as const },
+    { label: 'Profils & projets enfants', href: '/dashboard/profils-enfants', color: 'text-[#5ED9FF]', feature: 'profils-enfants' as const },
+    { label: 'Consulter les signalements', href: '/dashboard/signalements', color: 'text-red-400', feature: 'signalements' as const },
+    { label: 'Journal des formations', href: '/dashboard/formations', color: 'text-blue-400', feature: 'formations' as const },
+  ].filter((a) => hasFeature(a.feature));
 
   return (
     <div className="space-y-8">
@@ -155,23 +159,25 @@ export default function ResponsableClusterDashboard() {
           )}
         </div>
 
-        <div className="card lg:col-span-2">
-          <h3 className="text-white font-semibold mb-4">Dernières formations (cluster)</h3>
-          {recentFormations.length === 0 ? (
-            <p className="text-sm text-dark-400">Aucune formation récente.</p>
-          ) : (
-            <div className="grid sm:grid-cols-2 gap-3">
-              {recentFormations.map((f) => (
-                <div key={f.id} className="p-3 rounded-xl bg-dark-800 border border-dark-700">
-                  <p className="text-sm text-white font-medium">{f.titre}</p>
-                  <p className="text-xs text-dark-400 mt-1">
-                    {new Date(f.date).toLocaleDateString('fr-FR')} • {f.dureeHeures} h
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {hasFeature('formations') && (
+          <div className="card lg:col-span-2">
+            <h3 className="text-white font-semibold mb-4">Dernières formations (cluster)</h3>
+            {recentFormations.length === 0 ? (
+              <p className="text-sm text-dark-400">Aucune formation récente.</p>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-3">
+                {recentFormations.map((f) => (
+                  <div key={f.id} className="p-3 rounded-xl bg-dark-800 border border-dark-700">
+                    <p className="text-sm text-white font-medium">{f.titre}</p>
+                    <p className="text-xs text-dark-400 mt-1">
+                      {new Date(f.date).toLocaleDateString('fr-FR')} • {f.dureeHeures} h
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
