@@ -148,6 +148,21 @@ export default function UtilisateursPage() {
     }
   };
 
+  const [activatingId, setActivatingId] = useState<number | null>(null);
+
+  const handleActiver = async (id: number) => {
+    setActivatingId(id);
+    try {
+      await userService.activer(id);
+      toast.success('Compte réactivé.');
+      fetchUsers();
+    } catch (err) {
+      toast.error(describeApiError(err, 'Erreur lors de la réactivation.'));
+    } finally {
+      setActivatingId(null);
+    }
+  };
+
   const openEditAnciennete = (u: User) => {
     setEditAncienneteUser(u);
     setAncienneteValue(u.dateEntree || '');
@@ -373,14 +388,21 @@ export default function UtilisateursPage() {
                   </td>
                   {isDir && (
                     <td className="text-right">
-                      {u.actif && u.role !== 'DIRECTEUR' ? (
+                      {u.role === 'DIRECTEUR' ? (
+                        <span className="text-xs text-dark-500 italic">-</span>
+                      ) : u.actif ? (
                         <button onClick={() => handleDesactiver(u.id)}
                           className="btn-ghost p-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg inline-flex items-center gap-1">
                           <UserX className="w-3.5 h-3.5" />
                           Désactiver
                         </button>
                       ) : (
-                        <span className="text-xs text-dark-500 italic">-</span>
+                        <button onClick={() => handleActiver(u.id)}
+                          disabled={activatingId === u.id}
+                          className="btn-ghost p-1.5 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg inline-flex items-center gap-1 disabled:opacity-60">
+                          <UserCheck className="w-3.5 h-3.5" />
+                          {activatingId === u.id ? 'Réactivation…' : 'Réactiver'}
+                        </button>
                       )}
                     </td>
                   )}
