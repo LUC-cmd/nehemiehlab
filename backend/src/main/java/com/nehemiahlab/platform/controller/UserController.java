@@ -131,7 +131,7 @@ public class UserController {
     public ResponseEntity<?> creerCompte(@RequestBody Map<String, Object> body) {
         String nom = body.get("nom").toString();
         String prenom = body.get("prenom").toString();
-        String email = body.get("email").toString();
+        String email = body.get("email").toString().trim().toLowerCase();
         String roleStr = body.get("role").toString();
         String motDePassePropose = body.get("motDePasse") != null ? body.get("motDePasse").toString().trim() : "";
         String telephone = body.get("telephone") != null ? body.get("telephone").toString() : null;
@@ -151,7 +151,15 @@ public class UserController {
             }
         }
 
-        if (userRepository.existsByEmail(email)) {
+        if (!InputSanitizer.isSafeEmail(email)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Format d'email invalide."));
+        }
+        // Comparaison insensible a la casse : sans ca, "Coordinateur@ex.com" et
+        // "coordinateur@ex.com" etaient traites comme deux emails differents, ce qui
+        // permettait de creer deux comptes distincts pour le meme email reel (la
+        // connexion, elle, ignore la casse via findByEmailIgnoreCase) et rendait le
+        // comportement de ce formulaire imprevisible selon la casse tapee.
+        if (userRepository.existsByEmailIgnoreCase(email)) {
             return ResponseEntity.badRequest().body(Map.of("message", "Cet email est déjà utilisé."));
         }
 
