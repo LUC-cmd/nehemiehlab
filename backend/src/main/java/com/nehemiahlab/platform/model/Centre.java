@@ -82,6 +82,14 @@ public class Centre {
     @JoinColumn(name = "coordinateur_id")
     private User coordinateur;
 
+    /**
+     * Email fourni a la creation/modification du centre pour creer (ou relier)
+     * automatiquement le compte coordinateur correspondant. Champ de saisie
+     * uniquement : non stocke en base (le lien reel se fait via {@link #coordinateur}).
+     */
+    @Transient
+    private String coordinateurEmail;
+
     @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
