@@ -100,6 +100,45 @@ public class FormateurDocumentController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/formateur/{formateurId}")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<?> uploadForFormateur(
+            @PathVariable Long formateurId,
+            @RequestParam("type") String typeRaw,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "titre", required = false) String titre
+    ) {
+        FormateurDocumentType type = parseType(typeRaw);
+        if (type == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Type de document invalide."));
+        }
+        Optional<User> formateur = userRepository.findById(formateurId);
+        if (formateur.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        try {
+            String category = type == FormateurDocumentType.PROJET ? "media" : "document";
+            long maxBytes = type == FormateurDocumentType.PROJET ? MAX_PROJET_BYTES : MAX_DOCUMENT_BYTES;
+            String prefix = "formateur-doc-" + formateurId;
+            String url = secureFileStorage.store(file, "formateur-documents", category, maxBytes, prefix);
+
+            FormateurDocument doc = FormateurDocument.builder()
+                    .formateur(formateur.get())
+                    .type(type)
+                    .titre(titre == null || titre.isBlank() ? null : titre.trim())
+                    .url(url)
+                    .nomFichierOriginal(file.getOriginalFilename())
+                    .build();
+            formateurDocumentRepository.save(doc);
+            return ResponseEntity.ok(toDto(doc));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Echec upload document formateur (type={}) par le Directeur pour formateur {}", typeRaw, formateurId, e);
+            return ResponseEntity.internalServerError().body(Map.of("message", "Erreur lors de l'upload du fichier."));
+        }
+    }
+
     @GetMapping("/formateur/{formateurId}")
     @PreAuthorize("hasRole('DIRECTEUR')")
     public ResponseEntity<?> listForFormateur(
