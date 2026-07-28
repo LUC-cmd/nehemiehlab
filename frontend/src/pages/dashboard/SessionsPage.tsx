@@ -31,7 +31,7 @@ import ModuleSupportsPanel from '../../components/dashboard/ModuleSupportsPanel'
 import SessionHorairesCard from '../../components/dashboard/SessionHorairesCard';
 import { datetimeLocalToIso, nowForDatetimeLocal } from '../../utils/datetime';
 import { formatCoords } from '../../utils/geo';
-import { requireSessionGeolocation } from '../../utils/sessionGeo';
+import { requireSessionGeolocation, warmUpSessionGeolocation } from '../../utils/sessionGeo';
 import GeolocationRequiredModal from '../../components/ui/GeolocationRequiredModal';
 
 function formatElapsed(totalMinutes: number) {
@@ -312,6 +312,16 @@ export default function SessionsPage() {
     if (navigator.onLine) void syncOfflineDrafts();
     return () => window.removeEventListener('online', handleOnline);
   }, [syncOfflineDrafts]);
+
+  // Préchauffe la position GPS dès l'ouverture de la page Séances (en arrière-plan,
+  // sans bloquer ni demander de permission en plus) : quand le formateur clique
+  // ensuite sur démarrer/clôturer, le navigateur a déjà une position récente en
+  // cache et répond quasi instantanément au lieu de faire attendre une nouvelle
+  // acquisition GPS. C'était la principale source de lenteur ressentie sur ces
+  // deux actions.
+  useEffect(() => {
+    if (canEditTerrain) warmUpSessionGeolocation();
+  }, [canEditTerrain]);
 
   useEffect(() => {
     if (loading || centres.length === 0) return;
