@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { User, GraduationCap, Building2, CheckCircle2 } from 'lucide-react';
 import type { Centre } from '../../types';
 import { cleanNameInput, FIRSTNAME_EXAMPLE, NAME_EXAMPLE } from '../../utils/formInputs';
-import { centreLabel } from '../../utils/centreLabel';
+import { centreLabel, sortCentresByCode } from '../../utils/centreLabel';
 import {
   AGE_MAX,
   AGE_MIN,
@@ -231,8 +231,8 @@ export default function EleveFicheForm({
               value={values.centreId}
               onChange={(e) => patch({ centreId: e.target.value })}
             >
-              <option value="">Choisir un centre…</option>
-              {centres.map((c) => (
+              <option value="">Choisir un centre… (triés par numéro de centre)</option>
+              {sortCentresByCode(centres).map((c) => (
                 <option key={c.id} value={c.id}>{centreLabel(c)}</option>
               ))}
             </select>
