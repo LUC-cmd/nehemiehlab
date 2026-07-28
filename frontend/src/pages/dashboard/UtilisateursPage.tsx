@@ -288,7 +288,10 @@ export default function UtilisateursPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Gestion des Utilisateurs</h1>
+          <h1 className="text-2xl font-bold text-white">
+            Gestion des Utilisateurs
+            <span className="ml-2 text-base font-semibold text-dark-400">({filtered.length})</span>
+          </h1>
           <p className="text-dark-400 mt-1">
             Créez les comptes staff / CDEJ. Les parents se connectent avec le matricule (Espace parent).
           </p>
@@ -367,6 +370,7 @@ export default function UtilisateursPage() {
           <table>
             <thead>
               <tr>
+                <th className="w-12">#</th>
                 <th>Nom &amp; Prénom</th>
                 <th>Email</th>
                 <th>Rôle</th>
@@ -376,8 +380,9 @@ export default function UtilisateursPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((u) => (
+              {filtered.map((u, index) => (
                 <tr key={u.id}>
+                  <td className="text-dark-400 text-sm">{index + 1}</td>
                   <td>
                     <div className="flex items-center gap-3">
                       <UserAvatar user={u} size="sm" />
@@ -440,7 +445,7 @@ export default function UtilisateursPage() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={isDir ? 6 : 5} className="text-center py-8 text-dark-500">
+                  <td colSpan={isDir ? 7 : 6} className="text-center py-8 text-dark-500">
                     Aucun utilisateur trouvé.
                   </td>
                 </tr>

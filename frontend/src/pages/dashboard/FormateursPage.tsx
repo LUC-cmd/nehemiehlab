@@ -502,9 +502,12 @@ export default function FormateursPage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered
               .filter((f) => !f.actif)
-              .map((formateur) => (
+              .map((formateur, index) => (
                 <div key={formateur.id} className="card border border-amber-500/30 bg-amber-500/5">
                   <div className="flex items-center gap-4 mb-4">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-dark-800 border border-dark-700 text-dark-400 text-xs font-semibold flex items-center justify-center">
+                      {index + 1}
+                    </span>
                     <UserAvatar user={formateur} size="md" rounded="xl" />
                     <div>
                       <h3 className="text-white font-bold">
@@ -571,9 +574,12 @@ export default function FormateursPage() {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered
             .filter((f) => (isDir ? f.actif : true))
-            .map((formateur) => (
+            .map((formateur, index) => (
               <div key={formateur.id} className="card border border-dark-700 hover:border-dark-600 transition-all">
                 <div className="flex items-center gap-4 mb-4">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-dark-800 border border-dark-700 text-dark-400 text-xs font-semibold flex items-center justify-center">
+                    {index + 1}
+                  </span>
                   <UserAvatar user={formateur} size="md" rounded="xl" />
                   <div>
                     <h3 className="text-white font-bold">

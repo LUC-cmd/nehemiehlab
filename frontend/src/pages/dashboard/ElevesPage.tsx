@@ -322,7 +322,10 @@ export default function ElevesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Élèves / Apprenants</h1>
+          <h1 className="text-2xl font-bold text-white">
+            Élèves / Apprenants
+            <span className="ml-2 text-base font-semibold text-dark-400">({filtered.length})</span>
+          </h1>
           <p className="text-dark-400 mt-1">Infos fixes enfant (identité/scolarité) + suivi évolutif par séance et projet.</p>
         </div>
         {canEdit && (
@@ -363,6 +366,7 @@ export default function ElevesPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-dark-800/50 border-b border-dark-700">
+                  <th className="p-4 font-semibold text-dark-200 w-12">#</th>
                   <th className="p-4 font-semibold text-dark-200">Élève</th>
                   <th className="p-4 font-semibold text-dark-200">Matricule</th>
                   <th className="p-4 font-semibold text-dark-200">Âge / Sexe</th>
@@ -373,8 +377,9 @@ export default function ElevesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-800">
-                {filtered.map((eleve) => (
+                {filtered.map((eleve, index) => (
                   <tr key={eleve.id} className="hover:bg-dark-800/20 transition-colors">
+                    <td className="p-4 text-dark-400 text-sm">{index + 1}</td>
                     <td className="p-4">
                       <button
                         type="button"
@@ -516,7 +521,7 @@ export default function ElevesPage() {
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-dark-500">
+                    <td colSpan={8} className="p-8 text-center text-dark-500">
                       Aucun élève trouvé.
                     </td>
                   </tr>

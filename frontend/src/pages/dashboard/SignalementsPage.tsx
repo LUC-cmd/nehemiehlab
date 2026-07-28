@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { centreService, eleveService, signalementService, notificationService } from '../../services/api';
 import type { Signalement } from '../../types';
 import type { Centre, Eleve } from '../../types';
-import { centreLabel } from '../../utils/centreLabel';
+import { centreLabel, sortCentresByCode } from '../../utils/centreLabel';
 import { ALERT_PRESETS, type AlertPresetId } from '../../constants/alertPresets';
 import ValidationActionButton from '../../components/ui/ValidationActionButton';
 import {
@@ -321,7 +321,7 @@ export default function SignalementsPage() {
                 <label className="label">Centre (pour cibler les formateurs)</label>
                 <select className="input-field" value={broadcastCentreId} onChange={(e) => setBroadcastCentreId(e.target.value)}>
                   <option value="">Tous les centres</option>
-                  {centres.map((c) => <option key={c.id} value={String(c.id)}>{centreLabel(c)}</option>)}
+                  {sortCentresByCode(centres).map((c) => <option key={c.id} value={String(c.id)}>{centreLabel(c)}</option>)}
                 </select>
               </div>
               <div className="md:col-span-2">
