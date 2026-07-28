@@ -337,6 +337,15 @@ export const formateurDocumentService = {
     api.get<FormateurDocument[]>(`/formateur-documents/formateur/${formateurId}`, {
       params: type ? { type } : undefined,
     }),
+  uploadForFormateur: (formateurId: number, type: FormateurDocumentType, file: File, titre?: string) => {
+    const formData = new FormData();
+    formData.append('type', type);
+    formData.append('file', file);
+    if (titre) formData.append('titre', titre);
+    return api.post<FormateurDocument>(`/formateur-documents/formateur/${formateurId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   deleteAsDirecteur: (id: number) => api.delete(`/formateur-documents/${id}`),
 };
 

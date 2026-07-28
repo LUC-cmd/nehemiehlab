@@ -42,6 +42,12 @@ const TYPE_CONFIG: Record<FormateurDocumentType, {
 
 const TYPES = Object.keys(TYPE_CONFIG) as FormateurDocumentType[];
 
+const READONLY_UPLOAD_HINT: Partial<Record<FormateurDocumentType, string>> = {
+  CONTRAT: 'Déposez le contrat signé (PDF, Word ou image) pour ce formateur.',
+  PROJET: 'Déposez les projets Scratch (.sb3) de ce formateur (ex : les projets demandés avant sa sélection).',
+  PRESENTATION: 'Déposez une présentation (PowerPoint ou PDF) pour ce formateur.',
+};
+
 export default function FormateurDocumentsPanel({ mode, formateurId }: Props) {
   const [docs, setDocs] = useState<FormateurDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,7 +78,11 @@ export default function FormateurDocumentsPanel({ mode, formateurId }: Props) {
   const handleUpload = async (type: FormateurDocumentType, file: File) => {
     setUploading(type);
     try {
-      await formateurDocumentService.uploadMine(type, file, titreDraft[type]);
+      if (mode === 'own') {
+        await formateurDocumentService.uploadMine(type, file, titreDraft[type]);
+      } else {
+        await formateurDocumentService.uploadForFormateur(formateurId as number, type, file, titreDraft[type]);
+      }
       setTitreDraft((p) => ({ ...p, [type]: '' }));
       toast.success('Fichier envoyé.');
       await load();
@@ -129,7 +139,9 @@ export default function FormateurDocumentsPanel({ mode, formateurId }: Props) {
             <p className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
               {cfg.icon} {cfg.label}
             </p>
-            <p className="text-xs text-slate-500">{cfg.hint}</p>
+            <p className="text-xs text-slate-500">
+              {mode === 'readonly' && READONLY_UPLOAD_HINT[type] ? READONLY_UPLOAD_HINT[type] : cfg.hint}
+            </p>
 
             {items.length > 0 ? (
               <ul className="space-y-1.5">
@@ -173,7 +185,7 @@ export default function FormateurDocumentsPanel({ mode, formateurId }: Props) {
               <p className="text-xs text-slate-400 italic">Aucun fichier déposé.</p>
             )}
 
-            {mode === 'own' && (
+            {(mode === 'own' || (mode === 'readonly' && formateurId)) && (
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 {cfg.withTitre && (
                   <input
