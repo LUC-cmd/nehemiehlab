@@ -43,6 +43,7 @@ export default function HomePage() {
   const [heroAlt, setHeroAlt] = useState('Atelier Smart Kids Academy');
   const [fallingPhotos, setFallingPhotos] = useState<FallingPhoto[]>([]);
   const [galerieReady, setGalerieReady] = useState(false);
+  const [galeriePhotos, setGaleriePhotos] = useState<import('../types').GaleriePhoto[]>([]);
   const { ouverte: inscriptionsOuvertes } = useInscriptionFormateursOuverte();
   const heroImageY = useTransform(scrollY, [0, 600], [0, 80]);
   const heroImageScale = useTransform(scrollY, [0, 600], [1, 1.08]);
@@ -69,6 +70,7 @@ export default function HomePage() {
     siteService
       .getGalerie()
       .then((r) => {
+        setGaleriePhotos(r.data);
         const heroPhoto = r.data.find((p) => p.ordre === 0) ?? r.data[0];
         if (heroPhoto?.imageUrl) {
           setHeroImage(mediaUrl(heroPhoto.imageUrl));
@@ -318,7 +320,7 @@ export default function HomePage() {
 
       <NouveautesSection />
 
-      <GalerieSection />
+      <GalerieSection photos={galeriePhotos} loading={!galerieReady} />
 
       {showBackTop && (
         <motion.button
