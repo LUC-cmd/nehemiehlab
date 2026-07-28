@@ -89,8 +89,19 @@ public class CentreExcelService {
             };
             writeHeader(elevesSheet, eleveCols, headerStyle);
             int eRow = 1;
+            // Une seule requête pour tous les élèves (au lieu d'une requête par centre dans
+            // la boucle) — évite le N+1 sur l'export Excel quand il y a beaucoup de centres.
+            Map<Long, List<Eleve>> elevesByCentre = new HashMap<>();
+            for (Eleve e : eleveRepository.findAll()) {
+                if (e.getCentre() == null) continue;
+                elevesByCentre.computeIfAbsent(e.getCentre().getId(), id -> new ArrayList<>()).add(e);
+            }
+            for (List<Eleve> list : elevesByCentre.values()) {
+                list.sort(Comparator.comparing((Eleve e) -> nz(e.getNom()))
+                        .thenComparing(e -> nz(e.getPrenom())));
+            }
             for (Centre c : centres) {
-                for (Eleve e : eleveRepository.findByCentreIdOrderByNomAscPrenomAsc(c.getId())) {
+                for (Eleve e : elevesByCentre.getOrDefault(c.getId(), new ArrayList<>())) {
                     Row row = elevesSheet.createRow(eRow++);
                     int col = 0;
                     row.createCell(col++).setCellValue(nz(c.getNom()));
