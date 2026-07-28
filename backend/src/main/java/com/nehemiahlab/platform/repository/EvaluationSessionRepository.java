@@ -10,6 +10,13 @@ import java.util.List;
 @Repository
 public interface EvaluationSessionRepository extends JpaRepository<EvaluationSession, Long> {
     List<EvaluationSession> findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(Long sessionCoursId);
+
+    /**
+     * Charge les évaluations de plusieurs séances en une seule requête (au lieu
+     * d'une requête par séance dans une boucle), pour éviter le N+1 lors de la
+     * génération des rapports (Excel/PDF/liste) qui parcourent de nombreuses séances.
+     */
+    List<EvaluationSession> findBySessionCoursIdInOrderByEleve_NomAscEleve_PrenomAsc(List<Long> sessionCoursIds);
     List<EvaluationSession> findByEleveId(Long eleveId);
     EvaluationSession findBySessionCoursIdAndEleveId(Long sessionCoursId, Long eleveId);
     java.util.Optional<EvaluationSession> findByProjetFichierUrl(String projetFichierUrl);
