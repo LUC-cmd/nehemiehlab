@@ -18,9 +18,11 @@ import java.time.LocalDateTime;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/sessions")
@@ -67,10 +69,22 @@ public class SessionController {
             sessions = sessionCoursRepository.findAllByOrderByCreatedAtDesc();
         }
 
-        for (SessionCours session : sessions) {
-            List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId());
-            session.setNbTotalEleves((long) evals.size());
-            session.setNbPresents(evals.stream().filter(EvaluationSession::isPresent).count());
+        // Une seule requête groupée pour toutes les séances au lieu d'une requête par
+        // séance (évite le N+1 qui ralentissait le chargement de la liste des séances,
+        // y compris juste après un démarrer/clôturer qui recharge cette liste).
+        if (!sessions.isEmpty()) {
+            List<Long> sessionIds = sessions.stream().map(SessionCours::getId).collect(Collectors.toList());
+            List<EvaluationSession> allEvals = evaluationSessionRepository.findBySessionCoursIdInOrderByEleve_NomAscEleve_PrenomAsc(sessionIds);
+            Map<Long, List<EvaluationSession>> evalsBySession = new HashMap<>();
+            for (EvaluationSession ev : allEvals) {
+                if (ev.getSessionCours() == null) continue;
+                evalsBySession.computeIfAbsent(ev.getSessionCours().getId(), id -> new ArrayList<>()).add(ev);
+            }
+            for (SessionCours session : sessions) {
+                List<EvaluationSession> evals = evalsBySession.getOrDefault(session.getId(), new ArrayList<>());
+                session.setNbTotalEleves((long) evals.size());
+                session.setNbPresents(evals.stream().filter(EvaluationSession::isPresent).count());
+            }
         }
 
         return ResponseEntity.ok(sessions);

@@ -1579,6 +1579,7 @@ public class RapportController {
         }
 
         Map<Long, CentreMetrics> metricsByCentre = new HashMap<>();
+        Map<Long, List<EvaluationSession>> evalsBySessionExcel = loadEvaluationsBySession(sessions);
         int rowNum = 1;
         for (SessionCours session : sessions) {
             Long currentCentreId = session.getCentre() != null ? session.getCentre().getId() : null;
@@ -1592,7 +1593,7 @@ public class RapportController {
                 metrics.alertesEnAttenteCentre = pendingAlertsByCentre.getOrDefault(currentCentreId, 0L);
             }
 
-            List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId());
+            List<EvaluationSession> evals = evalsBySessionExcel.getOrDefault(session.getId(), new ArrayList<>());
             for (EvaluationSession ev : evals) {
                 if (ev.getEleve() == null) continue;
                 Row row = sheet.createRow(rowNum++);
@@ -1828,8 +1829,9 @@ public class RapportController {
 
         List<Map<String, Object>> rows = new ArrayList<>();
         int presentsTotal = 0;
+        Map<Long, List<EvaluationSession>> evalsBySessionExec = loadEvaluationsBySession(sessions);
         for (SessionCours session : sessions) {
-            List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId());
+            List<EvaluationSession> evals = evalsBySessionExec.getOrDefault(session.getId(), new ArrayList<>());
             int presents = (int) evals.stream().filter(EvaluationSession::isPresent).count();
             presentsTotal += presents;
             rows.add(toExecutionSeanceRow(session, evals.size(), presents));
@@ -1954,8 +1956,17 @@ public class RapportController {
 
     private Map<Long, List<EvaluationSession>> loadEvaluationsBySession(List<SessionCours> sessions) {
         Map<Long, List<EvaluationSession>> map = new HashMap<>();
+        if (sessions.isEmpty()) return map;
         for (SessionCours session : sessions) {
-            map.put(session.getId(), evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId()));
+            map.put(session.getId(), new ArrayList<>());
+        }
+        // Une seule requête pour toutes les séances au lieu d'une par séance (évite le N+1
+        // qui rendait la génération des rapports lente quand il y a beaucoup de séances).
+        List<Long> sessionIds = sessions.stream().map(SessionCours::getId).collect(Collectors.toList());
+        List<EvaluationSession> allEvals = evaluationSessionRepository.findBySessionCoursIdInOrderByEleve_NomAscEleve_PrenomAsc(sessionIds);
+        for (EvaluationSession ev : allEvals) {
+            if (ev.getSessionCours() == null) continue;
+            map.computeIfAbsent(ev.getSessionCours().getId(), id -> new ArrayList<>()).add(ev);
         }
         return map;
     }
