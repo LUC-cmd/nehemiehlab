@@ -133,6 +133,7 @@ export default function ActualitesPage() {
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Sparkles className="w-7 h-7 text-primary-500" />
             Nouveautés &amp; Activités
+            <span className="text-base font-semibold text-dark-400">({items.length})</span>
           </h1>
           <p className="text-dark-400 mt-1">
             Gérez la section « Activités en cours » visible sur la page d'accueil publique.
@@ -144,7 +145,7 @@ export default function ActualitesPage() {
       </div>
 
       <div className="space-y-4">
-        {items.map((a) => (
+        {items.map((a, index) => (
           <div key={a.id} className={`card border flex flex-col sm:flex-row gap-4 ${a.actif ? 'border-dark-700' : 'opacity-60'}`}>
             {a.imageUrl ? (
               <img src={mediaUrl(a.imageUrl)} alt="" className="w-full sm:w-32 h-32 rounded-xl object-cover shrink-0" />
@@ -155,7 +156,7 @@ export default function ActualitesPage() {
             )}
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <h3 className="font-bold text-white">{a.titre}</h3>
+                <h3 className="font-bold text-white">{index + 1}. {a.titre}</h3>
                 <span className="badge badge-info text-xs">{statutLabel[a.statut]}</span>
                 {!a.actif && <span className="badge badge-warning text-xs">Masquée</span>}
               </div>

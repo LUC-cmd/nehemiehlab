@@ -235,7 +235,10 @@ export default function SignalementsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Alertes centre & enfants</h1>
+          <h1 className="text-2xl font-bold text-white">
+            Alertes centre & enfants
+            <span className="ml-2 text-base font-semibold text-dark-400">({filtered.length})</span>
+          </h1>
           <p className="text-dark-400 mt-1">Enregistrez une alerte pour un enfant ou pour le centre, avec remontée ciblée.</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -521,10 +524,13 @@ export default function SignalementsPage() {
       </div>
 
       <div className="space-y-4">
-        {filtered.map((s) => (
+        {filtered.map((s, index) => (
           <div key={s.id} className="card border border-dark-700 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-dark-800 border border-dark-700 text-dark-400 text-xs font-semibold flex items-center justify-center">
+                  {index + 1}
+                </span>
                 <span className="p-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20">
                   <AlertTriangle className="w-4 h-4" />
                 </span>

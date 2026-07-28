@@ -269,7 +269,7 @@ export default function TransactionsPage() {
   );
 
   const colSpan = useMemo(() => {
-    let n = 7;
+    let n = 8;
     if (canValidateTx || isDirecteur) n += 1;
     return n;
   }, [canValidateTx, isDirecteur]);
@@ -282,7 +282,10 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Transactions &amp; Paiements</h1>
+          <h1 className="text-2xl font-bold text-slate-900">
+            Transactions &amp; Paiements
+            <span className="ml-2 text-base font-semibold text-slate-400">({transactions.length})</span>
+          </h1>
           <p className="text-slate-500 mt-1">
             {isFormateur
               ? 'Consultez vos paiements saisis hors app. Vous pouvez valider même si un justificatif manque.'
@@ -353,6 +356,7 @@ export default function TransactionsPage() {
           <table>
             <thead>
               <tr>
+                <th className="w-10">#</th>
                 <th>Date</th>
                 <th>Bénéficiaire</th>
                 <th>Type</th>
@@ -364,13 +368,14 @@ export default function TransactionsPage() {
               </tr>
             </thead>
             <tbody>
-              {transactions.map((tx) => {
+              {transactions.map((tx, index) => {
                 const missingProof = !tx.justificatifUrl;
                 return (
                   <tr
                     key={tx.id}
                     className={missingProof && tx.statut === 'EN_ATTENTE' ? 'bg-red-50/70' : undefined}
                   >
+                    <td className="text-slate-400 text-sm">{index + 1}</td>
                     <td>
                       <span className="flex items-center gap-1.5 text-slate-600">
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />

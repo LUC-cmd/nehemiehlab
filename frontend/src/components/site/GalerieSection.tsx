@@ -1,24 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { siteService } from '../../services/api';
 import type { GaleriePhoto } from '../../types';
 import { GALLERY_IMAGES } from '../../constants/branding';
 import { mediaUrl } from '../../utils/media';
 import SectionHeading from './SectionHeading';
 import AppLoader from '../ui/AppLoader';
 
-export default function GalerieSection() {
-  const [photos, setPhotos] = useState<GaleriePhoto[]>([]);
-  const [loading, setLoading] = useState(true);
+type Props = {
+  photos: GaleriePhoto[];
+  loading: boolean;
+};
 
-  useEffect(() => {
-    siteService
-      .getGalerie()
-      .then((r) => setPhotos(r.data))
-      .catch(() => setPhotos([]))
-      .finally(() => setLoading(false));
-  }, []);
-
+/**
+ * Reçoit les photos en props (chargées une seule fois par HomePage, qui en a
+ * de toute façon besoin pour le hero et le diaporama) plutôt que de refaire
+ * son propre appel réseau — évite un doublon d'appel à /site/galerie à
+ * chaque chargement de la page d'accueil.
+ */
+export default function GalerieSection({ photos, loading }: Props) {
   const items = photos.length
     ? photos
         .filter((p) => p.ordre !== 0)

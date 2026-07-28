@@ -144,6 +144,7 @@ export default function GaleriePage() {
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <ImageIcon className="w-7 h-7 text-primary-500" />
             Galerie du site
+            <span className="text-base font-semibold text-dark-400">({sortedItems.length})</span>
           </h1>
           <p className="text-dark-400 mt-1">
             Ajoutez, modifiez ou masquez les photos de la section « Galerie » sur la page d&apos;accueil.

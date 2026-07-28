@@ -133,7 +133,10 @@ export default function JournalActivitePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Journal d&apos;activité</h1>
+        <h1 className="text-2xl font-bold text-slate-900">
+          Journal d&apos;activité
+          <span className="ml-2 text-base font-semibold text-slate-400">({filteredEvents.length})</span>
+        </h1>
         <p className="mt-1 text-slate-500">
           Séances clôturées, modules enseignés, paiements et notifications importantes.
         </p>

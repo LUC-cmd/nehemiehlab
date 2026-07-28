@@ -8,7 +8,7 @@ import {
 import toast from 'react-hot-toast';
 import { centreService, contentManagementService, eleveService } from '../../services/api';
 import type { Centre, Eleve, EnfantProfilePublic, EnfantProject, ProjectMediaType } from '../../types';
-import { centreLabel } from '../../utils/centreLabel';
+import { centreLabel, sortCentresByCode } from '../../utils/centreLabel';
 import { compareEleveNomPrenom } from '../../utils/eleveSort';
 import { useAuth } from '../../context/AuthContext';
 import { mediaUrl } from '../../utils/media';
@@ -539,14 +539,14 @@ export default function ProfilsEnfantsPage() {
               onClick={() => setViewMode('profils')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium ${viewMode === 'profils' ? 'bg-white text-[#004b57] shadow-sm' : 'text-slate-500'}`}
             >
-              Profils
+              Profils ({filteredProfiles.length})
             </button>
             <button
               type="button"
               onClick={() => setViewMode('projets')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium ${viewMode === 'projets' ? 'bg-white text-[#004b57] shadow-sm' : 'text-slate-500'}`}
             >
-              Projets
+              Projets ({filteredProjects.length})
             </button>
           </div>
         </div>
@@ -583,7 +583,7 @@ export default function ProfilsEnfantsPage() {
             onChange={(e) => setCentreFilter(e.target.value)}
           >
             <option value="">Tous les centres</option>
-            {filteredCentres.map((c) => <option key={c.id} value={c.id}>{centreLabel(c)}</option>)}
+            {sortCentresByCode(filteredCentres).map((c) => <option key={c.id} value={c.id}>{centreLabel(c)}</option>)}
           </select>
         </div>
       </div>
