@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageSquare, Send, Users, Plus, Building2, Network, Wallet, MessageCircle, ArrowLeft, Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { discussionService, centreService, clusterService } from '../../services/api';
+import { sortCentresByCode } from '../../utils/centreLabel';
 import { connectNotificationsSocket } from '../../services/notificationsSocket';
 import type {
   CanalDiscussion,
@@ -941,7 +942,7 @@ export default function GroupesDiscussionPage() {
                   onChange={(e) => setCentreId(e.target.value ? Number(e.target.value) : '')}
                 >
                   <option value="">Sélectionner un centre…</option>
-                  {centres.map((c) => (
+                  {sortCentresByCode(centres).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.nom}
                     </option>

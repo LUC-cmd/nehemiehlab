@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Users, GraduationCap, Search } from 'lucide-react';
 import { eleveService } from '../../services/api';
 import type { Centre, Eleve } from '../../types';
-import { centreLabel } from '../../utils/centreLabel';
+import { centreLabel, sortCentresByCode } from '../../utils/centreLabel';
 import { compareEleveNomPrenom } from '../../utils/eleveSort';
 import { formatFullName } from '../../utils/displayName';
 
@@ -95,7 +95,7 @@ export default function CentreElevesPanel({
             value={centreId}
             onChange={(e) => setCentreId(e.target.value)}
           >
-            {centres.map((c) => (
+            {sortCentresByCode(centres).map((c) => (
               <option key={c.id} value={c.id}>
                 {centreLabel(c)}
               </option>

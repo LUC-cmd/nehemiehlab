@@ -173,7 +173,7 @@ export default function CentresPage() {
   const [clusterFilter, setClusterFilter] = useState('');
   const [formateurFilter, setFormateurFilter] = useState('');
   const [centreFilter, setCentreFilter] = useState('');
-  const [sortBy, setSortBy] = useState<'nom' | 'region' | 'cluster' | 'formateur'>('nom');
+  const [sortBy, setSortBy] = useState<'nom' | 'code' | 'region' | 'cluster' | 'formateur'>('nom');
   const [mapFocusCentre, setMapFocusCentre] = useState<Centre | null>(null);
 
   const [selectedCentre, setSelectedCentre] = useState<Centre | null>(null);
@@ -665,6 +665,14 @@ export default function CentresPage() {
     };
 
     return [...list].sort((a, b) => {
+      if (sortBy === 'code') {
+        if (a.codeCdej && b.codeCdej) {
+          return a.codeCdej.localeCompare(b.codeCdej, 'fr', { numeric: true });
+        }
+        if (a.codeCdej) return -1;
+        if (b.codeCdej) return 1;
+        return a.nom.localeCompare(b.nom, 'fr');
+      }
       if (sortBy === 'region') {
         return (a.region || '').localeCompare(b.region || '', 'fr') || a.nom.localeCompare(b.nom, 'fr');
       }
@@ -842,6 +850,7 @@ export default function CentresPage() {
               className="input-field py-2"
             >
               <option value="nom">Centre (A→Z)</option>
+              <option value="code">Numéro de centre (TG0xx)</option>
               <option value="region">Région</option>
               <option value="cluster">Cluster</option>
               <option value="formateur">Formateur</option>
@@ -864,6 +873,7 @@ export default function CentresPage() {
           <table className="w-full min-w-[1580px] text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
               <tr>
+                <th className="px-4 py-3 font-semibold w-12">#</th>
                 <th className="px-4 py-3 font-semibold">Nom</th>
                 <th className="px-4 py-3 font-semibold">Région</th>
                 <th className="px-4 py-3 font-semibold">Cluster</th>
@@ -878,7 +888,7 @@ export default function CentresPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredCentres.map((centre) => {
+              {filteredCentres.map((centre, index) => {
                 const hasGps = hasCentreGps(centre);
                 const formateur = centre.formateurs?.[0];
                 return (
@@ -889,6 +899,7 @@ export default function CentresPage() {
                     }`}
                     onClick={() => setMapFocusCentre(centre)}
                   >
+                    <td className="px-4 py-3 text-slate-500 text-sm">{index + 1}</td>
                     <td className="px-4 py-3 font-semibold text-slate-900">{centre.nom}{centre.codeCdej ? ` (${centre.codeCdej})` : ''}</td>
                     <td className="px-4 py-3 text-slate-600">{centre.region || '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{centre.cluster || '—'}</td>
