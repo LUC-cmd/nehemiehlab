@@ -712,7 +712,18 @@ public class RapportController {
     private Map<Long, String> centreNames(List<Long> centreIds) {
         if (centreIds.isEmpty()) return Map.of();
         return centreRepository.findAllById(centreIds).stream()
-                .collect(Collectors.toMap(Centre::getId, Centre::getNom, (a, b) -> a));
+                .collect(Collectors.toMap(Centre::getId, this::centreTgLabel, (a, b) -> a));
+    }
+
+    /**
+     * Libellé compact d'un centre pour les listes imprimées/exportées (Excel/PDF) :
+     * juste le code TG (ex TG087) au lieu du nom complet, pour des listes plus
+     * courtes et plus rapides à scanner sur le terrain. Si le centre n'a pas de
+     * code renseigné, on retombe sur le nom pour ne pas afficher une case vide.
+     */
+    private String centreTgLabel(Centre c) {
+        if (c == null) return "-";
+        return (c.getCodeCdej() != null && !c.getCodeCdej().isBlank()) ? c.getCodeCdej() : c.getNom();
     }
 
     private Map<Long, String> userNames(Set<Long> userIds) {
@@ -772,7 +783,7 @@ public class RapportController {
             row.createCell(5).setCellValue(eleve.getAge());
             row.createCell(6).setCellValue(eleve.getSexe());
             row.createCell(7).setCellValue(eleve.getClasse());
-            row.createCell(8).setCellValue(eleve.getCentre() != null ? eleve.getCentre().getNom() : "-");
+            row.createCell(8).setCellValue(centreTgLabel(eleve.getCentre()));
             row.createCell(9).setCellValue(eleve.getCentre() != null && eleve.getCentre().getRegion() != null ? eleve.getCentre().getRegion() : "-");
             row.createCell(10).setCellValue(eleve.getCentre() != null && eleve.getCentre().getCluster() != null ? eleve.getCentre().getCluster() : "-");
             row.createCell(11).setCellValue(eleve.getTotalHeures() != null ? eleve.getTotalHeures() : 0.0);
@@ -819,7 +830,7 @@ public class RapportController {
                 String.valueOf(e.getAge()),
                 e.getSexe() != null ? e.getSexe() : "-",
                 e.getClasse() != null ? e.getClasse() : "-",
-                e.getCentre() != null ? e.getCentre().getNom() : "-",
+                centreTgLabel(e.getCentre()),
                 e.getTotalHeures() != null ? String.format("%.1f h", e.getTotalHeures()) : "0.0 h",
                 e.getProjet() != null ? e.getProjet().getNom() : "Aucun"
         )).toList();
@@ -861,9 +872,7 @@ public class RapportController {
     private String centresLabel(User u) {
         if (u.getCentres() == null || u.getCentres().isEmpty()) return "-";
         return u.getCentres().stream()
-                .map(c -> c.getCodeCdej() != null && !c.getCodeCdej().isBlank()
-                        ? c.getNom() + " (" + c.getCodeCdej() + ")"
-                        : c.getNom())
+                .map(this::centreTgLabel)
                 .sorted()
                 .collect(Collectors.joining(", "));
     }
@@ -1163,7 +1172,7 @@ public class RapportController {
 
             Map<String, String> meta = new LinkedHashMap<>();
             meta.put("Enfant", eleve.getPrenom() + " " + eleve.getNom());
-            meta.put("Centre", eleve.getCentre() != null ? eleve.getCentre().getNom() : "-");
+            meta.put("Centre", centreTgLabel(eleve.getCentre()));
             meta.put("Classe", eleve.getClasse() != null ? eleve.getClasse() : "-");
             meta.put("Matricule", eleve.getMatricule() != null ? eleve.getMatricule() : "-");
 
@@ -1403,7 +1412,7 @@ public class RapportController {
             row.createCell(0).setCellValue(eleve.getId());
             row.createCell(1).setCellValue(eleve.getNom());
             row.createCell(2).setCellValue(eleve.getPrenom());
-            row.createCell(3).setCellValue(eleve.getCentre() != null ? eleve.getCentre().getNom() : "-");
+            row.createCell(3).setCellValue(centreTgLabel(eleve.getCentre()));
             row.createCell(4).setCellValue(eleve.getTotalHeures() != null ? eleve.getTotalHeures() : 0.0);
             row.createCell(5).setCellValue(sessionsPeriode);
             row.createCell(6).setCellValue(eleve.getDateDebutFormation() != null ? eleve.getDateDebutFormation().toString() : "-");
@@ -1584,7 +1593,7 @@ public class RapportController {
         for (SessionCours session : sessions) {
             Long currentCentreId = session.getCentre() != null ? session.getCentre().getId() : null;
             CentreMetrics metrics = metricsByCentre.computeIfAbsent(currentCentreId == null ? -1L : currentCentreId, id -> new CentreMetrics());
-            metrics.centreNom = session.getCentre() != null ? session.getCentre().getNom() : "-";
+            metrics.centreNom = centreTgLabel(session.getCentre());
             metrics.sessions++;
             if (session.getEtatEquipements() != null && !session.getEtatEquipements().isBlank()) metrics.sessionsAvecEquipements++;
             if (session.getDefisSession() != null && !session.getDefisSession().isBlank()) metrics.sessionsAvecDefis++;
@@ -1734,7 +1743,7 @@ public class RapportController {
             return List.of(
                     eleve.getNom() != null ? eleve.getNom() : "-",
                     eleve.getPrenom() != null ? eleve.getPrenom() : "-",
-                    eleve.getCentre() != null ? eleve.getCentre().getNom() : "-",
+                    centreTgLabel(eleve.getCentre()),
                     String.format("%.1f", eleve.getTotalHeures() != null ? eleve.getTotalHeures() : 0.0),
                     String.valueOf(sessionsPeriode),
                     eleve.getDateDebutFormation() != null ? eleve.getDateDebutFormation().toString() : "-"
