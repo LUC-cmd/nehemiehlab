@@ -61,11 +61,17 @@ export default function ControleGestionPage() {
       </div>
 
       <div className="card border border-dark-700">
-        <h2 className="text-white font-semibold mb-4">Dernières opérations</h2>
+        <h2 className="text-white font-semibold mb-4">
+          Dernières opérations
+          <span className="ml-2 font-normal text-dark-400 text-sm">
+            ({Math.min(transactions.length, 10)} / {transactions.length})
+          </span>
+        </h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-dark-400 border-b border-dark-700">
+                <th className="py-2 w-10">#</th>
                 <th className="py-2">Formateur</th>
                 <th className="py-2">Type</th>
                 <th className="py-2">Montant</th>
@@ -73,8 +79,9 @@ export default function ControleGestionPage() {
               </tr>
             </thead>
             <tbody>
-              {transactions.slice(0, 10).map((t) => (
+              {transactions.slice(0, 10).map((t, index) => (
                 <tr key={t.id} className="border-b border-dark-800">
+                  <td className="py-2 text-dark-400">{index + 1}</td>
                   <td className="py-2 text-white">{t.formateur?.prenom} {t.formateur?.nom}</td>
                   <td className="py-2 text-dark-300">{t.type}</td>
                   <td className="py-2 text-dark-300">{t.montant.toLocaleString('fr-FR')} FCFA</td>

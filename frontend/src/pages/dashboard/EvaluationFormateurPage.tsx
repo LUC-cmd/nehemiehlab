@@ -239,14 +239,15 @@ export default function EvaluationFormateurPage() {
         <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-4">
           <ClipboardList className="w-4 h-4" />
           {isDirector ? 'Évaluations reçues' : 'Mes évaluations'}
+          <span className="font-normal text-slate-400 text-sm">({evaluations.length})</span>
         </h2>
         {evaluations.length === 0 ? (
           <p className="text-sm text-slate-500">Aucune évaluation pour le moment.</p>
         ) : (
           <ul className="space-y-3">
-            {evaluations.map((ev) => (
+            {evaluations.map((ev, index) => (
               <li key={ev.id} className="rounded-lg border border-slate-100 p-3 text-sm">
-                <p className="font-semibold text-slate-900">{ev.moduleTitre || `Module #${ev.moduleCoursId}`}</p>
+                <p className="font-semibold text-slate-900">{index + 1}. {ev.moduleTitre || `Module #${ev.moduleCoursId}`}</p>
                 {isDirector && (
                   <p className="text-slate-600">
                     {formatFullName(ev.formateurPrenom, ev.formateurNom)}

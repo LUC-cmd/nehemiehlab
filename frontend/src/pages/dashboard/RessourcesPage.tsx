@@ -197,7 +197,10 @@ export default function RessourcesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Ressources SKA</h1>
+        <h1 className="text-2xl font-bold text-slate-900">
+          Ressources SKA
+          <span className="ml-2 text-base font-semibold text-slate-400">({activeResources.length})</span>
+        </h1>
         <p className="text-slate-500 mt-1">
           Référentiels, projets de référence et contenus d&apos;appui pédagogique — documents, photos, vidéos.
         </p>
@@ -298,14 +301,14 @@ export default function RessourcesPage() {
       )}
 
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {activeResources.map((resource) => {
+        {activeResources.map((resource, index) => {
           const files = resourceFiles(resource);
           return (
             <article key={resource.id} className="card border border-slate-200 hover:border-slate-300 transition-colors flex flex-col">
               <div className="w-11 h-11 rounded-xl bg-primary-50 border border-primary-100 flex items-center justify-center text-primary-600 mb-4">
                 <BookOpen className="w-5 h-5" />
               </div>
-              <h3 className="text-slate-900 font-semibold mb-2">{resource.titre}</h3>
+              <h3 className="text-slate-900 font-semibold mb-2">{index + 1}. {resource.titre}</h3>
               <p className="text-sm text-slate-600 leading-relaxed flex-1">{resource.description}</p>
 
               {resource.lien && (

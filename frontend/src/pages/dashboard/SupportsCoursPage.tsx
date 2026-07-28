@@ -440,6 +440,7 @@ export default function SupportsCoursPage() {
         <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
           <Layers className="w-5 h-5 text-primary-600" />
           Séries de supports
+          <span className="font-normal text-slate-400 text-sm">({visibleSeries.length})</span>
         </h2>
         {visibleSeries.length === 0 ? (
           <div className="card text-center text-slate-600 py-10">
@@ -565,6 +566,7 @@ export default function SupportsCoursPage() {
         <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
           <GraduationCap className="w-5 h-5 text-primary-600" />
           Modules pédagogiques SKA
+          <span className="font-normal text-slate-400 text-sm">({visibleModules.length})</span>
         </h2>
         <p className="text-sm text-slate-500 -mt-2">
           Référentiel des modules enseignés (sans fichiers — les supports sont dans les séries ci-dessus).

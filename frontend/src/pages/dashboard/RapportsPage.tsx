@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { rapportService, centreService, eleveService } from '../../services/api';
 import type { Centre, Eleve } from '../../types';
-import { centreLabel } from '../../utils/centreLabel';
+import { centreLabel, sortCentresByCode } from '../../utils/centreLabel';
 import {
   FileSpreadsheet, Download, Calendar, Building2, Loader2, Filter, FileText,
   Users, Clock, Activity, Wallet, ClipboardList, RotateCcw, CheckCircle2,
@@ -292,7 +292,7 @@ export default function RapportsPage() {
               }}
             >
               <option value="">Tous les centres du filtre</option>
-              {filteredCentres.map((c) => (
+              {sortCentresByCode(filteredCentres).map((c) => (
                 <option key={c.id} value={c.id}>{centreLabel(c)}</option>
               ))}
             </select>

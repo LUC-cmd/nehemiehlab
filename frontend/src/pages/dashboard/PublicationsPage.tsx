@@ -206,6 +206,7 @@ export default function PublicationsPage() {
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Megaphone className="w-7 h-7 text-primary-500" />
             Publications &amp; Annonces
+            <span className="text-base font-semibold text-dark-400">({items.length})</span>
           </h1>
           <p className="text-dark-400 mt-1">
             Ajoutez des images, vidéos ou textes visibles sur la page d&apos;accueil.
@@ -217,13 +218,13 @@ export default function PublicationsPage() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        {items.map((p) => (
+        {items.map((p, index) => (
           <div key={p.id} className={`card border ${p.actif ? 'border-dark-700' : 'border-dark-800 opacity-60'}`}>
             <div className="flex gap-4">
               {cardThumb(p)}
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-bold text-white truncate">{p.titre}</h3>
+                  <h3 className="font-bold text-white truncate">{index + 1}. {p.titre}</h3>
                   <span className={`badge text-xs ${p.actif ? 'badge-success' : 'badge-warning'}`}>
                     {p.actif ? 'En ligne' : 'Masquée'}
                   </span>
