@@ -78,6 +78,10 @@ export default function SessionsPage() {
     heureDebut: nowForDatetimeLocal(),
     // Séance déjà terminée qu'on saisit après coup (pas de géolocalisation requise).
     manuelle: false,
+    // Heure de fin, saisie directement ici pour une séance manuelle : évite d'avoir
+    // à rouvrir la séance et chercher le bloc « Horaires » juste pour pouvoir la
+    // clôturer ensuite.
+    heureFin: '',
   });
   
   const [selectedSession, setSelectedSession] = useState<SessionCours | null>(null);
@@ -206,6 +210,24 @@ export default function SessionsPage() {
       if (navigator.onLine) toast.error('Erreur lors du chargement des sessions.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Rafraîchit uniquement la liste des séances, sans passer par setLoading(true)
+  // (donc sans remplacer tout le contenu de la page par le squelette de chargement)
+  // et sans re-télécharger les centres/modules qui n'ont pas changé. Utilisé juste
+  // après démarrer/clôturer une séance : avant ce correctif, ces deux actions
+  // rappelaient fetchInitialData() qui provoquait un flash plein écran ressenti
+  // comme une lenteur, même une fois le GPS et les requêtes N+1 déjà optimisés.
+  const refreshSessionsOnly = async () => {
+    try {
+      const response = await sessionService.getAll();
+      setSessions(response.data);
+      writeCache('sessions', response.data);
+    } catch {
+      // Échec silencieux : la liste affichée reste celle d'avant (déjà à jour côté
+      // serveur suite à l'action qui vient de réussir) ; pas de toast d'erreur pour
+      // ne pas parasiter le message de succès qui vient de s'afficher.
     }
   };
 
@@ -347,11 +369,21 @@ export default function SessionsPage() {
       toast.error('Choisissez une durée prévue (heures et/ou minutes).');
       return;
     }
+    if (newSession.manuelle) {
+      if (!newSession.heureFin) {
+        toast.error('Indiquez l’heure de fin de cette séance déjà terminée.');
+        return;
+      }
+      if (new Date(newSession.heureFin).getTime() <= new Date(newSession.heureDebut).getTime()) {
+        toast.error('L’heure de fin doit être après l’heure de début.');
+        return;
+      }
+    }
     setCreatingSession(true);
 
     const resetNewSessionForm = () => setNewSession({
       titre: '', centreId: '', duree: '120', moduleCoursId: '', etatEquipements: '', defisSession: '',
-      heureDebut: nowForDatetimeLocal(), manuelle: false,
+      heureDebut: nowForDatetimeLocal(), manuelle: false, heureFin: '',
     });
 
     const runCreate = async (
@@ -417,16 +449,36 @@ export default function SessionsPage() {
         defisSession: newSession.defisSession || undefined,
         manuelle: newSession.manuelle,
       });
+
+      // Séance manuelle : on enregistre tout de suite l'heure de fin saisie dans ce
+      // même formulaire, pour que la séance soit immédiatement prête à clôturer sans
+      // avoir à la rouvrir et chercher le bloc « Horaires » séparément. Si cet appel
+      // échoue (réseau, session déjà en attente hors ligne...), on ne bloque pas la
+      // création elle-même : l'heure de fin pourra toujours être renseignée ensuite
+      // via « Horaires & localisation ».
+      const createdId = response.data?.id;
+      if (newSession.manuelle && newSession.heureFin && createdId && !response.data?.queuedOffline) {
+        try {
+          await sessionService.updateHoraires(createdId, {
+            heureFin: datetimeLocalToIso(newSession.heureFin),
+          });
+        } catch {
+          toast.error(
+            "Séance créée, mais l'heure de fin n'a pas pu être enregistrée. Renseignez-la via « Horaires ».",
+          );
+        }
+      }
+
       toast.success(
         response.data?.queuedOffline
           ? 'Session mise en attente hors ligne. Elle sera synchronisée automatiquement.'
           : newSession.manuelle
-          ? 'Séance ajoutée. Marquez les présences puis clôturez-la.'
+          ? 'Séance ajoutée avec ses horaires. Marquez les présences puis clôturez-la.'
           : 'Session démarrée avec localisation !',
       );
       setShowAddModal(false);
       resetNewSessionForm();
-      fetchInitialData();
+      refreshSessionsOnly();
     };
 
     let geo: { latitude: number; longitude: number; precisionMetres?: number } | null = null;
@@ -703,7 +755,7 @@ export default function SessionsPage() {
         );
         setConfirmClotureId(null);
         setShowSessionDetail(false);
-        fetchInitialData();
+        refreshSessionsOnly();
       };
 
       let geoFin: { latitude: number; longitude: number; precisionMetres?: number } | null = null;
@@ -1445,7 +1497,17 @@ export default function SessionsPage() {
                 type="checkbox"
                 className="mt-0.5"
                 checked={newSession.manuelle}
-                onChange={(e) => setNewSession({ ...newSession, manuelle: e.target.checked })}
+                onChange={(e) => {
+                  const manuelle = e.target.checked;
+                  // Pré-remplit l'heure de fin avec l'heure actuelle dès qu'on coche la
+                  // case, pour que le champ ne soit pas vide à remplir à la main : il
+                  // suffit ensuite d'ajuster si besoin, plutôt que de tout saisir.
+                  setNewSession({
+                    ...newSession,
+                    manuelle,
+                    heureFin: manuelle ? (newSession.heureFin || nowForDatetimeLocal()) : '',
+                  });
+                }}
               />
               <span className="text-sm text-dark-200">
                 <span className="font-medium text-white">Cette séance a déjà eu lieu</span>
@@ -1471,6 +1533,24 @@ export default function SessionsPage() {
                 : 'Ajustez si la séance a commencé plus tôt. La position GPS sera capturée au lancement.'}
             </p>
           </div>
+          {newSession.manuelle && (
+            <div>
+              <label className="label">Heure de fin *</label>
+              <input
+                type="datetime-local"
+                required
+                min={newSession.heureDebut}
+                max={nowForDatetimeLocal()}
+                className="input-field"
+                value={newSession.heureFin}
+                onChange={(e) => setNewSession({ ...newSession, heureFin: e.target.value })}
+              />
+              <p className="text-xs text-dark-500 mt-1">
+                Indiquez tout de suite l'heure de fin réelle : la séance sera prête à
+                clôturer sans étape supplémentaire.
+              </p>
+            </div>
+          )}
           <div>
             <label className="label">Durée prévue *</label>
             <div className="grid grid-cols-2 gap-2">
