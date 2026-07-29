@@ -343,6 +343,10 @@ export default function SessionsPage() {
       toast.error('Sélectionnez un module du catalogue Directeur.');
       return;
     }
+    if (!Number(newSession.duree)) {
+      toast.error('Choisissez une durée prévue (heures et/ou minutes).');
+      return;
+    }
     setCreatingSession(true);
 
     const resetNewSessionForm = () => setNewSession({
@@ -1468,13 +1472,40 @@ export default function SessionsPage() {
             </p>
           </div>
           <div>
-            <label className="label">Durée prévue</label>
-            <select required className="input-field" value={newSession.duree} onChange={e => setNewSession({...newSession, duree: e.target.value})}>
-              <option value="60">1 Heure</option>
-              <option value="120">2 Heures</option>
-              <option value="180">3 Heures</option>
-              <option value="240">4 Heures</option>
-            </select>
+            <label className="label">Durée prévue *</label>
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                required
+                className="input-field"
+                value={String(Math.floor((Number(newSession.duree) || 0) / 60))}
+                onChange={(e) => {
+                  const heures = Number(e.target.value);
+                  const minutesRestantes = (Number(newSession.duree) || 0) % 60;
+                  setNewSession({ ...newSession, duree: String(heures * 60 + minutesRestantes) });
+                }}
+              >
+                {Array.from({ length: 9 }, (_, h) => h).map((h) => (
+                  <option key={h} value={h}>{h} {h <= 1 ? 'Heure' : 'Heures'}</option>
+                ))}
+              </select>
+              <select
+                required
+                className="input-field"
+                value={String((Number(newSession.duree) || 0) % 60)}
+                onChange={(e) => {
+                  const minutes = Number(e.target.value);
+                  const heuresActuelles = Math.floor((Number(newSession.duree) || 0) / 60);
+                  setNewSession({ ...newSession, duree: String(heuresActuelles * 60 + minutes) });
+                }}
+              >
+                {[0, 15, 30, 45].map((m) => (
+                  <option key={m} value={m}>{m === 0 ? '00' : m} min</option>
+                ))}
+              </select>
+            </div>
+            <p className="text-xs text-dark-500 mt-1">
+              Choisissez les heures puis les minutes (ex : 4 Heures + 30 min pour 4h30).
+            </p>
           </div>
           <div>
             <label className="label">État des équipements</label>
