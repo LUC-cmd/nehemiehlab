@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
@@ -115,6 +116,41 @@ public class SessionController {
         }
 
         List<EvaluationSession> evaluations = evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(id);
+
+        // Un élève inscrit après le démarrage de la séance n'avait jamais d'évaluation
+        // créée pour cette séance (elles sont générées une fois, à la création). Résultat :
+        // le formateur le voyait dans « Mes élèves » (requête toujours à jour) mais pas
+        // dans « Gérer la séance » tant que la séance restait ouverte. Tant que la séance
+        // est EN_COURS, on complète les évaluations manquantes avec les nouveaux élèves du
+        // centre à chaque consultation, sans toucher aux séances déjà clôturées (dont la
+        // liste doit rester un instantané figé de qui était présent ce jour-là).
+        if ("EN_COURS".equals(session.getStatut())) {
+            List<Eleve> elevesCentre = eleveRepository.findByCentreIdOrderByNomAscPrenomAsc(session.getCentre().getId());
+            Set<Long> elevesDejaEvalues = evaluations.stream()
+                    .map(ev -> ev.getEleve().getId())
+                    .collect(Collectors.toSet());
+            boolean nouveauxAjoutes = false;
+            for (Eleve e : elevesCentre) {
+                if (!elevesDejaEvalues.contains(e.getId())) {
+                    String projetNom = (e.getProjet() != null && e.getProjet().getNom() != null)
+                            ? e.getProjet().getNom() : null;
+                    EvaluationSession eval = EvaluationSession.builder()
+                            .sessionCours(session)
+                            .eleve(e)
+                            .present(false)
+                            .note(null)
+                            .commentaire(null)
+                            .projetTravaille(projetNom)
+                            .build();
+                    evaluationSessionRepository.save(eval);
+                    nouveauxAjoutes = true;
+                }
+            }
+            if (nouveauxAjoutes) {
+                evaluations = evaluationSessionRepository.findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(id);
+            }
+        }
+
         Map<String, Object> response = new HashMap<>();
         response.put("session", session);
         response.put("evaluations", evaluations);
