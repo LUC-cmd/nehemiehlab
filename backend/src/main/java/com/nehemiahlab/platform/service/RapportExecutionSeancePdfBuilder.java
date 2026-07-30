@@ -34,6 +34,11 @@ import java.util.stream.Collectors;
 /**
  * Génère le « Rapport Exécution SKA Program » (format officiel type Yoto Sud)
  * à partir des seules données saisies par le formateur en séance.
+ *
+ * Les séances du jour sont présentées sous forme de VRAI tableau (colonnes,
+ * bordures, entête colorée, lignes zébrées) — même style que les autres
+ * exports PDF de la plateforme — et non plus comme du texte brut séparé par
+ * des « | ».
  */
 @Service
 public class RapportExecutionSeancePdfBuilder {
@@ -44,6 +49,15 @@ public class RapportExecutionSeancePdfBuilder {
     private static final DateTimeFormatter REPORT_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter CRENEAU_TIME = DateTimeFormatter.ofPattern("H'h'mm");
     private static final Locale FR = Locale.FRENCH;
+
+    private static final List<String> TABLE_HEADERS = List.of(
+            "N°", "Centre (CDEJ)", "Formateur", "Lieu", "Créneau", "Présents", "Module & défis rencontrés"
+    );
+    // Proportions des colonnes (somme = 1.0), appliquées à la largeur utile de la page.
+    private static final float[] COLUMN_RATIOS = {0.04f, 0.23f, 0.19f, 0.11f, 0.09f, 0.06f, 0.28f};
+    private static final float TABLE_FONT_SIZE = 8f;
+    private static final float TABLE_LINE_HEIGHT = 10.5f;
+    private static final float TABLE_MIN_BOTTOM = 95f;
 
     private static final String PREAMBULE_1 =
             "Pour contrer la problématique des défis en matière d'employabilité à laquelle certains jeunes se retrouvent "
@@ -92,6 +106,8 @@ public class RapportExecutionSeancePdfBuilder {
                     scope != null ? scope : "Séances terrain — données formateurs",
                     metaHeader(periodeDebut, periodeFin, ordered.size()));
 
+            float[] widths = columnWidths(ctx.maxW);
+
             ctx.y = drawLine(ctx, "Préambule", titleFont, SKA_TEAL);
             ctx.y -= 4f;
             for (String block : List.of(PREAMBULE_1, PREAMBULE_2, PREAMBULE_3)) {
@@ -110,7 +126,7 @@ public class RapportExecutionSeancePdfBuilder {
                         .sorted(Comparator.comparing(SessionCours::getHeureDebut))
                         .toList();
 
-                ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 80f);
+                ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 90f);
                 String dayTitle = sectionNum + ". Point sur le déroulement du programme durant la séance du "
                         + formatJourComplet(day);
                 ctx.y = PdfTextUtil.drawWrapped(ctx.content, dayTitle, titleFont, 10.5f, margin, ctx.y, ctx.maxW, 14f, SKA_INK) - 6f;
@@ -120,11 +136,8 @@ public class RapportExecutionSeancePdfBuilder {
                         + "(effectif des participants présents et défis majeurs rencontrés — données saisies par le formateur).";
                 ctx.y = PdfTextUtil.drawWrapped(ctx.content, intro, bodyFont, 9f, margin, ctx.y, ctx.maxW, 12f, MUTED) - 10f;
 
-                ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 30f);
-                ctx.y = drawLine(ctx,
-                        "N° | N°CDEJ / CDEJ | Contacts | Lieu | SKA Trainer | Créneau | P | Défis",
-                        bodyFont, SKA_TEAL);
-                ctx.y -= 4f;
+                ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 40f);
+                ctx.y = PdfTextUtil.drawTableHeaderRow(ctx.content, TABLE_HEADERS, widths, ctx.margin, ctx.y, titleFont);
 
                 int rowNum = 1;
                 int totalPresents = 0;
@@ -133,13 +146,28 @@ public class RapportExecutionSeancePdfBuilder {
                     int presents = (int) evals.stream().filter(EvaluationSession::isPresent).count();
                     totalPresents += presents;
 
-                    ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 70f);
-                    ctx.y = drawSessionRow(ctx, rowNum, session, presents, bodyFont, titleFont);
+                    List<String> row = buildRowValues(rowNum, session, presents);
+                    float rowHeight = PdfTextUtil.measureTableRowHeight(row, widths, bodyFont, TABLE_FONT_SIZE, TABLE_LINE_HEIGHT);
+
+                    if (ctx.y - rowHeight < TABLE_MIN_BOTTOM) {
+                        ctx.content.close();
+                        ctx = newPage(document, titleFont, bodyFont, margin,
+                                "Rapport Exécution SKA Program (suite)",
+                                scope != null ? scope : "",
+                                Map.of("Suite", "—"));
+                        ctx.y = PdfTextUtil.drawTableHeaderRow(ctx.content, TABLE_HEADERS, widths, ctx.margin, ctx.y, titleFont);
+                    }
+
+                    ctx.y = PdfTextUtil.drawTableDataRow(
+                            ctx.content, row, widths, ctx.margin, ctx.y, rowHeight,
+                            bodyFont, TABLE_FONT_SIZE, TABLE_LINE_HEIGHT, rowNum % 2 == 1
+                    );
                     rowNum++;
                 }
 
                 ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 40f);
-                ctx.y = drawLine(ctx, "T " + totalPresents, titleFont, SKA_INK);
+                ctx.y -= 6f;
+                ctx.y = drawLine(ctx, "Total élèves présents : " + totalPresents, titleFont, SKA_INK);
                 ctx.y -= 8f;
                 ctx.y = drawLine(ctx, "Les mesures proposées pour relever les défis", titleFont, SKA_TEAL);
                 ctx.y -= 4f;
@@ -164,10 +192,20 @@ public class RapportExecutionSeancePdfBuilder {
         }
     }
 
-    private float drawSessionRow(
-            PageCtx ctx, int rowNum, SessionCours session, int presents,
-            PDType1Font bodyFont, PDType1Font titleFont
-    ) throws IOException {
+    private static float[] columnWidths(float maxW) {
+        float[] widths = new float[COLUMN_RATIOS.length];
+        float used = 0f;
+        for (int i = 0; i < COLUMN_RATIOS.length - 1; i++) {
+            widths[i] = maxW * COLUMN_RATIOS[i];
+            used += widths[i];
+        }
+        // La dernière colonne récupère l'espace restant pour éviter tout écart
+        // d'arrondi et laisser le plus de place possible au texte libre (défis).
+        widths[widths.length - 1] = Math.max(40f, maxW - used);
+        return widths;
+    }
+
+    private List<String> buildRowValues(int rowNum, SessionCours session, int presents) {
         Centre centre = session.getCentre();
         User formateur = session.getFormateur();
 
@@ -190,13 +228,27 @@ public class RapportExecutionSeancePdfBuilder {
                 ? session.getModuleFait() : (session.getTitre() != null ? session.getTitre() : "-");
         String defis = buildDefis(session);
 
-        String header = String.format("%02d | %s %s | %s | %s | %s (%s) | %s | %d |",
-                rowNum, codeCdej, nomCdej, contacts, lieu, trainer, trainerContact, creneau, presents);
-        float y = PdfTextUtil.drawWrapped(ctx.content, header, titleFont, 8.5f, ctx.margin, ctx.y, ctx.maxW, 11f, SKA_INK) - 2f;
-        y = PdfTextUtil.drawWrapped(ctx.content, "Module : " + module, bodyFont, 8f, ctx.margin + 8f, y, ctx.maxW - 8f, 10f, MUTED) - 2f;
-        y = PdfTextUtil.drawWrapped(ctx.content, defis, bodyFont, 8.5f, ctx.margin + 8f, y, ctx.maxW - 8f, 11f, MUTED) - 8f;
-        ctx.y = y;
-        return y;
+        String centreCell = (codeCdej + " " + nomCdej).trim();
+        if (!"-".equals(contacts)) {
+            centreCell += "\nTél : " + contacts;
+        }
+
+        String formateurCell = trainer;
+        if (!"-".equals(trainerContact)) {
+            formateurCell += "\n" + trainerContact;
+        }
+
+        String moduleDefisCell = "Module : " + module + "\n" + defis;
+
+        return List.of(
+                String.valueOf(rowNum),
+                centreCell,
+                formateurCell,
+                lieu,
+                creneau,
+                String.valueOf(presents),
+                moduleDefisCell
+        );
     }
 
     private static String buildDefis(SessionCours session) {

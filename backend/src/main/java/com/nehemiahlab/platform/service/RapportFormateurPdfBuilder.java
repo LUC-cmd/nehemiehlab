@@ -147,9 +147,9 @@ public class RapportFormateurPdfBuilder {
                 ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, moduleLabel, centre, formateur, debut, fin, 95f);
 
                 String header = num + ". " + NameFormatUtil.formatNomComplet(eleve.getNom(), eleve.getPrenom())
-                        + "  |  " + (eleve.getSexe() != null ? eleve.getSexe() : "-")
-                        + "  |  " + eleve.getAge() + " ans  |  " + (eleve.getClasse() != null ? eleve.getClasse() : "-")
-                        + "  |  Nbre séances suivi : " + row.seancesSuivies + "  |  " + row.niveau;
+                        + "  ·  " + (eleve.getSexe() != null ? eleve.getSexe() : "-")
+                        + "  ·  " + eleve.getAge() + " ans  ·  " + (eleve.getClasse() != null ? eleve.getClasse() : "-")
+                        + "  ·  Nbre séances suivi : " + row.seancesSuivies + "  ·  " + row.niveau;
                 ctx.y = PdfTextUtil.drawWrapped(ctx.content, header, titleFont, 9f, margin, ctx.y, ctx.maxW, 12f, SKA_TEAL) - 2f;
 
                 String projetLine = "Projet : " + row.projetNom;
@@ -172,7 +172,7 @@ public class RapportFormateurPdfBuilder {
             ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, moduleLabel, centre, formateur, debut, fin, 100f);
             ctx.y = drawLine(ctx, "Synthèse — défis, leçons, propositions et perspectives", titleFont, SKA_INK);
             ctx.y -= 6f;
-            drawSyntheseTable(ctx, synthese, bodyFont, margin);
+            ctx = drawSyntheseTable(ctx, document, titleFont, bodyFont, margin, synthese, moduleLabel, centre, formateur, debut, fin);
 
             if (synthese != null) {
                 ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, moduleLabel, centre, formateur, debut, fin, 80f);
@@ -197,18 +197,55 @@ public class RapportFormateurPdfBuilder {
         }
     }
 
-    private void drawSyntheseTable(PageCtx ctx, RapportSyntheseCentre synthese, PDType1Font bodyFont, float margin) throws IOException {
+    private static final List<String> SYNTHESE_HEADERS =
+            List.of("Catégorie", "Défis rencontrés", "Leçons apprises", "Propositions du Trainer");
+    private static final float[] SYNTHESE_RATIOS = {0.16f, 0.28f, 0.28f, 0.28f};
+
+    private PageCtx drawSyntheseTable(
+            PageCtx ctx, PDDocument doc, PDType1Font titleFont, PDType1Font bodyFont, float margin,
+            RapportSyntheseCentre synthese, String moduleLabel, Centre centre, User formateur,
+            LocalDate debut, LocalDate fin
+    ) throws IOException {
         List<Map<String, String>> rows = parseSyntheseRows(synthese);
         if (rows.isEmpty()) {
             rows = defaultSyntheseRows();
         }
-        for (Map<String, String> row : rows) {
-            String line = row.getOrDefault("categorie", "—") + " — Défis: "
-                    + row.getOrDefault("defis", "—")
-                    + " | Leçons: " + row.getOrDefault("lecons", "—")
-                    + " | Trainer: " + row.getOrDefault("propsTrainer", "—");
-            ctx.y = PdfTextUtil.drawWrapped(ctx.content, line, bodyFont, 8f, margin, ctx.y, ctx.maxW, 11f, MUTED) - 6f;
+
+        float[] widths = new float[SYNTHESE_RATIOS.length];
+        float used = 0f;
+        for (int i = 0; i < widths.length - 1; i++) {
+            widths[i] = ctx.maxW * SYNTHESE_RATIOS[i];
+            used += widths[i];
         }
+        widths[widths.length - 1] = Math.max(40f, ctx.maxW - used);
+
+        ctx = ensureSpace(ctx, doc, titleFont, bodyFont, margin, moduleLabel, centre, formateur, debut, fin, 40f);
+        ctx.y = PdfTextUtil.drawTableHeaderRow(ctx.content, SYNTHESE_HEADERS, widths, ctx.margin, ctx.y, titleFont);
+
+        int rowIndex = 0;
+        for (Map<String, String> row : rows) {
+            List<String> cells = List.of(
+                    row.getOrDefault("categorie", "—"),
+                    row.getOrDefault("defis", "—"),
+                    row.getOrDefault("lecons", "—"),
+                    row.getOrDefault("propsTrainer", "—")
+            );
+            float rowHeight = PdfTextUtil.measureTableRowHeight(cells, widths, bodyFont, 8f, 10.5f);
+
+            if (ctx.y - rowHeight < 90f) {
+                ctx.content.close();
+                ctx = newPage(doc, titleFont, bodyFont, margin,
+                        "Rapport formateur (suite)", moduleLabel, centreHeader(centre, formateur, debut, fin));
+                ctx.y = PdfTextUtil.drawTableHeaderRow(ctx.content, SYNTHESE_HEADERS, widths, ctx.margin, ctx.y, titleFont);
+            }
+
+            ctx.y = PdfTextUtil.drawTableDataRow(
+                    ctx.content, cells, widths, ctx.margin, ctx.y, rowHeight,
+                    bodyFont, 8f, 10.5f, rowIndex % 2 == 0
+            );
+            rowIndex++;
+        }
+        return ctx;
     }
 
     private List<Map<String, String>> parseSyntheseRows(RapportSyntheseCentre synthese) {
