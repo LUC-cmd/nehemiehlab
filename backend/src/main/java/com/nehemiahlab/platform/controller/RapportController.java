@@ -25,6 +25,7 @@ import com.nehemiahlab.platform.service.CentreAccessService;
 import com.nehemiahlab.platform.service.RapportExecutionSeancePdfBuilder;
 import com.nehemiahlab.platform.service.RapportFormateurPdfBuilder;
 import com.nehemiahlab.platform.util.PdfTextUtil;
+import com.nehemiahlab.platform.util.NameFormatUtil;
 import com.nehemiahlab.platform.util.RapportAnnuelUtil;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -731,7 +732,7 @@ public class RapportController {
         return userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(
                         User::getId,
-                        u -> ((u.getPrenom() != null ? u.getPrenom() : "") + " " + (u.getNom() != null ? u.getNom() : "")).trim(),
+                        u -> NameFormatUtil.formatNomComplet(u.getNom(), u.getPrenom()),
                         (a, b) -> a
                 ));
     }
@@ -778,8 +779,8 @@ public class RapportController {
             row.createCell(0).setCellValue(n);
             row.createCell(1).setCellValue(eleve.getId());
             row.createCell(2).setCellValue(eleve.getMatricule() != null ? eleve.getMatricule() : "-");
-            row.createCell(3).setCellValue(eleve.getNom());
-            row.createCell(4).setCellValue(eleve.getPrenom());
+            row.createCell(3).setCellValue(NameFormatUtil.formatNom(eleve.getNom()));
+            row.createCell(4).setCellValue(NameFormatUtil.formatPrenom(eleve.getPrenom()));
             row.createCell(5).setCellValue(eleve.getAge());
             row.createCell(6).setCellValue(eleve.getSexe());
             row.createCell(7).setCellValue(eleve.getClasse());
@@ -825,8 +826,8 @@ public class RapportController {
 
         List<List<String>> rows = eleves.stream().map(e -> List.of(
                 e.getMatricule() != null ? e.getMatricule() : "-",
-                e.getNom() != null ? e.getNom() : "-",
-                e.getPrenom() != null ? e.getPrenom() : "-",
+                NameFormatUtil.formatNom(e.getNom()) != null && !NameFormatUtil.formatNom(e.getNom()).isEmpty() ? NameFormatUtil.formatNom(e.getNom()) : "-",
+                NameFormatUtil.formatPrenom(e.getPrenom()) != null && !NameFormatUtil.formatPrenom(e.getPrenom()).isEmpty() ? NameFormatUtil.formatPrenom(e.getPrenom()) : "-",
                 String.valueOf(e.getAge()),
                 e.getSexe() != null ? e.getSexe() : "-",
                 e.getClasse() != null ? e.getClasse() : "-",
@@ -925,8 +926,8 @@ public class RapportController {
         for (User f : formateurs) {
             Row row = sheet.createRow(n);
             row.createCell(0).setCellValue(n);
-            row.createCell(1).setCellValue(f.getNom());
-            row.createCell(2).setCellValue(f.getPrenom());
+            row.createCell(1).setCellValue(NameFormatUtil.formatNom(f.getNom()));
+            row.createCell(2).setCellValue(NameFormatUtil.formatPrenom(f.getPrenom()));
             row.createCell(3).setCellValue(f.getEmail());
             row.createCell(4).setCellValue(f.getTelephone() != null ? f.getTelephone() : "-");
             row.createCell(5).setCellValue(dateNaissanceLabel(f));
@@ -959,9 +960,9 @@ public class RapportController {
         List<User> formateurs = userRepository.findByRoleOrderByCreatedAtDesc(Role.FORMATEUR);
 
         List<List<String>> rows = formateurs.stream().map(f -> List.of(
-                f.getNom() != null ? f.getNom() : "-",
-                f.getPrenom() != null ? f.getPrenom() : "-",
-                f.getEmail(),
+                NameFormatUtil.formatNom(f.getNom()) != null && !NameFormatUtil.formatNom(f.getNom()).isEmpty() ? NameFormatUtil.formatNom(f.getNom()) : "-",
+                NameFormatUtil.formatPrenom(f.getPrenom()) != null && !NameFormatUtil.formatPrenom(f.getPrenom()).isEmpty() ? NameFormatUtil.formatPrenom(f.getPrenom()) : "-",
+                f.getEmail() != null ? f.getEmail() : "-",
                 f.getTelephone() != null ? f.getTelephone() : "-",
                 dateNaissanceLabel(f),
                 lieuNaissanceLabel(f),
@@ -1019,8 +1020,8 @@ public class RapportController {
         for (User u : utilisateurs) {
             Row row = sheet.createRow(n);
             row.createCell(0).setCellValue(n);
-            row.createCell(1).setCellValue(u.getNom());
-            row.createCell(2).setCellValue(u.getPrenom());
+            row.createCell(1).setCellValue(NameFormatUtil.formatNom(u.getNom()));
+            row.createCell(2).setCellValue(NameFormatUtil.formatPrenom(u.getPrenom()));
             row.createCell(3).setCellValue(u.getEmail());
             row.createCell(4).setCellValue(ROLE_LABELS_FR.getOrDefault(u.getRole(), u.getRole().name()));
             row.createCell(5).setCellValue(u.getTelephone() != null ? u.getTelephone() : "-");
@@ -1051,9 +1052,9 @@ public class RapportController {
                 .toList();
 
         List<List<String>> rows = utilisateurs.stream().map(u -> List.of(
-                u.getNom() != null ? u.getNom() : "-",
-                u.getPrenom() != null ? u.getPrenom() : "-",
-                u.getEmail(),
+                NameFormatUtil.formatNom(u.getNom()) != null && !NameFormatUtil.formatNom(u.getNom()).isEmpty() ? NameFormatUtil.formatNom(u.getNom()) : "-",
+                NameFormatUtil.formatPrenom(u.getPrenom()) != null && !NameFormatUtil.formatPrenom(u.getPrenom()).isEmpty() ? NameFormatUtil.formatPrenom(u.getPrenom()) : "-",
+                u.getEmail() != null ? u.getEmail() : "-",
                 ROLE_LABELS_FR.getOrDefault(u.getRole(), u.getRole().name()),
                 u.getTelephone() != null ? u.getTelephone() : "-",
                 u.isActif() ? "Actif" : "Inactif",
@@ -1142,7 +1143,7 @@ public class RapportController {
 
         String intro = "Smart Kids Academy accompagne chaque enfant dans un parcours entrepreneurial et creatif. "
                 + "Ce rapport individuel explique la situation reelle de "
-                + eleve.getPrenom() + " " + eleve.getNom()
+                + NameFormatUtil.formatNomComplet(eleve.getNom(), eleve.getPrenom())
                 + " : presence en seance, avancement du projet, causes des retards et recommandations concretes.";
 
         String bilanPresence = presentes + " presence(s) sur " + totalSeances + " seance(s) evaluee(s)"
@@ -1171,7 +1172,7 @@ public class RapportController {
             PDPageContentStream content = new PDPageContentStream(document, page);
 
             Map<String, String> meta = new LinkedHashMap<>();
-            meta.put("Enfant", eleve.getPrenom() + " " + eleve.getNom());
+            meta.put("Enfant", NameFormatUtil.formatNomComplet(eleve.getNom(), eleve.getPrenom()));
             meta.put("Centre", centreTgLabel(eleve.getCentre()));
             meta.put("Classe", eleve.getClasse() != null ? eleve.getClasse() : "-");
             meta.put("Matricule", eleve.getMatricule() != null ? eleve.getMatricule() : "-");
@@ -1235,7 +1236,7 @@ public class RapportController {
                 for (Commentaire c : commentaires) {
                     if (n >= 5) break;
                     String who = c.getAuteur() != null
-                            ? (c.getAuteur().getPrenom() + " " + c.getAuteur().getNom())
+                            ? NameFormatUtil.formatNomComplet(c.getAuteur().getNom(), c.getAuteur().getPrenom())
                             : "Formateur";
                     y = PdfTextUtil.drawWrapped(content,
                             "- " + who + " : " + (c.getContenu() != null ? c.getContenu() : ""),
@@ -1410,8 +1411,8 @@ public class RapportController {
                     .count();
             Row row = sheet.createRow(rowNum++);
             row.createCell(0).setCellValue(eleve.getId());
-            row.createCell(1).setCellValue(eleve.getNom());
-            row.createCell(2).setCellValue(eleve.getPrenom());
+            row.createCell(1).setCellValue(NameFormatUtil.formatNom(eleve.getNom()));
+            row.createCell(2).setCellValue(NameFormatUtil.formatPrenom(eleve.getPrenom()));
             row.createCell(3).setCellValue(centreTgLabel(eleve.getCentre()));
             row.createCell(4).setCellValue(eleve.getTotalHeures() != null ? eleve.getTotalHeures() : 0.0);
             row.createCell(5).setCellValue(sessionsPeriode);
@@ -1608,8 +1609,8 @@ public class RapportController {
                 Row row = sheet.createRow(rowNum++);
                 boolean urgent = currentCentreId != null && urgentCentreIds.contains(currentCentreId);
 
-                Cell c0 = row.createCell(0); c0.setCellValue(ev.getEleve().getNom() != null ? ev.getEleve().getNom() : "-");
-                Cell c1 = row.createCell(1); c1.setCellValue(ev.getEleve().getPrenom() != null ? ev.getEleve().getPrenom() : "-");
+                Cell c0 = row.createCell(0); c0.setCellValue(NameFormatUtil.formatNom(ev.getEleve().getNom()) != null ? NameFormatUtil.formatNom(ev.getEleve().getNom()) : "-");
+                Cell c1 = row.createCell(1); c1.setCellValue(NameFormatUtil.formatPrenom(ev.getEleve().getPrenom()) != null ? NameFormatUtil.formatPrenom(ev.getEleve().getPrenom()) : "-");
                 Cell c2 = row.createCell(2); c2.setCellValue(ev.getEleve().getSexe() != null ? ev.getEleve().getSexe() : "-");
                 Cell c3 = row.createCell(3); c3.setCellValue(ev.getEleve().getClasse() != null ? ev.getEleve().getClasse() : "-");
                 Cell c4 = row.createCell(4); c4.setCellValue(ev.getEleve().getAge() != null ? ev.getEleve().getAge() : 0);
@@ -1741,8 +1742,8 @@ public class RapportController {
                     .filter(f -> f.getElevesPresents() != null && f.getElevesPresents().contains(eleve.getId()))
                     .count();
             return List.of(
-                    eleve.getNom() != null ? eleve.getNom() : "-",
-                    eleve.getPrenom() != null ? eleve.getPrenom() : "-",
+                    NameFormatUtil.formatNom(eleve.getNom()) != null && !NameFormatUtil.formatNom(eleve.getNom()).isEmpty() ? NameFormatUtil.formatNom(eleve.getNom()) : "-",
+                    NameFormatUtil.formatPrenom(eleve.getPrenom()) != null && !NameFormatUtil.formatPrenom(eleve.getPrenom()).isEmpty() ? NameFormatUtil.formatPrenom(eleve.getPrenom()) : "-",
                     centreTgLabel(eleve.getCentre()),
                     String.format("%.1f", eleve.getTotalHeures() != null ? eleve.getTotalHeures() : 0.0),
                     String.valueOf(sessionsPeriode),
@@ -1873,7 +1874,7 @@ public class RapportController {
         row.put("cluster", centre != null ? centre.getCluster() : null);
         row.put("formateurId", formateur != null ? formateur.getId() : null);
         row.put("formateurNom", formateur != null
-                ? formateur.getPrenom() + " " + formateur.getNom() : null);
+                ? NameFormatUtil.formatNomComplet(formateur.getNom(), formateur.getPrenom()) : null);
         row.put("moduleFait", session.getModuleFait() != null ? session.getModuleFait() : session.getTitre());
         row.put("presents", presents);
         row.put("totalEleves", totalEleves);
@@ -2068,7 +2069,7 @@ public class RapportController {
             Row row = sheet.createRow(n);
             row.createCell(0).setCellValue(n);
             row.createCell(1).setCellValue(tx.getId());
-            row.createCell(2).setCellValue(tx.getFormateur().getPrenom() + " " + tx.getFormateur().getNom());
+            row.createCell(2).setCellValue(NameFormatUtil.formatNomComplet(tx.getFormateur().getNom(), tx.getFormateur().getPrenom()));
             row.createCell(3).setCellValue(tx.getMontant());
             row.createCell(4).setCellValue(tx.getType());
             row.createCell(5).setCellValue(tx.getDescription());
@@ -2112,7 +2113,7 @@ public class RapportController {
 
         List<List<String>> rows = transactions.stream().map(tx -> List.of(
                 String.valueOf(tx.getId()),
-                tx.getFormateur().getPrenom() + " " + tx.getFormateur().getNom(),
+                NameFormatUtil.formatNomComplet(tx.getFormateur().getNom(), tx.getFormateur().getPrenom()),
                 String.format("%.0f FCFA", tx.getMontant() == null ? 0.0 : tx.getMontant()),
                 tx.getType() != null ? tx.getType() : "-",
                 tx.getDescription() != null ? tx.getDescription() : "-",

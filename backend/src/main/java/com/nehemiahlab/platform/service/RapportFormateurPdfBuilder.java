@@ -9,6 +9,7 @@ import com.nehemiahlab.platform.repository.RapportSyntheseCentreRepository;
 import com.nehemiahlab.platform.repository.SessionCoursRepository;
 import com.nehemiahlab.platform.repository.SignalementRepository;
 import com.nehemiahlab.platform.util.PdfTextUtil;
+import com.nehemiahlab.platform.util.NameFormatUtil;
 import com.nehemiahlab.platform.util.RapportAnnuelUtil;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -145,7 +146,7 @@ public class RapportFormateurPdfBuilder {
                 ChildRow row = buildChildRow(eleve, debut, fin);
                 ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, moduleLabel, centre, formateur, debut, fin, 95f);
 
-                String header = num + ". " + eleve.getPrenom() + " " + eleve.getNom()
+                String header = num + ". " + NameFormatUtil.formatNomComplet(eleve.getNom(), eleve.getPrenom())
                         + "  |  " + (eleve.getSexe() != null ? eleve.getSexe() : "-")
                         + "  |  " + eleve.getAge() + " ans  |  " + (eleve.getClasse() != null ? eleve.getClasse() : "-")
                         + "  |  Nbre séances suivi : " + row.seancesSuivies + "  |  " + row.niveau;
@@ -426,14 +427,14 @@ public class RapportFormateurPdfBuilder {
         if (f == null) return "—";
         String tel = f.getTelephone() != null ? f.getTelephone() : "";
         String email = f.getEmail() != null ? f.getEmail() : "";
-        return f.getPrenom() + " " + f.getNom() + (tel.isBlank() ? "" : " — " + tel) + (email.isBlank() ? "" : " — " + email);
+        return NameFormatUtil.formatNomComplet(f.getNom(), f.getPrenom()) + (tel.isBlank() ? "" : " — " + tel) + (email.isBlank() ? "" : " — " + email);
     }
 
     private Map<String, String> centreHeader(Centre centre, User formateur, LocalDate debut, LocalDate fin) {
         Map<String, String> meta = new LinkedHashMap<>();
         meta.put("Centre", centre.getNom());
         meta.put("Période", debut.format(REPORT_DATE) + " → " + fin.format(REPORT_DATE));
-        meta.put("Formateur", formateur != null ? formateur.getPrenom() + " " + formateur.getNom() : "—");
+        meta.put("Formateur", formateur != null ? NameFormatUtil.formatNomComplet(formateur.getNom(), formateur.getPrenom()) : "—");
         meta.put("Généré le", LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
         return meta;
     }
