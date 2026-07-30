@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import type { User, Role } from '../types';
 import { authService } from '../services/api';
+import { formatFullName } from '../utils/displayName';
 import toast from 'react-hot-toast';
 import {
   clearAuthSession,
@@ -93,7 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const enfant = data.eleve;
       toast.success(
         enfant
-          ? `Bienvenue — suivi de ${enfant.prenom} ${enfant.nom}`
+          ? `Bienvenue — suivi de ${formatFullName(enfant.prenom, enfant.nom)}`
           : 'Bienvenue dans l’espace parent.',
       );
     } catch (error: unknown) {
