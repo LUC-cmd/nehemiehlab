@@ -57,8 +57,8 @@ export default function FormateurDashboard() {
       centre: c.nom,
       region: c.region,
       nom: c.coordinateur
-        ? `${c.coordinateur.prenom} ${c.coordinateur.nom}`
-        : `${c.coordinateurPrenom || ''} ${c.coordinateurNom || ''}`.trim(),
+        ? formatFullName(c.coordinateur.prenom, c.coordinateur.nom)
+        : formatFullName(c.coordinateurPrenom, c.coordinateurNom),
       telephone: c.telephoneCoordinateur || c.coordinateur?.telephone || '',
     }));
 

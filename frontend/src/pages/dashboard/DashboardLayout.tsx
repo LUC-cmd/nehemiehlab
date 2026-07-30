@@ -503,7 +503,7 @@ export default function DashboardLayout() {
                     className="!bg-white/15 !border-white/25 !text-white ring-1 ring-white/20"
                   />
                   <div className="hidden sm:block text-left">
-                    <p className="text-white text-sm font-medium leading-none">{user?.prenom} {user?.nom}</p>
+                    <p className="text-white text-sm font-medium leading-none">{formatFullName(user?.prenom, user?.nom)}</p>
                     <p className="text-white/65 text-xs mt-0.5">{role ? ROLE_LABELS[role] : ''}</p>
                   </div>
                   <ChevronDown className={`w-4 h-4 text-white/70 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />

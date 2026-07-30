@@ -10,6 +10,7 @@ import { centreService, contentManagementService, eleveService } from '../../ser
 import type { Centre, Eleve, EnfantProfilePublic, EnfantProject, ProjectMediaType } from '../../types';
 import { centreLabel, sortCentresByCode } from '../../utils/centreLabel';
 import { compareEleveNomPrenom } from '../../utils/eleveSort';
+import { formatFullName } from '../../utils/displayName';
 import { useAuth } from '../../context/AuthContext';
 import { mediaUrl } from '../../utils/media';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -611,7 +612,7 @@ export default function ProfilsEnfantsPage() {
                       </div>
                     )}
                     <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/70 via-black/30 to-transparent">
-                      <h3 className="text-white font-bold text-lg">{enfant.prenom} {enfant.nom}</h3>
+                      <h3 className="text-white font-bold text-lg">{formatFullName(enfant.prenom, enfant.nom)}</h3>
                       <p className="text-white/80 text-xs mt-0.5 flex items-center gap-1">
                         <MapPin className="w-3 h-3" />
                         {[enfant.age ? `${enfant.age} ans` : null, enfant.centre].filter(Boolean).join(' · ') || 'Centre non renseigné'}
@@ -678,7 +679,7 @@ export default function ProfilsEnfantsPage() {
                 </div>
                 <div className="min-w-0">
                   <h3 className="font-semibold text-slate-900 truncate">{project.titre}</h3>
-                  <p className="text-xs text-slate-500">{enfant.prenom} {enfant.nom} · {project.mediaType}</p>
+                  <p className="text-xs text-slate-500">{formatFullName(enfant.prenom, enfant.nom)} · {project.mediaType}</p>
                 </div>
               </div>
               {project.description && <p className="text-sm text-slate-600">{project.description}</p>}
@@ -702,7 +703,7 @@ export default function ProfilsEnfantsPage() {
       {/* Détail profil */}
       <Modal
         open={!!detailEnfant}
-        title={detailEnfant ? `${detailEnfant.prenom} ${detailEnfant.nom}` : ''}
+        title={detailEnfant ? formatFullName(detailEnfant.prenom, detailEnfant.nom) : ''}
         size="lg"
         onClose={() => setDetailEnfant(null)}
         footer={
@@ -886,7 +887,7 @@ export default function ProfilsEnfantsPage() {
                     const taken = linkedEleveIds.has(el.id);
                     return (
                       <option key={el.id} value={el.id} disabled={taken}>
-                        {el.prenom} {el.nom}
+                        {formatFullName(el.prenom, el.nom)}
                         {el.matricule ? ` — ${el.matricule}` : ''}
                         {taken ? ' (profil existant)' : ''}
                       </option>
@@ -1009,7 +1010,7 @@ export default function ProfilsEnfantsPage() {
             <select className="input-field" required value={selectedEnfantId || ''} onChange={(e) => setSelectedEnfantId(Number(e.target.value) || null)}>
               <option value="">Choisir…</option>
               {profiles.map((p) => (
-                <option key={p.id} value={p.id}>{p.prenom} {p.nom}{p.centre ? ` — ${p.centre}` : ''}</option>
+                <option key={p.id} value={p.id}>{formatFullName(p.prenom, p.nom)}{p.centre ? ` — ${p.centre}` : ''}</option>
               ))}
             </select>
           </div>

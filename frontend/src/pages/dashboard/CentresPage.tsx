@@ -4,6 +4,7 @@ import { useAccess } from '../../context/AccessContext';
 import { centreService, userService, clusterService } from '../../services/api';
 import type { Centre, Cluster, User } from '../../types';
 import { centreLabel } from '../../utils/centreLabel';
+import { formatFullName } from '../../utils/displayName';
 import {
   Plus, X, Building2, UserPlus, Trash2, MapPin, Navigation, ExternalLink, Pencil,
   Download, Upload, Phone,
@@ -459,7 +460,7 @@ export default function CentresPage() {
   const coordinateurLabel = (centre: Centre) => {
     const prenom = centre.coordinateurPrenom || centre.coordinateur?.prenom || '';
     const nom = centre.coordinateurNom || centre.coordinateur?.nom || '';
-    const full = `${prenom} ${nom}`.trim();
+    const full = formatFullName(prenom, nom);
     return full || null;
   };
 
@@ -824,7 +825,7 @@ export default function CentresPage() {
               <option value="">Tous</option>
               {formateurOptions.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.prenom} {f.nom}
+                  {formatFullName(f.prenom, f.nom)}
                 </option>
               ))}
             </select>
@@ -912,18 +913,18 @@ export default function CentresPage() {
                     <td className="px-4 py-3 text-slate-700">
                       {formateur ? (
                         <span className="inline-flex items-center gap-2">
-                          <span>{formateur.prenom} {formateur.nom}</span>
+                          <span>{formatFullName(formateur.prenom, formateur.nom)}</span>
                           <button
                             type="button"
                             className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                            aria-label={`Retirer ${formateur.prenom} ${formateur.nom}`}
+                            aria-label={`Retirer ${formatFullName(formateur.prenom, formateur.nom)}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               setPendingConfirmation({
                                 type: 'remove-formateur',
                                 centreId: centre.id,
                                 formateurId: formateur.id,
-                                formateurName: `${formateur.prenom} ${formateur.nom}`,
+                                formateurName: formatFullName(formateur.prenom, formateur.nom),
                               });
                             }}
                           >
@@ -1200,7 +1201,7 @@ export default function CentresPage() {
                             className="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700"
                           >
                             <UserAvatar user={f} size="xs" className="!w-5 !h-5 !text-[8px]" />
-                            {f.prenom} {f.nom}
+                            {formatFullName(f.prenom, f.nom)}
                             {(centre.telephoneFormateur || f.telephone) && (
                               <a
                                 href={`tel:${centre.telephoneFormateur || f.telephone}`}
@@ -1526,7 +1527,7 @@ export default function CentresPage() {
               <option value="">Sélectionner un coordinateur...</option>
               {coordinateurs.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.prenom} {c.nom}
+                  {formatFullName(c.prenom, c.nom)}
                 </option>
               ))}
             </select>
@@ -1547,7 +1548,7 @@ export default function CentresPage() {
               <option value="">Sélectionner un formateur...</option>
               {formateurs.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.prenom} {f.nom}
+                  {formatFullName(f.prenom, f.nom)}
                 </option>
               ))}
             </select>

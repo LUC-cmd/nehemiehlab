@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { rapportService, centreService, eleveService } from '../../services/api';
 import type { Centre, Eleve } from '../../types';
 import { centreLabel, sortCentresByCode } from '../../utils/centreLabel';
+import { formatFullName } from '../../utils/displayName';
 import {
   FileSpreadsheet, Download, Calendar, Building2, Loader2, Filter, FileText,
   Users, Clock, Activity, Wallet, ClipboardList, RotateCcw, CheckCircle2,
@@ -117,7 +118,7 @@ export default function RapportsPage() {
     }
     if (selectedEleveId) {
       const e = eleves.find((x) => String(x.id) === selectedEleveId);
-      if (e) parts.push(`${e.prenom} ${e.nom}`);
+      if (e) parts.push(formatFullName(e.prenom, e.nom));
     }
     if (dateDebut || dateFin) {
       parts.push(`${dateDebut || '…'} → ${dateFin || '…'}`);
@@ -310,7 +311,7 @@ export default function RapportsPage() {
                   {selectedCentreId ? 'Tous les enfants du centre' : 'Choisir un centre d’abord'}
                 </option>
                 {eleves.map((e) => (
-                  <option key={e.id} value={e.id}>{e.prenom} {e.nom}{e.matricule ? ` — ${e.matricule}` : ''}</option>
+                  <option key={e.id} value={e.id}>{formatFullName(e.prenom, e.nom)}{e.matricule ? ` — ${e.matricule}` : ''}</option>
                 ))}
               </select>
             </div>

@@ -756,7 +756,7 @@ export default function FormateursPage() {
 
       <Modal
         open={Boolean(detailFormateur)}
-        title={detailFormateur ? `${detailFormateur.prenom} ${detailFormateur.nom}` : 'Dossier formateur'}
+        title={detailFormateur ? formatFullName(detailFormateur.prenom, detailFormateur.nom) : 'Dossier formateur'}
         subtitle="Informations d’inscription et carte d’identité"
         size="lg"
         onClose={() => setDetailFormateur(null)}
@@ -780,7 +780,7 @@ export default function FormateursPage() {
               <UserAvatar user={detailFormateur} size="lg" rounded="xl" />
               <div>
                 <p className="font-bold text-slate-900 text-lg">
-                  {detailFormateur.prenom} {detailFormateur.nom}
+                  {formatFullName(detailFormateur.prenom, detailFormateur.nom)}
                 </p>
                 <p className="text-sm text-slate-500">{detailFormateur.email}</p>
                 <div className="mt-2 flex flex-wrap gap-2">

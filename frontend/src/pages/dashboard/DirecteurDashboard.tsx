@@ -239,7 +239,7 @@ export default function DirecteurDashboard() {
               {pendingTransactions.map((tx) => (
                 <div key={tx.id} className="p-3 rounded-xl border border-dark-700 bg-dark-800/60 flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm text-white font-medium truncate">{tx.formateur?.prenom} {tx.formateur?.nom}</p>
+                    <p className="text-sm text-white font-medium truncate">{formatFullName(tx.formateur?.prenom, tx.formateur?.nom)}</p>
                     <p className="text-xs text-dark-400">{tx.type}</p>
                   </div>
                   <span className="text-sm font-semibold text-amber-400 whitespace-nowrap">{tx.montant.toLocaleString('fr-FR')} FCFA</span>

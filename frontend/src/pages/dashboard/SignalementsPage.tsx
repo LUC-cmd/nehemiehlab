@@ -4,6 +4,7 @@ import { centreService, eleveService, signalementService, notificationService } 
 import type { Signalement } from '../../types';
 import type { Centre, Eleve } from '../../types';
 import { centreLabel, sortCentresByCode } from '../../utils/centreLabel';
+import { formatFullName } from '../../utils/displayName';
 import { ALERT_PRESETS, type AlertPresetId } from '../../constants/alertPresets';
 import ValidationActionButton from '../../components/ui/ValidationActionButton';
 import {
@@ -425,7 +426,7 @@ export default function SignalementsPage() {
               <label className="label">Enfant concerné</label>
               <select className="input-field" value={newEleveId} onChange={e => setNewEleveId(e.target.value)}>
                 <option value="">Sélectionner un enfant...</option>
-                {eleves.map(e => <option key={e.id} value={e.id}>{e.prenom} {e.nom} ({e.classe})</option>)}
+                {eleves.map(e => <option key={e.id} value={e.id}>{formatFullName(e.prenom, e.nom)} ({e.classe})</option>)}
               </select>
             </div>
           )}
@@ -577,7 +578,7 @@ export default function SignalementsPage() {
               <div className="flex flex-wrap gap-4 pt-2 text-xs text-dark-400">
                 <span className="flex items-center gap-1">
                   <User className="w-3.5 h-3.5" />
-                  Signalé par : {s.auteur?.prenom} {s.auteur?.nom}
+                  Signalé par : {formatFullName(s.auteur?.prenom, s.auteur?.nom)}
                 </span>
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5" />
