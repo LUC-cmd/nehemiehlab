@@ -543,6 +543,8 @@ export const formateurEvaluationService = {
 // ============================================================
 export const sessionService = {
   getAll: () => api.get('/sessions'),
+  /** Séances EN_COURS du formateur connecté — pour le rappel persistant de séance ouverte. */
+  getEnCours: () => api.get('/sessions/en-cours'),
   getById: (id: number) => api.get(`/sessions/${id}`),
   create: (data: {
     titre: string;
