@@ -5,6 +5,7 @@ import com.nehemiahlab.platform.model.EvaluationSession;
 import com.nehemiahlab.platform.model.SessionCours;
 import com.nehemiahlab.platform.model.User;
 import com.nehemiahlab.platform.util.PdfTextUtil;
+import com.nehemiahlab.platform.util.NameFormatUtil;
 import com.nehemiahlab.platform.util.RapportAnnuelUtil;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -179,7 +180,7 @@ public class RapportExecutionSeancePdfBuilder {
                 : (centre.getVille() != null ? centre.getVille() : "-"))
                 : "-";
         String trainer = formateur != null
-                ? formateur.getPrenom() + " " + formateur.getNom()
+                ? NameFormatUtil.formatNomComplet(formateur.getNom(), formateur.getPrenom())
                 : "-";
         String trainerContact = formateur != null && formateur.getTelephone() != null
                 ? formateur.getTelephone()
