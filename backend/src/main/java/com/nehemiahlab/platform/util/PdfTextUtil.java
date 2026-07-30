@@ -14,7 +14,16 @@ public final class PdfTextUtil {
 
     public static List<String> wrap(String text, PDType1Font font, float fontSize, float maxWidth) throws IOException {
         if (text == null || text.isBlank()) return List.of("-");
-        String cleaned = text.replace("\r", "").replace('\t', ' ');
+        // IMPORTANT : on sanitize AVANT de mesurer/decouper le texte, pas seulement
+        // au moment de l'ecrire dans le PDF. Les polices Standard 14 (Helvetica) du
+        // PDF n'acceptent que l'encodage WinAnsi : un caractere absent de cet
+        // encodage (guillemets courbes, tirets longs, emojis... frequents dans les
+        // saisies au telephone des formateurs pour "defis de la seance" ou "etat des
+        // equipements") fait planter font.getStringWidth() avec une
+        // IllegalArgumentException avant meme d'atteindre le sanitize() utilise plus
+        // bas pour l'affichage, ce qui cassait la generation de rapport des qu'une
+        // seance contenait ce genre de texte.
+        String cleaned = sanitize(text).replace("\r", "").replace('\t', ' ');
         List<String> lines = new ArrayList<>();
         for (String paragraph : cleaned.split("\n")) {
             if (paragraph.isBlank()) {

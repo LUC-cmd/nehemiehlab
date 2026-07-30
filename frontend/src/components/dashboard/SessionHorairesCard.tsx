@@ -89,7 +89,7 @@ export default function SessionHorairesCard({ session, readOnly = false, onUpdat
               type="button"
               onClick={() => void saveHoraires()}
               disabled={saving}
-              className="btn-ghost text-sm inline-flex items-center gap-2 text-sky-300"
+              className="btn-ghost text-sm inline-flex items-center gap-2 text-sky-700"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Enregistrer les horaires

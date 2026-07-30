@@ -78,9 +78,9 @@ function noteLabel(note?: number | null): string {
 function noteTextColor(note?: number | null): string {
   if (note == null) return 'text-dark-500';
   const n = note > 10 ? note / 2 : note;
-  if (n >= 8) return 'text-emerald-300';
-  if (n >= 5) return 'text-amber-300';
-  return 'text-rose-300';
+  if (n >= 8) return 'text-emerald-700';
+  if (n >= 5) return 'text-amber-700';
+  return 'text-rose-700';
 }
 
 function isWorking(ev: EvaluationSession): boolean {
@@ -357,7 +357,7 @@ export default function SessionAttendanceBoard({
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <p className="col-span-full text-xs text-dark-500 -mb-2">
           {supervisionMode ? (
-            <span className="inline-flex items-center gap-1.5 text-sky-300">
+            <span className="inline-flex items-center gap-1.5 text-sky-700">
               <Eye className="w-3.5 h-3.5" />
               Mode consultation — suivi en direct des enfants sur le terrain (lecture seule).
             </span>
@@ -366,28 +366,28 @@ export default function SessionAttendanceBoard({
           )}
         </p>
         <div className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/15 to-emerald-900/10 p-4">
-          <div className="flex items-center gap-2 text-emerald-300 text-xs font-semibold uppercase tracking-wide">
+          <div className="flex items-center gap-2 text-emerald-700 text-xs font-semibold uppercase tracking-wide">
             <UserCheck className="w-4 h-4" /> Présents
           </div>
           <p className="text-3xl font-bold text-white mt-1">{stats.present}</p>
           <p className="text-xs text-emerald-400/80 mt-0.5">sur {stats.total} élèves</p>
         </div>
         <div className="rounded-2xl border border-sky-500/25 bg-gradient-to-br from-sky-500/15 to-sky-900/10 p-4">
-          <div className="flex items-center gap-2 text-sky-300 text-xs font-semibold uppercase tracking-wide">
+          <div className="flex items-center gap-2 text-sky-700 text-xs font-semibold uppercase tracking-wide">
             <Hammer className="w-4 h-4" /> En travail
           </div>
           <p className="text-3xl font-bold text-white mt-1">{stats.working}</p>
           <p className="text-xs text-sky-400/80 mt-0.5">projet en cours</p>
         </div>
         <div className="rounded-2xl border border-rose-500/25 bg-gradient-to-br from-rose-500/15 to-rose-900/10 p-4">
-          <div className="flex items-center gap-2 text-rose-300 text-xs font-semibold uppercase tracking-wide">
+          <div className="flex items-center gap-2 text-rose-700 text-xs font-semibold uppercase tracking-wide">
             <UserX className="w-4 h-4" /> Absents
           </div>
           <p className="text-3xl font-bold text-white mt-1">{stats.absent}</p>
           <p className="text-xs text-rose-400/80 mt-0.5">à signaler</p>
         </div>
         <div className="rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-500/15 to-violet-900/10 p-4">
-          <div className="flex items-center gap-2 text-violet-300 text-xs font-semibold uppercase tracking-wide">
+          <div className="flex items-center gap-2 text-violet-700 text-xs font-semibold uppercase tracking-wide">
             <TrendingUp className="w-4 h-4" /> Taux
           </div>
           <div className="flex items-end gap-2 mt-1">
@@ -401,7 +401,7 @@ export default function SessionAttendanceBoard({
           </div>
         </div>
         <div className="rounded-2xl border border-amber-500/25 bg-gradient-to-br from-amber-500/15 to-amber-900/10 p-4 col-span-2 lg:col-span-1">
-          <div className="flex items-center gap-2 text-amber-300 text-xs font-semibold uppercase tracking-wide">
+          <div className="flex items-center gap-2 text-amber-700 text-xs font-semibold uppercase tracking-wide">
             <Star className="w-4 h-4" /> Moyenne
           </div>
           <p className="text-3xl font-bold text-white mt-1">
@@ -426,7 +426,7 @@ export default function SessionAttendanceBoard({
               onClick={() => setTab(id)}
               className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 tab === id
-                  ? 'bg-primary-500/20 text-primary-300 shadow-sm border border-primary-500/30'
+                  ? 'bg-primary-500/20 text-primary-700 shadow-sm border border-primary-500/30'
                   : 'text-dark-400 hover:text-dark-200'
               }`}
             >
@@ -525,7 +525,7 @@ export default function SessionAttendanceBoard({
                                 {ev.eleve.age} ans · {ev.eleve.sexe === 'F' ? 'Fille' : 'Garçon'}
                               </p>
                               {ev.projetFinal && (
-                                <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 border border-amber-500/30">
                                   <Award className="w-2.5 h-2.5" /> Projet final
                                 </span>
                               )}
@@ -547,14 +547,14 @@ export default function SessionAttendanceBoard({
                             }
                             className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-wide transition-all ${
                               ev.present
-                                ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                                ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-700'
                                 : 'border-dark-600 bg-dark-800/80 text-dark-400'
                             } ${
                               displayOnly
                                 ? 'cursor-default'
                                 : ev.present
                                 ? 'hover:bg-emerald-500/25 cursor-pointer'
-                                : 'hover:border-rose-500/40 hover:text-rose-300 cursor-pointer'
+                                : 'hover:border-rose-500/40 hover:text-rose-700 cursor-pointer'
                             }`}
                           >
                             {ev.present ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
@@ -585,7 +585,7 @@ export default function SessionAttendanceBoard({
                         <td className="px-3 py-2 align-top text-center">
                           <span
                             className={`font-mono text-xs font-semibold ${
-                              ev.present ? (session.statut === 'EN_COURS' ? 'text-emerald-300' : 'text-white') : 'text-dark-600'
+                              ev.present ? (session.statut === 'EN_COURS' ? 'text-emerald-700' : 'text-white') : 'text-dark-600'
                             }`}
                           >
                             {formatHMS(dureeSec)}
@@ -654,7 +654,7 @@ export default function SessionAttendanceBoard({
                                 onClick={() => void handleDownloadProjetFichier(ev)}
                                 disabled={downloadingEvalId === ev.id}
                                 title={ev.projetFichierNom || 'Voir le fichier'}
-                                className="p-1.5 rounded text-sky-300 hover:bg-sky-500/10"
+                                className="p-1.5 rounded text-sky-700 hover:bg-sky-500/10"
                               >
                                 {downloadingEvalId === ev.id ? (
                                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -678,7 +678,7 @@ export default function SessionAttendanceBoard({
                           ) : (
                             <label
                               title="Ajouter un fichier (photo, vidéo, .sb3)"
-                              className={`inline-flex p-1.5 rounded text-dark-400 hover:text-sky-300 hover:bg-sky-500/10 cursor-pointer ${
+                              className={`inline-flex p-1.5 rounded text-dark-400 hover:text-sky-700 hover:bg-sky-500/10 cursor-pointer ${
                                 uploadingEvalId === ev.id ? 'opacity-60 pointer-events-none' : ''
                               }`}
                             >
@@ -734,7 +734,7 @@ export default function SessionAttendanceBoard({
                             className={`p-1.5 rounded ${
                               !ev.present
                                 ? 'text-dark-700 cursor-not-allowed'
-                                : 'text-dark-400 hover:text-primary-300 hover:bg-primary-500/10'
+                                : 'text-dark-400 hover:text-primary-700 hover:bg-primary-500/10'
                             }`}
                           >
                             {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -747,7 +747,7 @@ export default function SessionAttendanceBoard({
                               type="button"
                               onClick={() => setAlertTarget(ev)}
                               title="Signaler / alerter"
-                              className="p-1.5 rounded text-amber-400/80 hover:text-amber-300 hover:bg-amber-500/10"
+                              className="p-1.5 rounded text-amber-400/80 hover:text-amber-700 hover:bg-amber-500/10"
                             >
                               <AlertTriangle className="w-4 h-4" />
                             </button>
@@ -768,8 +768,8 @@ export default function SessionAttendanceBoard({
                                   <span
                                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${
                                       ev.projetFinal
-                                        ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                                        : 'bg-sky-500/15 text-sky-300 border border-sky-500/30'
+                                        ? 'bg-amber-500/15 text-amber-700 border border-amber-500/30'
+                                        : 'bg-sky-500/15 text-sky-700 border border-sky-500/30'
                                     }`}
                                   >
                                     {ev.projetFinal ? <Award className="w-3.5 h-3.5" /> : <FlaskConical className="w-3.5 h-3.5" />}
@@ -792,7 +792,7 @@ export default function SessionAttendanceBoard({
                                       }}
                                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                                         !ev.projetFinal
-                                          ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                                          ? 'bg-sky-500/20 text-sky-700 border border-sky-500/30'
                                           : 'text-dark-400 hover:text-dark-200'
                                       }`}
                                     >
@@ -809,7 +809,7 @@ export default function SessionAttendanceBoard({
                                       }}
                                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                                         ev.projetFinal
-                                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                          ? 'bg-amber-500/20 text-amber-700 border border-amber-500/30'
                                           : 'text-dark-400 hover:text-dark-200'
                                       }`}
                                     >

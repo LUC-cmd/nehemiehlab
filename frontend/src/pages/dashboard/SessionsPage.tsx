@@ -1613,7 +1613,7 @@ export default function SessionsPage() {
 
       {/* Détail Session (Plein écran ou grande modale) */}
       {showSessionDetail && (
-        <div className="fixed inset-0 z-50 overflow-y-auto flex flex-col" style={{ backgroundColor: '#0A0818' }}>
+        <div className="fixed inset-0 z-50 overflow-y-auto flex flex-col bg-slate-50">
           <div className="sticky top-0 bg-dark-900 border-b border-dark-800 p-4 px-6 flex items-center justify-between z-10 shadow-xl">
             <div className="flex items-center gap-4">
               <button onClick={() => setShowSessionDetail(false)} className="p-2 rounded-lg bg-dark-800 text-dark-400 hover:text-white transition-colors">
@@ -1624,7 +1624,7 @@ export default function SessionsPage() {
                   {selectedSession?.titre || 'Détail de la session'}
                   {selectedSession?.statut === 'CLOTUREE' && <Lock className="w-4 h-4 text-red-400" />}
                   {selectedOfflineDraftId && (
-                    <span className="px-2 py-1 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    <span className="px-2 py-1 rounded text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
                       Hors ligne
                     </span>
                   )}
@@ -1641,7 +1641,7 @@ export default function SessionsPage() {
             
             {selectedSession?.statut === 'EN_COURS' && isDirecteur && !detailLoading && (
               <div className="flex items-center gap-3">
-                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-sm">
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 text-sm">
                   <Radio className="w-4 h-4 animate-pulse" />
                   Consultation en direct — actualisation auto
                 </span>
@@ -1667,7 +1667,7 @@ export default function SessionsPage() {
                 <button onClick={handleUpdateEvaluations} className="btn-ghost flex items-center gap-2 text-primary-400 hover:bg-primary-500/10">
                   <Save className="w-4 h-4" /> Sauvegarder
                 </button>
-                <button onClick={handleSaveContexte} className="btn-ghost flex items-center gap-2 text-amber-300 hover:bg-amber-500/10">
+                <button onClick={handleSaveContexte} className="btn-ghost flex items-center gap-2 text-amber-700 hover:bg-amber-50">
                   <Save className="w-4 h-4" /> Sauvegarder contexte
                 </button>
                 {!selectedOfflineDraftId && (
@@ -1786,13 +1786,13 @@ export default function SessionsPage() {
 
             {selectedModuleIdForSupports && (
               <div className="mb-5">
-                <ModuleSupportsPanel moduleId={selectedModuleIdForSupports} variant="dark" />
+                <ModuleSupportsPanel moduleId={selectedModuleIdForSupports} />
               </div>
             )}
 
             <div className="card overflow-hidden p-0 border border-dark-700 mb-5">
               {selectedSession.statut !== 'CLOTUREE' && isFormateur && (
-                <div className="p-4 border-b border-dark-700 bg-dark-900/40 grid md:grid-cols-3 gap-4">
+                <div className="p-4 border-b border-slate-200 bg-slate-50 grid md:grid-cols-3 gap-4">
                   <div>
                     <label className="label">Module enseigné <span className="text-red-400">*</span></label>
                     <select
