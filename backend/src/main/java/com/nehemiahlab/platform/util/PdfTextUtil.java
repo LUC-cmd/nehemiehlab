@@ -87,4 +87,133 @@ public final class PdfTextUtil {
                 .replace("…", "...");
         return s.replaceAll("[^\\x20-\\x7E\\xA0-\\xFF\\n]", "?");
     }
+
+    // ------------------------------------------------------------------
+    // Tableaux : mêmes couleurs/bordures/zébrage que les exports officiels
+    // (voir RapportController#buildPdfTableReport) afin que TOUS les
+    // rapports (exécution de séance, exports listes, etc.) affichent de
+    // vrais tableaux avec colonnes et bordures, jamais du texte brut
+    // séparé par des « | ».
+    // ------------------------------------------------------------------
+
+    private static final Color TABLE_HEADER_BG = new Color(0, 75, 87);
+    private static final Color TABLE_HEADER_BORDER = new Color(15, 23, 42);
+    private static final Color TABLE_HEADER_SEP = new Color(71, 85, 105);
+    private static final Color TABLE_ROW_ZEBRA = new Color(248, 250, 252);
+    private static final Color TABLE_ROW_BORDER = new Color(214, 224, 234);
+    private static final Color TABLE_CELL_SEP = new Color(226, 232, 240);
+    private static final Color TABLE_TEXT = new Color(30, 41, 59);
+
+    public static float sumWidths(float[] widths) {
+        float total = 0f;
+        for (float w : widths) total += w;
+        return total;
+    }
+
+    /** Dessine l'entête (fond plein + texte blanc + séparateurs de colonnes) d'un tableau. */
+    public static float drawTableHeaderRow(
+            PDPageContentStream content,
+            List<String> headers,
+            float[] widths,
+            float x,
+            float y,
+            PDType1Font titleFont
+    ) throws IOException {
+        float headerHeight = 20f;
+        float tableWidth = sumWidths(widths);
+        content.setNonStrokingColor(TABLE_HEADER_BG);
+        content.addRect(x, y - headerHeight, tableWidth, headerHeight);
+        content.fill();
+        content.setStrokingColor(TABLE_HEADER_BORDER);
+        content.addRect(x, y - headerHeight, tableWidth, headerHeight);
+        content.stroke();
+
+        float cx = x;
+        for (int i = 0; i < headers.size(); i++) {
+            if (i > 0) {
+                content.setStrokingColor(TABLE_HEADER_SEP);
+                content.moveTo(cx, y);
+                content.lineTo(cx, y - headerHeight);
+                content.stroke();
+            }
+            content.beginText();
+            content.setNonStrokingColor(Color.WHITE);
+            content.setFont(titleFont, 8.6f);
+            content.newLineAtOffset(cx + 4f, y - 13f);
+            content.showText(sanitize(headers.get(i)));
+            content.endText();
+            cx += widths[i];
+        }
+        return y - headerHeight;
+    }
+
+    /** Calcule la hauteur nécessaire pour une ligne de tableau (texte replié colonne par colonne). */
+    public static float measureTableRowHeight(
+            List<String> row,
+            float[] widths,
+            PDType1Font bodyFont,
+            float fontSize,
+            float lineHeight
+    ) throws IOException {
+        int maxLines = 1;
+        for (int i = 0; i < widths.length; i++) {
+            String cell = i < row.size() ? row.get(i) : "-";
+            float maxTextWidth = Math.max(20f, widths[i] - 8f);
+            List<String> lines = wrap(cell, bodyFont, fontSize, maxTextWidth);
+            maxLines = Math.max(maxLines, lines.size());
+        }
+        return (maxLines * lineHeight) + 8f;
+    }
+
+    /** Dessine une ligne de données du tableau (fond zébré + bordures + texte replié). */
+    public static float drawTableDataRow(
+            PDPageContentStream content,
+            List<String> row,
+            float[] widths,
+            float x,
+            float y,
+            float rowHeight,
+            PDType1Font bodyFont,
+            float fontSize,
+            float lineHeight,
+            boolean zebra
+    ) throws IOException {
+        float tableWidth = sumWidths(widths);
+        if (zebra) {
+            content.setNonStrokingColor(TABLE_ROW_ZEBRA);
+            content.addRect(x, y - rowHeight, tableWidth, rowHeight);
+            content.fill();
+        }
+        content.setStrokingColor(TABLE_ROW_BORDER);
+        content.addRect(x, y - rowHeight, tableWidth, rowHeight);
+        content.stroke();
+
+        float cx = x;
+        for (int i = 0; i < widths.length; i++) {
+            float w = widths[i];
+            content.setStrokingColor(TABLE_CELL_SEP);
+            content.moveTo(cx, y);
+            content.lineTo(cx, y - rowHeight);
+            content.stroke();
+
+            String cell = i < row.size() ? row.get(i) : "-";
+            float maxTextWidth = Math.max(20f, w - 8f);
+            List<String> lines = wrap(cell, bodyFont, fontSize, maxTextWidth);
+            float textY = y - 12f;
+            for (String line : lines) {
+                content.beginText();
+                content.setNonStrokingColor(TABLE_TEXT);
+                content.setFont(bodyFont, fontSize);
+                content.newLineAtOffset(cx + 4f, textY);
+                content.showText(sanitize(line));
+                content.endText();
+                textY -= lineHeight;
+            }
+            cx += w;
+        }
+        content.moveTo(x + tableWidth, y);
+        content.lineTo(x + tableWidth, y - rowHeight);
+        content.stroke();
+        return y - rowHeight;
+    }
 }
