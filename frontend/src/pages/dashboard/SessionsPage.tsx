@@ -5,6 +5,7 @@ import { useAccess } from '../../context/AccessContext';
 import { centreService, eleveService, sessionService, syncOfflineQueue, moduleCoursService, rapportService } from '../../services/api';
 import type { Centre, Eleve, SessionCours, EvaluationSession, User, ModuleCours } from '../../types';
 import { centreLabel } from '../../utils/centreLabel';
+import { formatFullName } from '../../utils/displayName';
 import { fetchWithOfflineCache, readCache, writeCache } from '../../utils/offlineCache';
 import {
   getOfflineSessionDraft,
@@ -1090,7 +1091,7 @@ export default function SessionsPage() {
               <option value="">Sélectionner un formateur...</option>
               {formateurs.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.prenom} {f.nom}
+                  {formatFullName(f.prenom, f.nom)}
                 </option>
               ))}
             </select>
@@ -1145,7 +1146,7 @@ export default function SessionsPage() {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-900">
-                  {selectedFormateur.prenom} {selectedFormateur.nom}
+                  {formatFullName(selectedFormateur.prenom, selectedFormateur.nom)}
                   {selectedCentre ? ` · ${selectedCentre.nom}` : ''}
                 </p>
                 {onTerrain && liveSession ? (

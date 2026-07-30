@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAccess } from '../../context/AccessContext';
 import { transactionService, userService, rapportService } from '../../services/api';
+import { formatFullName } from '../../utils/displayName';
 import type { Transaction, User } from '../../types';
 import {
   Plus, X, Calendar, User as UserIcon, Check, XSquare, Clock,
@@ -385,7 +386,7 @@ export default function TransactionsPage() {
                     <td>
                       <span className="flex items-center gap-1.5 text-slate-900 font-medium">
                         <UserIcon className="w-3.5 h-3.5 text-slate-400" />
-                        {tx.formateur?.prenom} {tx.formateur?.nom}
+                        {formatFullName(tx.formateur?.prenom, tx.formateur?.nom)}
                       </span>
                     </td>
                     <td>
@@ -562,7 +563,7 @@ export default function TransactionsPage() {
             >
               <option value="">Sélectionner le formateur...</option>
               {formateurs.map((f) => (
-                <option key={f.id} value={f.id}>{f.prenom} {f.nom}</option>
+                <option key={f.id} value={f.id}>{formatFullName(f.prenom, f.nom)}</option>
               ))}
             </select>
           </div>
@@ -667,7 +668,7 @@ export default function TransactionsPage() {
               <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
                 <p className="text-xs text-slate-500">Bénéficiaire</p>
                 <p className="font-semibold text-slate-900">
-                  {detailTx.formateur?.prenom} {detailTx.formateur?.nom}
+                  {formatFullName(detailTx.formateur?.prenom, detailTx.formateur?.nom)}
                 </p>
               </div>
               <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">

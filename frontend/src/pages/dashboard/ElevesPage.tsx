@@ -562,7 +562,7 @@ export default function ElevesPage() {
 
       <Modal
         open={showEditModal && !!activeEleve}
-        title={activeEleve ? `Fiche — ${activeEleve.prenom} ${activeEleve.nom}` : 'Modifier'}
+        title={activeEleve ? `Fiche — ${formatFullName(activeEleve.prenom, activeEleve.nom)}` : 'Modifier'}
         size="md"
         onClose={() => { setShowEditModal(false); setActiveEleve(null); }}
         footer={
@@ -787,7 +787,7 @@ export default function ElevesPage() {
         open={!!parentCodeInfo}
         title="Code d’activation parent"
         subtitle={parentCodeInfo
-          ? `${parentCodeInfo.eleve.prenom} ${parentCodeInfo.eleve.nom} · ${parentCodeInfo.eleve.matricule}`
+          ? `${formatFullName(parentCodeInfo.eleve.prenom, parentCodeInfo.eleve.nom)} · ${parentCodeInfo.eleve.matricule}`
           : undefined}
         size="sm"
         onClose={() => setParentCodeInfo(null)}

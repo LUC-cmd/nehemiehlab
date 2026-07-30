@@ -5,6 +5,7 @@ import { userService, centreService, rapportService } from '../../services/api';
 import { ROLE_LABELS, ROLES_CREABLES_PAR_DIRECTEUR, ROLE_ACCESS_SUMMARY } from '../../constants/roleAccess';
 import type { User, Centre, Role } from '../../types';
 import { centreLabel } from '../../utils/centreLabel';
+import { formatFullName } from '../../utils/displayName';
 import { ancienneteDate, formatAnciennete } from '../../utils/anciennete';
 import { Plus, Search, Shield, UserCheck, UserX, Pencil, FileSpreadsheet, FileText, KeyRound, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -386,7 +387,7 @@ export default function UtilisateursPage() {
                   <td>
                     <div className="flex items-center gap-3">
                       <UserAvatar user={u} size="sm" />
-                      <span className="text-white font-medium">{u.prenom} {u.nom}</span>
+                      <span className="text-white font-medium">{formatFullName(u.prenom, u.nom)}</span>
                     </div>
                   </td>
                   <td className="text-dark-300">{u.email}</td>
@@ -589,7 +590,7 @@ export default function UtilisateursPage() {
         title="Supprimer ce compte définitivement ?"
         message={
           confirmDeleteUser
-            ? `Cette action est irréversible : le compte de ${confirmDeleteUser.prenom} ${confirmDeleteUser.nom} (${confirmDeleteUser.email}) sera supprimé de la base de données. S'il est encore lié à un centre en tant que coordinateur, ce lien sera aussi retiré.`
+            ? `Cette action est irréversible : le compte de ${formatFullName(confirmDeleteUser.prenom, confirmDeleteUser.nom)} (${confirmDeleteUser.email}) sera supprimé de la base de données. S'il est encore lié à un centre en tant que coordinateur, ce lien sera aussi retiré.`
             : ''
         }
         confirmLabel="Supprimer définitivement"
@@ -650,7 +651,7 @@ export default function UtilisateursPage() {
       <Modal
         open={editAncienneteUser != null}
         title="Modifier l'ancienneté"
-        subtitle={editAncienneteUser ? `${editAncienneteUser.prenom} ${editAncienneteUser.nom}` : undefined}
+        subtitle={editAncienneteUser ? formatFullName(editAncienneteUser.prenom, editAncienneteUser.nom) : undefined}
         size="sm"
         onClose={() => setEditAncienneteUser(null)}
         footer={

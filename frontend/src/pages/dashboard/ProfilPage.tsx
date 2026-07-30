@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { banqueService, userService } from '../../services/api';
+import { formatFullName } from '../../utils/displayName';
 import type { Banque } from '../../types';
 import {
   Building2, Camera, CreditCard, FileImage, FolderOpen, Loader2, Lock, Mail, MapPin, Phone, Smartphone, Trash2, User,
@@ -313,7 +314,7 @@ export default function ProfilPage() {
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
             </div>
             <div>
-              <p className="text-lg font-bold text-slate-900">{user?.prenom} {user?.nom}</p>
+              <p className="text-lg font-bold text-slate-900">{formatFullName(user?.prenom, user?.nom)}</p>
               <p className="text-sm text-slate-500">{role}</p>
               <p className="text-xs text-slate-400 mt-1">{user?.email}</p>
               {user?.avatar && (

@@ -589,7 +589,7 @@ export default function FormationsPage() {
                       }`}
                     >
                       <span className="text-sm font-medium">
-                        {e.prenom} {e.nom}
+                        {formatFullName(e.prenom, e.nom)}
                       </span>
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${

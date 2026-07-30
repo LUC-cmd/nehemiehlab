@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { rapportService, userService } from '../../services/api';
+import { formatFullName } from '../../utils/displayName';
 import type { RapportExecutionSeanceItem, User } from '../../types';
 import {
   ArrowDownAZ, ArrowUpAZ, Download, FileText, Loader2, RefreshCw, Users,
@@ -230,7 +231,7 @@ export default function RapportExecutionSeancesPanel({
               <option value="">Tous les formateurs</option>
               {formateurs.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.prenom} {f.nom}
+                  {formatFullName(f.prenom, f.nom)}
                 </option>
               ))}
             </select>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowUpRight, Filter, Sparkles, UserCircle2 } from 'lucide-react';
 import { centreService, contentManagementService } from '../../services/api';
+import { formatFullName } from '../../utils/displayName';
 import type { Centre, EnfantProfilePublic } from '../../types';
 import { centreLabel } from '../../utils/centreLabel';
 import { mediaUrl } from '../../utils/media';
@@ -211,7 +212,7 @@ export default function EnfantsProfilesShowcase({
                 </div>
                 <div className="p-2.5">
                   <p className={`text-sm font-semibold truncate ${dark ? 'text-white' : 'text-slate-900'}`}>
-                    {p.prenom} {p.nom}
+                    {formatFullName(p.prenom, p.nom)}
                   </p>
                   <p className={`text-[11px] truncate ${dark ? 'text-dark-400' : 'text-slate-500'}`}>
                     {[p.age ? `${p.age} ans` : null, p.centre].filter(Boolean).join(' · ') || '—'}

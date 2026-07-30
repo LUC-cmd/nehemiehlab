@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { CreditCard, Clock, CheckCircle, XCircle, TrendingUp, ArrowUpRight, Landmark, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { banqueService, dashboardService, transactionService } from '../../services/api';
+import { formatFullName } from '../../utils/displayName';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { Banque, Transaction } from '../../types';
 import { fetchWithOfflineCache, describeDataLoadIssue } from '../../utils/offlineCache';
@@ -216,7 +217,7 @@ export default function ComptableDashboard() {
             {pendingTransactions.map((tx) => (
               <div key={tx.id} className="p-3 rounded-xl border border-dark-700 bg-dark-800/60 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm text-white font-medium truncate">{tx.formateur?.prenom} {tx.formateur?.nom}</p>
+                  <p className="text-sm text-white font-medium truncate">{formatFullName(tx.formateur?.prenom, tx.formateur?.nom)}</p>
                   <p className="text-xs text-dark-400">{tx.type}</p>
                 </div>
                 <span className="text-sm font-semibold text-amber-400 whitespace-nowrap">{tx.montant.toLocaleString('fr-FR')} FCFA</span>

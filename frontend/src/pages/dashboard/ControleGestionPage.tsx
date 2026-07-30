@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CreditCard, TrendingUp, Clock3, CheckCircle2 } from 'lucide-react';
 import { dashboardService, transactionService } from '../../services/api';
+import { formatFullName } from '../../utils/displayName';
 import type { DashboardStats, Transaction } from '../../types';
 
 export default function ControleGestionPage() {
@@ -82,7 +83,7 @@ export default function ControleGestionPage() {
               {transactions.slice(0, 10).map((t, index) => (
                 <tr key={t.id} className="border-b border-dark-800">
                   <td className="py-2 text-dark-400">{index + 1}</td>
-                  <td className="py-2 text-white">{t.formateur?.prenom} {t.formateur?.nom}</td>
+                  <td className="py-2 text-white">{formatFullName(t.formateur?.prenom, t.formateur?.nom)}</td>
                   <td className="py-2 text-dark-300">{t.type}</td>
                   <td className="py-2 text-dark-300">{t.montant.toLocaleString('fr-FR')} FCFA</td>
                   <td className="py-2">

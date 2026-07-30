@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Circle,
 import L, { LatLngExpression } from 'leaflet';
 import type { Centre, SessionCours } from '../../types';
 import { centreLabel } from '../../utils/centreLabel';
+import { formatFullName } from '../../utils/displayName';
 
 const DEFAULT_CENTER: LatLngExpression = [8.6, 1.0]; // centre approximatif du Togo
 const DEFAULT_ZOOM = 7;
@@ -204,7 +205,7 @@ export default function GeoMapPanel({
                     <Popup>
                       <strong>{s.titre}</strong>
                       <br />
-                      Début session — {s.formateur?.prenom} {s.formateur?.nom}
+                      Début session — {formatFullName(s.formateur?.prenom, s.formateur?.nom)}
                     </Popup>
                   </Marker>
                 )}
@@ -240,7 +241,7 @@ export default function GeoMapPanel({
               <Popup>
                 <strong>Sur le terrain</strong>
                 <br />
-                {liveSession.formateur?.prenom} {liveSession.formateur?.nom}
+                {formatFullName(liveSession.formateur?.prenom, liveSession.formateur?.nom)}
                 <br />
                 Session en cours : {liveSession.titre}
               </Popup>
