@@ -49,6 +49,7 @@ export type DashboardPage =
   | 'eleves'
   | 'sessions'
   | 'formations'
+  | 'modules'
   | 'supports-cours'
   | 'journal-activite'
   | 'evaluation-formateur'
@@ -85,6 +86,7 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { id: 'eleves', label: 'Élèves', kind: 'voir' },
   { id: 'sessions', label: 'Séances terrain (présences / clôture)', kind: 'voir' },
   { id: 'formations', label: 'Modules enseignés (journal pédagogique)', kind: 'voir' },
+  { id: 'modules', label: 'Modules par formateur / centre (vue Directeur)', kind: 'voir' },
   { id: 'supports-cours', label: 'Supports de cours / modules SKA', kind: 'voir' },
   { id: 'journal-activite', label: "Journal d'activité", kind: 'voir' },
   { id: 'evaluation-formateur', label: 'Évaluation formateur (quiz / Scratch)', kind: 'voir' },
@@ -118,6 +120,7 @@ export const PAGE_ROLES: Record<DashboardPage, Role[]> = {
   eleves: ['DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER', 'COMPTABLE', 'STAFF_NEHEMIAH', 'ANIMATEUR', 'BENEVOLE', 'PARTICIPANT'],
   sessions: ['DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER', 'COMPTABLE', 'STAFF_NEHEMIAH', 'ANIMATEUR', 'BENEVOLE', 'PARTICIPANT'],
   formations: ['DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER', 'COMPTABLE', 'STAFF_NEHEMIAH', 'ANIMATEUR', 'BENEVOLE', 'PARTICIPANT'],
+  modules: ['DIRECTEUR'],
   'supports-cours': ['DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER'],
   'journal-activite': ['DIRECTEUR'],
   'evaluation-formateur': ['DIRECTEUR', 'FORMATEUR'],
@@ -153,6 +156,7 @@ export const NAV_FALLBACK: NavItemDef[] = [
   { page: 'eleves', to: '/dashboard/eleves', label: 'Élèves' },
   { page: 'sessions', to: '/dashboard/sessions', label: 'Séances terrain' },
   { page: 'formations', to: '/dashboard/formations', label: 'Modules enseignés' },
+  { page: 'modules', to: '/dashboard/modules', label: 'Modules (formateur / centre)' },
   { page: 'supports-cours', to: '/dashboard/supports-cours', label: 'Supports de cours' },
   { page: 'journal-activite', to: '/dashboard/journal-activite', label: "Journal d'activité" },
   { page: 'evaluation-formateur', to: '/dashboard/evaluation-formateur', label: 'Évaluation formateur' },
@@ -191,6 +195,7 @@ export const NAV_BY_ROLE: Record<Role, NavItemDef[]> = {
     { page: 'evaluation-formateur', to: '/dashboard/evaluation-formateur', label: 'Évaluation formateur' },
     { page: 'transactions', to: '/dashboard/transactions', label: 'Transactions' },
     { page: 'rapports', to: '/dashboard/rapports', label: 'Rapports' },
+    { page: 'modules', to: '/dashboard/modules', label: 'Modules (formateur / centre)' },
     { page: 'publications', to: '/dashboard/publications', label: 'Publications site' },
     { page: 'actualites', to: '/dashboard/actualites', label: 'Nouveautés' },
     { page: 'galerie', to: '/dashboard/galerie', label: 'Galerie site' },
@@ -277,7 +282,7 @@ export const NAV_BY_ROLE: Record<Role, NavItemDef[]> = {
 /** Défauts features par rôle (alignés backend) */
 export const DEFAULT_FEATURES_BY_ROLE: Record<Role, FeatureId[]> = {
   DIRECTEUR: [
-    'home', 'centres', 'formateurs', 'eleves', 'sessions', 'formations', 'supports-cours', 'journal-activite', 'evaluation-formateur', 'transactions', 'rapports',
+    'home', 'centres', 'formateurs', 'eleves', 'sessions', 'formations', 'modules', 'supports-cours', 'journal-activite', 'evaluation-formateur', 'transactions', 'rapports',
     'publications', 'actualites', 'galerie', 'ressources', 'communaute', 'discussion', 'profils-enfants', 'controle-gestion',
     'utilisateurs', 'permissions', 'profil',
     'edit_centre_location', 'create_eleve', 'manage_sessions', 'manage_signalements',
@@ -350,6 +355,7 @@ export function pageFromPath(pathname: string): DashboardPage | null {
     '/dashboard/eleves': 'eleves',
     '/dashboard/sessions': 'sessions',
     '/dashboard/formations': 'formations',
+    '/dashboard/modules': 'modules',
     '/dashboard/supports-cours': 'supports-cours',
     '/dashboard/journal-activite': 'journal-activite',
     '/dashboard/evaluation-formateur': 'evaluation-formateur',
