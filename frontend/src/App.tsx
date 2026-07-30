@@ -29,6 +29,7 @@ const FormateursPage = lazy(() => import('./pages/dashboard/FormateursPage'));
 const ElevesPage = lazy(() => import('./pages/dashboard/ElevesPage'));
 const SessionsPage = lazy(() => import('./pages/dashboard/SessionsPage'));
 const FormationsPage = lazy(() => import('./pages/dashboard/FormationsPage'));
+const ModulesPage = lazy(() => import('./pages/dashboard/ModulesPage'));
 const JournalActivitePage = lazy(() => import('./pages/dashboard/JournalActivitePage'));
 const EvaluationFormateurPage = lazy(() => import('./pages/dashboard/EvaluationFormateurPage'));
 const TransactionsPage = lazy(() => import('./pages/dashboard/TransactionsPage'));
@@ -121,6 +122,13 @@ function AppRoutes() {
           <Route path="formations" element={
             <ProtectedRoute roles={PAGE_ROLES.formations} feature="formations">
               <PageTransition><FormationsPage /></PageTransition>
+            </ProtectedRoute>
+          } />
+
+          {/* Modules par formateur / centre — Directeur */}
+          <Route path="modules" element={
+            <ProtectedRoute roles={PAGE_ROLES.modules} feature="modules">
+              <PageTransition><ModulesPage /></PageTransition>
             </ProtectedRoute>
           } />
 
