@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface SessionCoursRepository extends JpaRepository<SessionCours, Long> {
     List<SessionCours> findByCentreIdOrderByCreatedAtDesc(Long centreId);
     List<SessionCours> findByFormateurIdOrderByCreatedAtDesc(Long formateurId);
+    List<SessionCours> findByFormateurIdAndStatut(Long formateurId, String statut);
     List<SessionCours> findAllByOrderByCreatedAtDesc();
     Optional<SessionCours> findByRapportUrl(String rapportUrl);
 }

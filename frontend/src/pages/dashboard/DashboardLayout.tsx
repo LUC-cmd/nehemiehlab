@@ -13,6 +13,7 @@ import { connectNotificationsSocket } from '../../services/notificationsSocket';
 import { LOGO_SRC, BRAND_TEAL } from '../../constants/branding';
 import { buildNavForRole, ROLE_LABELS } from '../../constants/roleAccess';
 import InscriptionsToggle from '../../components/dashboard/InscriptionsToggle';
+import SeanceOuverteBanner from '../../components/dashboard/SeanceOuverteBanner';
 import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
 import UserAvatar from '../../components/ui/UserAvatar';
 import { formatFullName } from '../../utils/displayName';
@@ -536,6 +537,7 @@ export default function DashboardLayout() {
 
           {/* Contenu */}
           <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 md:p-6 lg:p-8 bg-slate-50 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <SeanceOuverteBanner />
             <div className="mx-auto w-full max-w-7xl min-w-0">
               <Outlet />
             </div>

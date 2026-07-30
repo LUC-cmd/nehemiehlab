@@ -359,6 +359,20 @@ export default function SessionsPage() {
     setSearchParams({}, { replace: true });
   }, [loading, centres, searchParams, setSearchParams]);
 
+  // Ouvre directement le détail d'une séance quand on arrive via ?sessionId=...
+  // (ex : bouton "Clôturer maintenant" du rappel persistant de séance ouverte).
+  useEffect(() => {
+    if (loading || sessions.length === 0) return;
+    const sessionIdParam = searchParams.get('sessionId');
+    if (!sessionIdParam) return;
+    const sessionId = Number(sessionIdParam);
+    const target = sessions.find((s) => s.id === sessionId);
+    if (target) {
+      void openSessionDetail(target);
+    }
+    setSearchParams({}, { replace: true });
+  }, [loading, sessions, searchParams, setSearchParams]);
+
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
     if (creatingSession) return;

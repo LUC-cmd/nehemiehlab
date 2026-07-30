@@ -90,6 +90,19 @@ public class SessionController {
         return ResponseEntity.ok(sessions);
     }
 
+    /**
+     * Séances EN_COURS du formateur connecté — utilisé par le rappel persistant
+     * affiché sur toutes les pages tant qu'une séance n'a pas été clôturée.
+     * Requête légère et ciblée (pas la liste complète + agrégats) pour ne pas
+     * alourdir la navigation.
+     */
+    @GetMapping("/en-cours")
+    public ResponseEntity<?> getSessionsEnCours(Authentication auth) {
+        User user = (User) auth.getPrincipal();
+        List<SessionCours> sessions = sessionCoursRepository.findByFormateurIdAndStatut(user.getId(), "EN_COURS");
+        return ResponseEntity.ok(sessions);
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<?> getSessionById(@PathVariable Long id, Authentication auth) {
         User user = (User) auth.getPrincipal();
@@ -112,6 +125,25 @@ public class SessionController {
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR')")
     public ResponseEntity<?> createSession(@RequestBody SessionCours request, Authentication auth) {
         User user = (User) auth.getPrincipal();
+
+        // Un formateur (ou tout utilisateur créant une séance en son nom) ne peut
+        // avoir qu'une seule séance ouverte à la fois : il doit clôturer la séance
+        // en cours avant d'en démarrer une nouvelle, sinon les données de terrain
+        // (présences, notes, heures) se mélangent entre deux séances actives.
+        List<SessionCours> sessionsEnCours = sessionCoursRepository.findByFormateurIdAndStatut(user.getId(), "EN_COURS");
+        if (!sessionsEnCours.isEmpty()) {
+            SessionCours enCours = sessionsEnCours.get(0);
+            String titreEnCours = enCours.getTitre() != null ? enCours.getTitre() : "Séance";
+            String centreEnCours = enCours.getCentre() != null && enCours.getCentre().getNom() != null
+                    ? enCours.getCentre().getNom() : "";
+            String detail = centreEnCours.isBlank() ? titreEnCours : (titreEnCours + " — " + centreEnCours);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Vous avez déjà une séance en cours (" + detail
+                            + "). Clôturez-la avant d'en démarrer une nouvelle.",
+                    "sessionEnCoursId", enCours.getId()
+            ));
+        }
+
         if (request.getCentre() == null || request.getCentre().getId() == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "Centre obligatoire."));
         }
