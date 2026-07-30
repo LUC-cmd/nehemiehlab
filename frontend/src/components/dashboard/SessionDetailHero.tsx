@@ -40,15 +40,15 @@ export default function SessionDetailHero({
               <span
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
                   isLive
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                    : 'bg-slate-500/20 text-slate-300 border border-slate-500/30'
+                    ? 'bg-emerald-500/20 text-emerald-700 border border-emerald-500/30'
+                    : 'bg-slate-500/20 text-slate-700 border border-slate-500/30'
                 }`}
               >
                 {isLive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
                 {isLive ? 'En cours' : 'Clôturée'}
               </span>
               {session.manuelle && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-violet-500/15 text-violet-300 border border-violet-500/30">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-violet-500/15 text-violet-700 border border-violet-500/30">
                   Saisie manuelle
                 </span>
               )}
