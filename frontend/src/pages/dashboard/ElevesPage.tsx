@@ -453,19 +453,19 @@ export default function ElevesPage() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleOpenSeances(eleve)}
-                          className="p-2 text-primary-400 hover:text-primary-300 hover:bg-primary-500/10 rounded-lg transition-colors"
+                          className="p-2 text-primary-500 hover:text-primary-600 hover:bg-primary-500/10 rounded-lg transition-colors"
                           title="Historique des séances"
                         >
                           <CalendarDays className="w-4 h-4" />
                         </button>
                         <button onClick={() => { setActiveEleve(eleve); setCommentText(''); setShowCommentModal(true); }}
-                          className="p-2 text-dark-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors" title="Commenter">
+                          className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors" title="Commenter">
                           <MessageSquare className="w-4 h-4" />
                         </button>
                         {canEdit && (
                           <button
                             onClick={() => openEditModal(eleve)}
-                            className="p-2 text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 rounded-lg transition-colors"
+                            className="p-2 text-sky-600 hover:text-sky-700 hover:bg-sky-500/10 rounded-lg transition-colors"
                             title="Modifier la fiche"
                           >
                             <Edit2 className="w-4 h-4" />
@@ -489,27 +489,27 @@ export default function ElevesPage() {
                             });
                             setShowProjectModal(true);
                           }}
-                            className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors" title="Projet">
+                            className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10 rounded-lg transition-colors" title="Projet">
                             <Edit2 className="w-4 h-4" />
                           </button>
                         )}
                         {canIssueParentCode && (
                           <button
                             onClick={() => handleIssueParentCode(eleve)}
-                            className="p-2 text-amber-300 hover:text-amber-200 hover:bg-amber-500/10 rounded-lg transition-colors"
+                            className="p-2 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 rounded-lg transition-colors"
                             title="Générer un code d’activation parent"
                           >
                             <KeyRound className="w-4 h-4" />
                           </button>
                         )}
                         <button onClick={() => { setActiveEleve(eleve); setSignalText(''); setSignalIncludeInReport(true); setSignalPriorite('NORMALE'); setSignalEquipements(''); setSignalDefis(''); setShowSignalModal(true); }}
-                          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors" title="Signaler">
+                          className="p-2 text-red-600 hover:text-red-700 hover:bg-red-500/10 rounded-lg transition-colors" title="Signaler">
                           <AlertTriangle className="w-4 h-4" />
                         </button>
                         {isDir && (
                           <button
                             onClick={() => setDeleteEleveTarget(eleve)}
-                            className="p-2 text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                            className="p-2 text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 rounded-lg transition-colors"
                             title="Supprimer définitivement l'élève"
                           >
                             <Trash2 className="w-4 h-4" />
