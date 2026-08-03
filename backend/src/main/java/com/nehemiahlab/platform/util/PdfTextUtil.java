@@ -1,7 +1,10 @@
 package com.nehemiahlab.platform.util;
 
+import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.springframework.core.io.ClassPathResource;
 
 import java.awt.Color;
 import java.io.IOException;
@@ -11,6 +14,44 @@ import java.util.List;
 /** Helpers texte pour rapports PDF narratifs. */
 public final class PdfTextUtil {
     private PdfTextUtil() {}
+
+    /**
+     * Dessine le logo SKA (branding/ska-logo.png) dans l'en-tête d'un rapport, avec un
+     * repli "SKA" en texte si l'image est indisponible — même logique que celle déjà
+     * utilisée par les exports (heures, activités, financier...) afin que TOUS les
+     * rapports PDF (y compris exécution de séance et rapport formateur) affichent le
+     * même en-tête avec logo.
+     */
+    public static boolean drawLogoOrFallback(
+            PDDocument document, PDPageContentStream content, PDType1Font titleFont,
+            float x, float y, float size
+    ) {
+        try {
+            ClassPathResource resource = new ClassPathResource("branding/ska-logo.png");
+            if (resource.exists()) {
+                PDImageXObject logo = PDImageXObject.createFromByteArray(
+                        document, resource.getInputStream().readAllBytes(), "ska-logo");
+                content.drawImage(logo, x, y, size, size);
+                return true;
+            }
+        } catch (Exception ignored) {
+            // Repli texte ci-dessous si le logo est indisponible ou illisible.
+        }
+        try {
+            content.setNonStrokingColor(Color.WHITE);
+            content.addRect(x, y, size, size);
+            content.fill();
+            content.beginText();
+            content.setNonStrokingColor(new Color(0, 75, 87));
+            content.setFont(titleFont, 8f);
+            content.newLineAtOffset(x + size * 0.17f, y + size * 0.35f);
+            content.showText("SKA");
+            content.endText();
+        } catch (IOException ignored) {
+            return false;
+        }
+        return false;
+    }
 
     public static List<String> wrap(String text, PDType1Font font, float fontSize, float maxWidth) throws IOException {
         if (text == null || text.isBlank()) return List.of("-");
@@ -30,16 +71,34 @@ public final class PdfTextUtil {
                 lines.add(" ");
                 continue;
             }
-            String[] words = paragraph.trim().split("\\s+");
             StringBuilder current = new StringBuilder();
-            for (String word : words) {
+            for (String rawWord : paragraph.trim().split("\\s+")) {
+                String word = rawWord;
+                // Un seul "mot" sans espace (ex: un creneau horaire "13h30-23h00" ou
+                // un intitule de colonne comme "Presents") peut a lui seul depasser la
+                // largeur de la colonne : on le decoupe alors caractere par caractere
+                // au lieu de le laisser deborder sur la colonne suivante. C'est ce
+                // debordement silencieux qui collait "Creneau" et "Presents" (et leur
+                // contenu) dans les rapports d'execution de seance.
+                while (font.getStringWidth(word) / 1000f * fontSize > maxWidth && word.length() > 1) {
+                    int cut = word.length();
+                    while (cut > 1 && font.getStringWidth(word.substring(0, cut)) / 1000f * fontSize > maxWidth) {
+                        cut--;
+                    }
+                    if (!current.isEmpty()) {
+                        lines.add(current.toString());
+                        current.setLength(0);
+                    }
+                    lines.add(word.substring(0, cut));
+                    word = word.substring(cut);
+                }
                 String candidate = current.isEmpty() ? word : current + " " + word;
                 float width = font.getStringWidth(candidate) / 1000f * fontSize;
-                if (width <= maxWidth) {
+                if (current.isEmpty() || width <= maxWidth) {
                     current.setLength(0);
                     current.append(candidate);
                 } else {
-                    if (!current.isEmpty()) lines.add(current.toString());
+                    lines.add(current.toString());
                     current.setLength(0);
                     current.append(word);
                 }
@@ -110,7 +169,16 @@ public final class PdfTextUtil {
         return total;
     }
 
-    /** Dessine l'entête (fond plein + texte blanc + séparateurs de colonnes) d'un tableau. */
+    private static final float TABLE_HEADER_FONT_SIZE = 8.6f;
+    private static final float TABLE_HEADER_LINE_HEIGHT = 10.5f;
+
+    /**
+     * Dessine l'entête (fond plein + texte blanc + séparateurs de colonnes) d'un tableau.
+     * Les intitulés sont repliés colonne par colonne (comme les données) et la hauteur
+     * de l'entête s'ajuste en conséquence : un intitulé plus large que sa colonne (ex.
+     * "Présents") passe sur 2 lignes au lieu de déborder visuellement sur la colonne
+     * suivante.
+     */
     public static float drawTableHeaderRow(
             PDPageContentStream content,
             List<String> headers,
@@ -119,7 +187,16 @@ public final class PdfTextUtil {
             float y,
             PDType1Font titleFont
     ) throws IOException {
-        float headerHeight = 20f;
+        List<List<String>> wrappedHeaders = new ArrayList<>();
+        int maxLines = 1;
+        for (int i = 0; i < headers.size(); i++) {
+            float maxTextWidth = Math.max(20f, widths[i] - 8f);
+            List<String> lines = wrap(headers.get(i), titleFont, TABLE_HEADER_FONT_SIZE, maxTextWidth);
+            wrappedHeaders.add(lines);
+            maxLines = Math.max(maxLines, lines.size());
+        }
+        float headerHeight = Math.max(20f, maxLines * TABLE_HEADER_LINE_HEIGHT + 8f);
+
         float tableWidth = sumWidths(widths);
         content.setNonStrokingColor(TABLE_HEADER_BG);
         content.addRect(x, y - headerHeight, tableWidth, headerHeight);
@@ -136,12 +213,16 @@ public final class PdfTextUtil {
                 content.lineTo(cx, y - headerHeight);
                 content.stroke();
             }
-            content.beginText();
-            content.setNonStrokingColor(Color.WHITE);
-            content.setFont(titleFont, 8.6f);
-            content.newLineAtOffset(cx + 4f, y - 13f);
-            content.showText(sanitize(headers.get(i)));
-            content.endText();
+            float textY = y - 13f;
+            for (String line : wrappedHeaders.get(i)) {
+                content.beginText();
+                content.setNonStrokingColor(Color.WHITE);
+                content.setFont(titleFont, TABLE_HEADER_FONT_SIZE);
+                content.newLineAtOffset(cx + 4f, textY);
+                content.showText(sanitize(line));
+                content.endText();
+                textY -= TABLE_HEADER_LINE_HEIGHT;
+            }
             cx += widths[i];
         }
         return y - headerHeight;
