@@ -470,7 +470,7 @@ public class RapportFormateurPdfBuilder {
     private Map<String, String> centreHeader(Centre centre, User formateur, LocalDate debut, LocalDate fin) {
         Map<String, String> meta = new LinkedHashMap<>();
         meta.put("Centre", centre.getNom());
-        meta.put("Période", debut.format(REPORT_DATE) + " → " + fin.format(REPORT_DATE));
+        meta.put("Période", debut.format(REPORT_DATE) + " - " + fin.format(REPORT_DATE));
         meta.put("Formateur", formateur != null ? NameFormatUtil.formatNomComplet(formateur.getNom(), formateur.getPrenom()) : "—");
         meta.put("Généré le", LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
         return meta;
@@ -499,10 +499,11 @@ public class RapportFormateurPdfBuilder {
         content.setNonStrokingColor(SKA_TEAL);
         content.addRect(0, topY - 42f, pageWidth, 42f);
         content.fill();
+        PdfTextUtil.drawLogoOrFallback(doc, content, titleFont, margin, topY - 33f, 26f);
         content.beginText();
         content.setNonStrokingColor(Color.WHITE);
         content.setFont(titleFont, 12);
-        content.newLineAtOffset(margin, topY - 24f);
+        content.newLineAtOffset(margin + 34f, topY - 24f);
         content.showText("SMART KIDS ACADEMY — SKA Program");
         content.endText();
 
@@ -595,7 +596,7 @@ public class RapportFormateurPdfBuilder {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("periodeDebut", debut.toString());
         out.put("periodeFin", fin.toString());
-        out.put("periodeLabel", debut.format(REPORT_DATE) + " → " + fin.format(REPORT_DATE));
+        out.put("periodeLabel", debut.format(REPORT_DATE) + " - " + fin.format(REPORT_DATE));
         out.put("seancesTerrain", seances);
         out.put("elevesInscrits", eleves.size());
         out.put("elevesActifs", elevesActifs);
