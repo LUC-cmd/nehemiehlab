@@ -74,12 +74,38 @@ public class RapportExecutionSeancePdfBuilder {
             "Ce rapport d'exécution consolide les séances terrain saisies par les SKA Trainers : effectifs présents, "
                     + "créneaux horaires, état des équipements et défis rencontrés.";
 
-    private static final List<String> MESURES_DEFIS = List.of(
-            "Exhorter les CDEJ a acquérir des PC complementaires et prendre des dispositions mere dans les salles (routeurs wifi) ;",
-            "Encourager les SKA Trainers a s'adapter au terrain et collaborer avec les animateurs pour le transport vers les CDEJ ;",
-            "Exhorter les CDEJ a amenager les salles de formation et suivre l'assiduite des participants ;",
-            "Encourager les SKA Trainers a faire des entretiens individuels avec chaque enfant (2 par seance) pour connaitre motivation et reves."
+    /**
+     * Mesures suggérées, sélectionnées UNIQUEMENT si les défis réellement
+     * saisis par les formateurs ce jour-là contiennent l'un des mots-clés
+     * associés. Avant ce correctif, ce bloc s'affichait tel quel sur CHAQUE
+     * rapport, identique du premier au dernier, sans lien avec les données
+     * réelles saisies en séance — ce que le Directeur a signalé.
+     */
+    private static final List<MesureRule> MESURE_REGLES = List.of(
+            new MesureRule(
+                    List.of("pc", "ordinateur", "wifi", "wi-fi", "réseau", "reseau", "internet",
+                            "matériel", "materiel", "équipement", "equipement"),
+                    "Exhorter les CDEJ à acquérir des PC complémentaires et à prendre des dispositions "
+                            + "pour une meilleure connexion dans les salles (routeurs wifi)."
+            ),
+            new MesureRule(
+                    List.of("transport", "distance", "route", "déplacement", "deplacement", "trajet"),
+                    "Encourager les SKA Trainers à s'adapter au terrain et à collaborer avec les "
+                            + "animateurs pour le transport vers les CDEJ."
+            ),
+            new MesureRule(
+                    List.of("salle", "assiduité", "assiduite", "absence", "présence", "presence", "local"),
+                    "Exhorter les CDEJ à aménager les salles de formation et à suivre l'assiduité des participants."
+            ),
+            new MesureRule(
+                    List.of("motivation", "décrochage", "decrochage", "engagement", "rêve", "reve", "démotivation", "demotivation"),
+                    "Encourager les SKA Trainers à faire des entretiens individuels avec chaque enfant "
+                            + "(2 par séance) pour connaître sa motivation et ses rêves."
+            )
     );
+
+    private record MesureRule(List<String> motsCles, String mesure) {
+    }
 
     public byte[] buildSingle(SessionCours session, List<EvaluationSession> evaluations) throws IOException {
         return build(List.of(session), Map.of(session.getId(), evaluations), null, null, null, null);
@@ -173,11 +199,31 @@ public class RapportExecutionSeancePdfBuilder {
                 ctx.y -= 16f;
                 ctx.y = drawLine(ctx, "Total élèves présents : " + totalPresents, titleFont, SKA_INK);
                 ctx.y -= 12f;
-                ctx.y = drawLine(ctx, "Les mesures proposées pour relever les défis", titleFont, SKA_TEAL);
-                ctx.y -= 4f;
-                for (String mesure : MESURES_DEFIS) {
+
+                List<String> defisDuJour = distinctDefisDuJour(daySessions);
+                if (defisDuJour.isEmpty()) {
                     ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 30f);
-                    ctx.y = PdfTextUtil.drawWrapped(ctx.content, "- " + mesure, bodyFont, 8.5f, margin, ctx.y, ctx.maxW, 11f, MUTED) - 4f;
+                    ctx.y = PdfTextUtil.drawWrapped(ctx.content,
+                            "Aucun défi majeur rapporté par les formateurs durant cette journée.",
+                            bodyFont, 9f, margin, ctx.y, ctx.maxW, 12f, MUTED) - 4f;
+                } else {
+                    ctx.y = drawLine(ctx, "Défis rencontrés (saisis par les formateurs)", titleFont, SKA_TEAL);
+                    ctx.y -= 4f;
+                    for (String defi : defisDuJour) {
+                        ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 30f);
+                        ctx.y = PdfTextUtil.drawWrapped(ctx.content, "- " + defi, bodyFont, 8.5f, margin, ctx.y, ctx.maxW, 11f, MUTED) - 4f;
+                    }
+
+                    List<String> mesures = matchMesures(defisDuJour);
+                    if (!mesures.isEmpty()) {
+                        ctx.y -= 8f;
+                        ctx.y = drawLine(ctx, "Mesures proposées pour relever ces défis", titleFont, SKA_TEAL);
+                        ctx.y -= 4f;
+                        for (String mesure : mesures) {
+                            ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 30f);
+                            ctx.y = PdfTextUtil.drawWrapped(ctx.content, "- " + mesure, bodyFont, 8.5f, margin, ctx.y, ctx.maxW, 11f, MUTED) - 4f;
+                        }
+                    }
                 }
                 ctx.y -= 12f;
                 sectionNum++;
@@ -253,6 +299,39 @@ public class RapportExecutionSeancePdfBuilder {
                 String.valueOf(presents),
                 moduleDefisCell
         );
+    }
+
+    /**
+     * Défis réellement saisis par les formateurs pour les séances de cette journée,
+     * dédupliqués et en excluant les entrées vides ("RAS"). Sert de base à la fois
+     * pour l'affichage des défis et pour la sélection des mesures pertinentes
+     * (voir matchMesures) — plus de texte générique déconnecté des données.
+     */
+    private static List<String> distinctDefisDuJour(List<SessionCours> daySessions) {
+        java.util.LinkedHashSet<String> uniques = new java.util.LinkedHashSet<>();
+        for (SessionCours session : daySessions) {
+            String defi = buildDefis(session);
+            if (defi != null && !defi.isBlank() && !"RAS".equalsIgnoreCase(defi.trim())) {
+                uniques.add(defi.trim());
+            }
+        }
+        return new ArrayList<>(uniques);
+    }
+
+    /**
+     * Sélectionne, parmi MESURE_REGLES, uniquement les mesures dont au moins un
+     * mot-clé apparaît dans les défis réellement rapportés ce jour-là.
+     */
+    private static List<String> matchMesures(List<String> defisDuJour) {
+        String texte = String.join(" ", defisDuJour).toLowerCase(FR);
+        List<String> mesures = new ArrayList<>();
+        for (MesureRule regle : MESURE_REGLES) {
+            boolean correspond = regle.motsCles().stream().anyMatch(texte::contains);
+            if (correspond) {
+                mesures.add(regle.mesure());
+            }
+        }
+        return mesures;
     }
 
     private static String buildDefis(SessionCours session) {
