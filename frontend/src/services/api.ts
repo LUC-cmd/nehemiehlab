@@ -561,7 +561,19 @@ export const sessionService = {
     /** Séance saisie manuellement a posteriori (sans géolocalisation) */
     manuelle?: boolean;
   }) => api.post('/sessions', data),
-  cloturer: (id: number, data?: { heureFin?: string }) =>
+  cloturer: (id: number, data?: {
+    heureFin?: string;
+    // Contexte de fin et géolocalisation regroupés dans le même appel : évite deux
+    // aller-retours réseau séparés (contexte + localisation) à chaque clôture, qui
+    // pouvaient aussi s'écraser l'un l'autre en cas d'exécution en parallèle (voir
+    // le commentaire du même nom côté backend, SessionController#cloturerSession).
+    moduleCoursId?: number;
+    etatEquipements?: string;
+    defisSession?: string;
+    latitude?: number;
+    longitude?: number;
+    precisionMetres?: number;
+  }) =>
     api.put(`/sessions/${id}/cloturer`, data ?? {}),
   updateHoraires: (id: number, data: { heureDebut?: string; heureFin?: string }) =>
     api.put(`/sessions/${id}/horaires`, data),
