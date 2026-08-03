@@ -614,7 +614,7 @@ export default function SessionsPage() {
     setShowSessionDetail(true);
   };
 
-  const handleUpdateEvaluations = async () => {
+  const handleUpdateEvaluations = async (options?: { skipReload?: boolean }) => {
     if (!selectedSession) return;
     try {
       if (selectedOfflineDraftId) {
@@ -653,6 +653,12 @@ export default function SessionsPage() {
         projetSolution: ev.projetFinal ? ev.projetSolution : undefined,
       }));
       await sessionService.updateEvaluations(selectedSession.id, data);
+      // Depuis la clôture (confirmCloturer), on saute le toast et le rechargement
+      // complet de la séance : la boîte de dialogue se ferme dans la foulée, donc ce
+      // GET (et sa reconciliation des évaluations côté serveur) n'aurait servi à rien
+      // — c'était un aller-retour réseau entier gaspillé à chaque clôture, ce qui
+      // contribuait à la lenteur ressentie par les formateurs.
+      if (options?.skipReload) return;
       toast.success('Évaluations sauvegardées');
       openSessionDetail(selectedSession);
     } catch {
@@ -721,7 +727,7 @@ export default function SessionsPage() {
     // session" redevenir cliquable et permettait de relancer une deuxième clôture
     // en parallèle pendant que la première était encore en cours.
     try {
-      await handleUpdateEvaluations();
+      await handleUpdateEvaluations({ skipReload: true });
 
       const finishClose = async (
         geoFin: { latitude: number; longitude: number; precisionMetres?: number } | null,
@@ -748,23 +754,26 @@ export default function SessionsPage() {
           setShowSessionDetail(false);
           return;
         }
-        await sessionService.updateContexte(selectedSession.id, {
+        // Contexte de fin (module/équipements/défis), géolocalisation de fin et
+        // clôture proprement dite regroupés en UN SEUL appel réseau (au lieu de
+        // trois appels séparés attendus l'un après l'autre). En plus d'éviter deux
+        // aller-retours réseau complets à chaque clôture — l'une des principales
+        // sources de lenteur ressentie par les formateurs — ça évite aussi que ces
+        // écritures s'écrasent l'une l'autre si elles s'exécutaient en parallèle
+        // (sessionCoursRepository.save() fait un UPDATE complet de la ligne, pas un
+        // patch colonne par colonne). Pour une séance manuelle (saisie a
+        // posteriori), on transmet l'heure de fin déjà enregistrée via le bloc
+        // « Horaires » : sans ça, le serveur clôturerait avec l'heure actuelle, ce
+        // qui fausserait complètement la durée et les heures cumulées.
+        await sessionService.cloturer(selectedSession.id, {
+          heureFin: selectedSession.manuelle ? selectedSession.heureFin : undefined,
           moduleCoursId: contextForm.moduleCoursId ? Number(contextForm.moduleCoursId) : undefined,
           etatEquipements: contextForm.etatEquipements,
           defisSession: contextForm.defisSession,
+          latitude: geoFin?.latitude,
+          longitude: geoFin?.longitude,
+          precisionMetres: geoFin?.precisionMetres,
         });
-        if (geoFin) {
-          await sessionService.localiserFin(selectedSession.id, geoFin);
-        }
-        // Pour une séance manuelle (saisie a posteriori), on doit transmettre
-        // l'heure de fin déjà enregistrée via le bloc « Horaires » : sans ça, le
-        // serveur clôturerait avec l'heure actuelle, ce qui fausserait
-        // complètement la durée et les heures cumulées (calculées entre le
-        // début — potentiellement il y a plusieurs jours — et « maintenant »).
-        await sessionService.cloturer(
-          selectedSession.id,
-          selectedSession.manuelle ? { heureFin: selectedSession.heureFin } : undefined,
-        );
         toast.success(
           geoFin ? 'Session clôturée avec localisation de fin.' : 'Séance manuelle clôturée.',
         );
@@ -1678,7 +1687,7 @@ export default function SessionsPage() {
                     <Navigation className="w-4 h-4" /> Capturer debut (manuel)
                   </button>
                 ) : null}
-                <button onClick={handleUpdateEvaluations} className="btn-ghost flex items-center gap-2 text-primary-400 hover:bg-primary-500/10">
+                <button onClick={() => handleUpdateEvaluations()} className="btn-ghost flex items-center gap-2 text-primary-400 hover:bg-primary-500/10">
                   <Save className="w-4 h-4" /> Sauvegarder
                 </button>
                 <button onClick={handleSaveContexte} className="btn-ghost flex items-center gap-2 text-amber-700 hover:bg-amber-50">
