@@ -219,6 +219,28 @@ public class RapportController {
         }
     }
 
+    /**
+     * Détermine les dates à AFFICHER dans l'en-tête "Période début / Période fin" d'un
+     * rapport. debutDate/finDate (issues de parseDateOrDefault) servent de bornes très
+     * larges (an 2000 → +2 ans) pour la REQUÊTE quand l'utilisateur n'a filtré aucune
+     * période — mais elles ne doivent jamais être affichées telles quelles, sinon le
+     * rapport prétend couvrir "01/01/2000 → 02/08/2028" alors qu'aucune période n'a
+     * réellement été demandée. Si l'utilisateur n'a pas fourni debut/fin, on affiche à
+     * la place la période réellement couverte par les données renvoyées.
+     */
+    private LocalDate[] displayPeriod(String debutParam, String finParam,
+                                       LocalDate parsedDebut, LocalDate parsedFin,
+                                       List<LocalDate> dataDates) {
+        boolean explicite = (debutParam != null && !debutParam.isBlank())
+                || (finParam != null && !finParam.isBlank());
+        if (explicite) {
+            return new LocalDate[]{parsedDebut, parsedFin};
+        }
+        LocalDate min = dataDates.stream().filter(java.util.Objects::nonNull).min(LocalDate::compareTo).orElse(null);
+        LocalDate max = dataDates.stream().filter(java.util.Objects::nonNull).max(LocalDate::compareTo).orElse(null);
+        return new LocalDate[]{min, max};
+    }
+
     private List<Long> allowedCentreIds(User user) {
         return centreAccessService.accessibleCentreIds(user);
     }
@@ -1751,9 +1773,12 @@ public class RapportController {
             );
         }).toList();
 
+        LocalDate[] periode = displayPeriod(debut, fin, debutDate, finDate,
+                formations.stream().map(ModuleFormation::getDate).toList());
+
         Map<String, String> meta = new LinkedHashMap<>();
-        meta.put("Période début", debutDate.format(REPORT_DATE));
-        meta.put("Période fin", finDate.format(REPORT_DATE));
+        meta.put("Période début", periode[0] != null ? periode[0].format(REPORT_DATE) : "-");
+        meta.put("Période fin", periode[1] != null ? periode[1].format(REPORT_DATE) : "-");
         meta.put("Region", region == null ? "-" : region);
         meta.put("Cluster", cluster == null ? "-" : cluster);
         meta.put("Total apprenants", String.valueOf(rows.size()));
@@ -1806,8 +1831,16 @@ public class RapportController {
                 user, centreId, region, cluster, formateurId, debutDate, finDate);
         Map<Long, List<EvaluationSession>> evalsBySession = loadEvaluationsBySession(sessions);
 
+        // N'affiche jamais les bornes techniques de filtrage (an 2000 → +2 ans) comme
+        // si c'était la vraie période du rapport quand aucune période n'a été demandée.
+        LocalDate[] periode = displayPeriod(debut, fin, debutDate, finDate,
+                sessions.stream()
+                        .filter(s -> s.getHeureDebut() != null)
+                        .map(s -> s.getHeureDebut().toLocalDate())
+                        .toList());
+
         byte[] pdf = rapportExecutionSeancePdfBuilder.build(
-                sessions, evalsBySession, cluster, region, debutDate, finDate);
+                sessions, evalsBySession, cluster, region, periode[0], periode[1]);
 
         String scope = cluster != null && !cluster.isBlank()
                 ? cluster.replaceAll("[^a-zA-Z0-9_-]", "_")
@@ -2011,9 +2044,12 @@ public class RapportController {
                 f.getElevesPresents() != null ? String.valueOf(f.getElevesPresents().size()) : "0"
         )).toList();
 
+        LocalDate[] periode = displayPeriod(debut, fin, debutDate, finDate,
+                formations.stream().map(ModuleFormation::getDate).toList());
+
         Map<String, String> meta = new LinkedHashMap<>();
-        meta.put("Période début", debutDate.format(REPORT_DATE));
-        meta.put("Période fin", finDate.format(REPORT_DATE));
+        meta.put("Période début", periode[0] != null ? periode[0].format(REPORT_DATE) : "-");
+        meta.put("Période fin", periode[1] != null ? periode[1].format(REPORT_DATE) : "-");
         meta.put("Region", region == null ? "-" : region);
         meta.put("Cluster", cluster == null ? "-" : cluster);
         meta.put("Total activites", String.valueOf(rows.size()));
@@ -2122,9 +2158,15 @@ public class RapportController {
                 tx.getCreatedAt() != null ? tx.getCreatedAt().format(REPORT_DATE_TIME) : "-"
         )).toList();
 
+        LocalDate[] periode = displayPeriod(debut, fin, startDate, endDate,
+                transactions.stream()
+                        .filter(tx -> tx.getCreatedAt() != null)
+                        .map(tx -> tx.getCreatedAt().toLocalDate())
+                        .toList());
+
         Map<String, String> meta = new LinkedHashMap<>();
-        meta.put("Période début", startDate.format(REPORT_DATE));
-        meta.put("Période fin", endDate.format(REPORT_DATE));
+        meta.put("Période début", periode[0] != null ? periode[0].format(REPORT_DATE) : "-");
+        meta.put("Période fin", periode[1] != null ? periode[1].format(REPORT_DATE) : "-");
         meta.put("Total transactions", String.valueOf(rows.size()));
 
         byte[] pdf = buildPdfTableReport(

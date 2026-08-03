@@ -54,7 +54,11 @@ public class RapportExecutionSeancePdfBuilder {
             "N°", "Centre (CDEJ)", "Formateur", "Lieu", "Créneau", "Présents", "Module & défis rencontrés"
     );
     // Proportions des colonnes (somme = 1.0), appliquées à la largeur utile de la page.
-    private static final float[] COLUMN_RATIOS = {0.04f, 0.23f, 0.19f, 0.11f, 0.09f, 0.06f, 0.28f};
+    // Créneau et Présents ont été élargis : avec les anciennes valeurs (0.09 / 0.06),
+    // un horaire comme "13h30-23h00" ou l'intitulé "Présents" étaient plus larges que
+    // leur propre colonne et débordaient visuellement sur la colonne suivante — c'est
+    // ce qui donnait l'impression que les colonnes étaient "collées" dans le rapport.
+    private static final float[] COLUMN_RATIOS = {0.035f, 0.18f, 0.145f, 0.10f, 0.125f, 0.095f, 0.32f};
     private static final float TABLE_FONT_SIZE = 8f;
     private static final float TABLE_LINE_HEIGHT = 10.5f;
     private static final float TABLE_MIN_BOTTOM = 95f;
@@ -165,15 +169,15 @@ public class RapportExecutionSeancePdfBuilder {
                     rowNum++;
                 }
 
-                ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 40f);
-                ctx.y -= 6f;
+                ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 48f);
+                ctx.y -= 16f;
                 ctx.y = drawLine(ctx, "Total élèves présents : " + totalPresents, titleFont, SKA_INK);
-                ctx.y -= 8f;
+                ctx.y -= 12f;
                 ctx.y = drawLine(ctx, "Les mesures proposées pour relever les défis", titleFont, SKA_TEAL);
                 ctx.y -= 4f;
                 for (String mesure : MESURES_DEFIS) {
                     ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 30f);
-                    ctx.y = PdfTextUtil.drawWrapped(ctx.content, "● " + mesure, bodyFont, 8.5f, margin, ctx.y, ctx.maxW, 11f, MUTED) - 4f;
+                    ctx.y = PdfTextUtil.drawWrapped(ctx.content, "- " + mesure, bodyFont, 8.5f, margin, ctx.y, ctx.maxW, 11f, MUTED) - 4f;
                 }
                 ctx.y -= 12f;
                 sectionNum++;
@@ -308,7 +312,7 @@ public class RapportExecutionSeancePdfBuilder {
         if (cluster != null && !cluster.isBlank()) parts.add("Cluster " + cluster);
         if (region != null && !region.isBlank()) parts.add("Région " + region);
         if (debut != null && fin != null) {
-            parts.add("Période " + debut.format(REPORT_DATE) + " → " + fin.format(REPORT_DATE));
+            parts.add("Période " + debut.format(REPORT_DATE) + " - " + fin.format(REPORT_DATE));
         }
         return parts.isEmpty() ? null : String.join(" · ", parts);
     }
@@ -346,10 +350,11 @@ public class RapportExecutionSeancePdfBuilder {
         content.setNonStrokingColor(SKA_TEAL);
         content.addRect(0, topY - 42f, pageWidth, 42f);
         content.fill();
+        PdfTextUtil.drawLogoOrFallback(doc, content, titleFont, margin, topY - 33f, 26f);
         content.beginText();
         content.setNonStrokingColor(Color.WHITE);
         content.setFont(titleFont, 12);
-        content.newLineAtOffset(margin, topY - 24f);
+        content.newLineAtOffset(margin + 34f, topY - 24f);
         content.showText("SMART KIDS ACADEMY — SKA Program");
         content.endText();
 
