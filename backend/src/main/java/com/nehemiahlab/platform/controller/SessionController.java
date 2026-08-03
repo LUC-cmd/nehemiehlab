@@ -308,6 +308,48 @@ public class SessionController {
                         "message", "L'heure de fin doit être postérieure à l'heure de début."
                 ));
             }
+
+            // Le client peut regrouper ici le contexte de fin de séance (module, état des
+            // équipements, défis) et la géolocalisation de fin, au lieu de faire deux
+            // appels PUT/POST séparés avant celui-ci. Deux raisons à ce regroupement :
+            // 1) ça évite un aller-retour réseau entier à chaque clôture (contribuait à la
+            //    lenteur ressentie par les formateurs, notamment sur connexion instable) ;
+            // 2) ça évite une vraie perte de données : sessionCoursRepository.save() fait
+            //    un UPDATE complet de la ligne (pas de @DynamicUpdate), donc deux appels
+            //    PUT/POST concurrents sur la même séance (ex: contexte + localisation en
+            //    parallèle) peuvent s'écraser l'un l'autre si l'un a lu la ligne avant que
+            //    l'autre n'ait sauvegardé. Un seul save() ici élimine ce risque.
+            if (body != null) {
+                Object moduleCoursIdRaw = body.get("moduleCoursId");
+                if (moduleCoursIdRaw != null) {
+                    Long moduleCoursId = moduleCoursIdRaw instanceof Number
+                            ? ((Number) moduleCoursIdRaw).longValue()
+                            : Long.parseLong(moduleCoursIdRaw.toString());
+                    ModuleCours catalogModule = moduleCoursService.requireActive(moduleCoursId);
+                    session.setModuleCoursId(catalogModule.getId());
+                    session.setModuleFait(catalogModule.getTitre());
+                }
+                Object etatEquipements = body.get("etatEquipements");
+                if (etatEquipements != null) {
+                    session.setEtatEquipements(InputSanitizer.cleanNullable(etatEquipements.toString()));
+                }
+                Object defisSession = body.get("defisSession");
+                if (defisSession != null) {
+                    session.setDefisSession(InputSanitizer.cleanNullable(defisSession.toString()));
+                }
+                Object latitude = body.get("latitude");
+                Object longitude = body.get("longitude");
+                if (latitude != null && longitude != null) {
+                    session.setLatitudeFin(((Number) latitude).doubleValue());
+                    session.setLongitudeFin(((Number) longitude).doubleValue());
+                    Object precision = body.get("precisionMetres");
+                    if (precision != null) {
+                        session.setPrecisionFinMetres(((Number) precision).doubleValue());
+                    }
+                }
+                stampModification(session, user);
+            }
+
             session.setHeureFin(fin);
             session.setStatut("CLOTUREE");
             long dureeSeance = Math.max(0, Duration.between(session.getHeureDebut(), fin).toMinutes());
