@@ -73,16 +73,10 @@ export default function DirecteurDashboard() {
     load();
   }, []);
 
-  const dataHeures = [
-    { mois: 'Jan', heures: Math.round((stats.totalHeuresFormation ?? 0) * 0.08) },
-    { mois: 'Fév', heures: Math.round((stats.totalHeuresFormation ?? 0) * 0.1) },
-    { mois: 'Mar', heures: Math.round((stats.totalHeuresFormation ?? 0) * 0.09) },
-    { mois: 'Avr', heures: Math.round((stats.totalHeuresFormation ?? 0) * 0.12) },
-    { mois: 'Mai', heures: Math.round((stats.totalHeuresFormation ?? 0) * 0.11) },
-    { mois: 'Jun', heures: Math.round((stats.totalHeuresFormation ?? 0) * 0.14) },
-    { mois: 'Jul', heures: Math.round((stats.totalHeuresFormation ?? 0) * 0.16) },
-    { mois: 'Aoû', heures: Math.round((stats.totalHeuresFormation ?? 0) * 0.2) },
-  ];
+  // Heures réelles par mois, calculées côté backend à partir des séances
+  // effectivement clôturées (plus de répartition fictive fixe Janvier→Août :
+  // le graphique ne montre désormais que les mois où la formation a eu lieu).
+  const dataHeures = stats.heuresParMois ?? [];
 
   const kpis = [
     { label: 'Centres actifs', value: stats.totalCentres ?? 0, icon: <Building2 className="w-6 h-6" />, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
