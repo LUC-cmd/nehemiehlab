@@ -48,6 +48,7 @@ export type DashboardPage =
   | 'formateurs'
   | 'eleves'
   | 'sessions'
+  | 'agenda'
   | 'formations'
   | 'modules'
   | 'supports-cours'
@@ -85,6 +86,7 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { id: 'formateurs', label: 'Formateurs', kind: 'voir' },
   { id: 'eleves', label: 'Élèves', kind: 'voir' },
   { id: 'sessions', label: 'Séances terrain (présences / clôture)', kind: 'voir' },
+  { id: 'agenda', label: 'Mon agenda', kind: 'voir' },
   { id: 'formations', label: 'Modules enseignés (journal pédagogique)', kind: 'voir' },
   { id: 'modules', label: 'Modules par formateur / centre (vue Directeur)', kind: 'voir' },
   { id: 'supports-cours', label: 'Supports de cours / modules SKA', kind: 'voir' },
@@ -119,6 +121,7 @@ export const PAGE_ROLES: Record<DashboardPage, Role[]> = {
   formateurs: ['DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER', 'COMPTABLE', 'STAFF_NEHEMIAH', 'ANIMATEUR', 'BENEVOLE', 'PARTICIPANT'],
   eleves: ['DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER', 'COMPTABLE', 'STAFF_NEHEMIAH', 'ANIMATEUR', 'BENEVOLE', 'PARTICIPANT'],
   sessions: ['DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER', 'COMPTABLE', 'STAFF_NEHEMIAH', 'ANIMATEUR', 'BENEVOLE', 'PARTICIPANT'],
+  agenda: ['FORMATEUR'],
   formations: ['DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER', 'COMPTABLE', 'STAFF_NEHEMIAH', 'ANIMATEUR', 'BENEVOLE', 'PARTICIPANT'],
   modules: ['DIRECTEUR'],
   'supports-cours': ['DIRECTEUR', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER'],
@@ -155,6 +158,7 @@ export const NAV_FALLBACK: NavItemDef[] = [
   { page: 'formateurs', to: '/dashboard/formateurs', label: 'Formateurs' },
   { page: 'eleves', to: '/dashboard/eleves', label: 'Élèves' },
   { page: 'sessions', to: '/dashboard/sessions', label: 'Séances terrain' },
+  { page: 'agenda', to: '/dashboard/agenda', label: 'Mon agenda' },
   { page: 'formations', to: '/dashboard/formations', label: 'Modules enseignés' },
   { page: 'modules', to: '/dashboard/modules', label: 'Modules (formateur / centre)' },
   { page: 'supports-cours', to: '/dashboard/supports-cours', label: 'Supports de cours' },
@@ -212,6 +216,7 @@ export const NAV_BY_ROLE: Record<Role, NavItemDef[]> = {
     { page: 'mes-centres', to: '/dashboard/mes-centres', label: 'Mes Centres' },
     { page: 'eleves', to: '/dashboard/eleves', label: 'Mes Élèves' },
     { page: 'sessions', to: '/dashboard/sessions', label: 'Séances terrain' },
+    { page: 'agenda', to: '/dashboard/agenda', label: 'Mon agenda' },
     { page: 'formations', to: '/dashboard/formations', label: 'Modules enseignés' },
     { page: 'supports-cours', to: '/dashboard/supports-cours', label: 'Supports de cours' },
     { page: 'evaluation-formateur', to: '/dashboard/evaluation-formateur', label: 'Évaluation formateur' },
@@ -288,7 +293,7 @@ export const DEFAULT_FEATURES_BY_ROLE: Record<Role, FeatureId[]> = {
     'edit_centre_location', 'create_eleve', 'manage_sessions', 'manage_signalements',
   ],
   FORMATEUR: [
-    'home', 'mes-centres', 'eleves', 'sessions', 'formations', 'supports-cours', 'evaluation-formateur', 'ressources', 'communaute', 'discussion',
+    'home', 'mes-centres', 'eleves', 'sessions', 'agenda', 'formations', 'supports-cours', 'evaluation-formateur', 'ressources', 'communaute', 'discussion',
     'profils-enfants', 'transactions', 'rapports', 'profil',
     'edit_centre_location', 'create_eleve', 'manage_sessions', 'validate_transactions',
   ],
@@ -354,6 +359,7 @@ export function pageFromPath(pathname: string): DashboardPage | null {
     '/dashboard/formateurs': 'formateurs',
     '/dashboard/eleves': 'eleves',
     '/dashboard/sessions': 'sessions',
+    '/dashboard/agenda': 'agenda',
     '/dashboard/formations': 'formations',
     '/dashboard/modules': 'modules',
     '/dashboard/supports-cours': 'supports-cours',
