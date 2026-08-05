@@ -113,7 +113,7 @@ export default function ParentDashboard() {
               <p className="text-xs text-slate-500 uppercase tracking-wide">Performance</p>
               <p className="font-bold text-slate-900">
                 {enfant.performanceMoyenne != null
-                  ? `${enfant.performanceMoyenne} / 20`
+                  ? `${enfant.performanceMoyenne} / 10`
                   : 'Non évalué'}
               </p>
             </div>
