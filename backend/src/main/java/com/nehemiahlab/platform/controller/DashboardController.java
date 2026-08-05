@@ -10,9 +10,15 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 
 @RestController
 @RequestMapping("/dashboard")
@@ -137,8 +143,37 @@ public class DashboardController {
             stats.put("montantTotalTransactions", montantTotal);
             stats.put("signalementsNonTraites", signalementsActifs);
             stats.put("totalFormations", totalFormations);
+            stats.put("heuresParMois", heuresReellesParMois());
         }
 
         return ResponseEntity.ok(stats);
+    }
+
+    /**
+     * Heures réelles de formation groupées par mois calendaire, à partir des
+     * séances effectivement clôturées (heureDebut + dureeReelleMinutes) — au
+     * lieu de l'ancien graphique qui répartissait le total sur des pourcentages
+     * fixes de Janvier à Août, peu importe la date réelle de démarrage du
+     * programme (ce qui affichait des heures dès janvier même quand la
+     * formation n'avait commencé que plus tard dans l'année).
+     */
+    private List<Map<String, Object>> heuresReellesParMois() {
+        Map<YearMonth, Double> parMois = new TreeMap<>();
+        for (SessionCours session : sessionCoursRepository.findByStatut("CLOTUREE")) {
+            if (session.getHeureDebut() == null || session.getDureeReelleMinutes() == null) continue;
+            YearMonth mois = YearMonth.from(session.getHeureDebut());
+            parMois.merge(mois, session.getDureeReelleMinutes() / 60.0, Double::sum);
+        }
+        DateTimeFormatter moisFmt = DateTimeFormatter.ofPattern("MMM yyyy", Locale.FRENCH);
+        List<Map<String, Object>> resultat = new ArrayList<>();
+        for (Map.Entry<YearMonth, Double> entry : parMois.entrySet()) {
+            String label = entry.getKey().atDay(1).format(moisFmt);
+            label = label.substring(0, 1).toUpperCase(Locale.FRENCH) + label.substring(1);
+            Map<String, Object> point = new LinkedHashMap<>();
+            point.put("mois", label);
+            point.put("heures", Math.round(entry.getValue() * 10.0) / 10.0);
+            resultat.add(point);
+        }
+        return resultat;
     }
 }
