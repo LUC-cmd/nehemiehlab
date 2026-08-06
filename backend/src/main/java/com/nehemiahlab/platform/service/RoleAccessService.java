@@ -27,6 +27,7 @@ public class RoleAccessService {
             "formateurs",
             "eleves",
             "sessions",
+            "agenda",
             "formations",
             "supports-cours",
             "journal-activite",
@@ -71,7 +72,7 @@ public class RoleAccessService {
                 "manage_signalements"
         ));
         m.put(Role.FORMATEUR.name(), set(
-                "home", "mes-centres", "eleves", "sessions", "formations", "supports-cours", "evaluation-formateur", "ressources",
+                "home", "mes-centres", "eleves", "sessions", "agenda", "formations", "supports-cours", "evaluation-formateur", "ressources",
                 "communaute", "discussion", "profils-enfants", "transactions", "rapports", "profil",
                 "edit_centre_location", "create_eleve", "manage_sessions", "validate_transactions"
         ));
