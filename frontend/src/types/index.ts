@@ -486,6 +486,7 @@ export interface DashboardStats {
   transactionsEnAttente?: number;
   montantTotalTransactions?: number;
   signalementsNonTraites?: number;
+  heuresParMois?: { mois: string; heures: number }[];
 }
 
 // --- Pagination ---
@@ -694,4 +695,17 @@ export interface Banque {
   id: number;
   nom: string;
   createdAt?: string;
+}
+
+// --- Agenda hebdomadaire du formateur ---
+export interface FormateurAgendaEntry {
+  id: number;
+  centre: { id: number; nom: string };
+  centreNom?: string;
+  jourSemaine: number; // 1 = lundi ... 7 = dimanche
+  heureDebut: string; // "HH:mm:ss" ou "HH:mm"
+  heureFin: string;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
