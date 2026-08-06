@@ -83,32 +83,40 @@ public class RapportExecutionSeancePdfBuilder {
      */
     private static final List<MesureRule> MESURE_REGLES = List.of(
             new MesureRule(
+                    "Matériel informatique / connexion insuffisante",
                     List.of("pc", "ordinateur", "wifi", "wi-fi", "réseau", "reseau", "internet",
                             "matériel", "materiel", "équipement", "equipement"),
                     "Exhorter les CDEJ à acquérir des PC complémentaires et à prendre des dispositions "
                             + "pour une meilleure connexion dans les salles (routeurs wifi)."
             ),
             new MesureRule(
+                    "Transport / accès au centre",
                     List.of("transport", "distance", "route", "déplacement", "deplacement", "trajet"),
                     "Encourager les SKA Trainers à s'adapter au terrain et à collaborer avec les "
                             + "animateurs pour le transport vers les CDEJ."
             ),
             new MesureRule(
+                    "Aménagement des salles / assiduité",
                     List.of("salle", "assiduité", "assiduite", "absence", "présence", "presence", "local"),
                     "Exhorter les CDEJ à aménager les salles de formation et à suivre l'assiduité des participants."
             ),
             new MesureRule(
+                    "Motivation et engagement des enfants",
                     List.of("motivation", "décrochage", "decrochage", "engagement", "rêve", "reve", "démotivation", "demotivation"),
                     "Encourager les SKA Trainers à faire des entretiens individuels avec chaque enfant "
                             + "(2 par séance) pour connaître sa motivation et ses rêves."
             )
     );
 
-    private record MesureRule(List<String> motsCles, String mesure) {
+    private record MesureRule(String libelle, List<String> motsCles, String mesure) {
     }
 
     public byte[] buildSingle(SessionCours session, List<EvaluationSession> evaluations) throws IOException {
-        return build(List.of(session), Map.of(session.getId(), evaluations), null, null, null, null);
+        // Une seule séance = un seul centre : on l'affiche systématiquement en
+        // en-tête du rapport pour que le contexte (quel CDEJ) soit toujours
+        // visible, même sans filtre cluster/région explicite.
+        return build(List.of(session), Map.of(session.getId(), evaluations),
+                centreScopeLabel(session.getCentre()), null, null, null, null);
     }
 
     public byte[] build(
@@ -119,12 +127,24 @@ public class RapportExecutionSeancePdfBuilder {
             LocalDate periodeDebut,
             LocalDate periodeFin
     ) throws IOException {
+        return build(sessions, evaluationsBySessionId, null, clusterLabel, regionLabel, periodeDebut, periodeFin);
+    }
+
+    public byte[] build(
+            List<SessionCours> sessions,
+            Map<Long, List<EvaluationSession>> evaluationsBySessionId,
+            String centreLabel,
+            String clusterLabel,
+            String regionLabel,
+            LocalDate periodeDebut,
+            LocalDate periodeFin
+    ) throws IOException {
         List<SessionCours> ordered = sessions.stream()
                 .filter(s -> s.getHeureDebut() != null)
                 .sorted(Comparator.comparing(SessionCours::getHeureDebut))
                 .toList();
 
-        String scope = buildScopeLabel(clusterLabel, regionLabel, periodeDebut, periodeFin);
+        String scope = buildScopeLabel(centreLabel, clusterLabel, regionLabel, periodeDebut, periodeFin);
 
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PDType1Font titleFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
@@ -195,38 +215,20 @@ public class RapportExecutionSeancePdfBuilder {
                     rowNum++;
                 }
 
-                ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 48f);
+                ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 40f);
                 ctx.y -= 16f;
                 ctx.y = drawLine(ctx, "Total élèves présents : " + totalPresents, titleFont, SKA_INK);
                 ctx.y -= 12f;
-
-                List<String> defisDuJour = distinctDefisDuJour(daySessions);
-                if (defisDuJour.isEmpty()) {
-                    ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 30f);
-                    ctx.y = PdfTextUtil.drawWrapped(ctx.content,
-                            "Aucun défi majeur rapporté par les formateurs durant cette journée.",
-                            bodyFont, 9f, margin, ctx.y, ctx.maxW, 12f, MUTED) - 4f;
-                } else {
-                    ctx.y = drawLine(ctx, "Défis rencontrés (saisis par les formateurs)", titleFont, SKA_TEAL);
-                    ctx.y -= 4f;
-                    for (String defi : defisDuJour) {
-                        ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 30f);
-                        ctx.y = PdfTextUtil.drawWrapped(ctx.content, "- " + defi, bodyFont, 8.5f, margin, ctx.y, ctx.maxW, 11f, MUTED) - 4f;
-                    }
-
-                    List<String> mesures = matchMesures(defisDuJour);
-                    if (!mesures.isEmpty()) {
-                        ctx.y -= 8f;
-                        ctx.y = drawLine(ctx, "Mesures proposées pour relever ces défis", titleFont, SKA_TEAL);
-                        ctx.y -= 4f;
-                        for (String mesure : mesures) {
-                            ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 30f);
-                            ctx.y = PdfTextUtil.drawWrapped(ctx.content, "- " + mesure, bodyFont, 8.5f, margin, ctx.y, ctx.maxW, 11f, MUTED) - 4f;
-                        }
-                    }
-                }
-                ctx.y -= 12f;
                 sectionNum++;
+            }
+
+            // Synthèse UNIQUE pour tout le rapport (et non plus répétée jour par jour) :
+            // on prend en compte les défis saisis par TOUS les formateurs sur TOUTES les
+            // séances du périmètre demandé (centre / cluster / région / période), puis on
+            // en fait un résumé thématique — au lieu de dupliquer le même texte partout.
+            if (!ordered.isEmpty()) {
+                ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 60f);
+                ctx = drawSyntheseDefisEtMesures(ctx, document, titleFont, bodyFont, margin, scope, ordered);
             }
 
             if (ordered.isEmpty()) {
@@ -301,15 +303,17 @@ public class RapportExecutionSeancePdfBuilder {
         );
     }
 
+    private record ThemeCount(String libelle, String mesure, int nbSeances) {
+    }
+
     /**
-     * Défis réellement saisis par les formateurs pour les séances de cette journée,
-     * dédupliqués et en excluant les entrées vides ("RAS"). Sert de base à la fois
-     * pour l'affichage des défis et pour la sélection des mesures pertinentes
-     * (voir matchMesures) — plus de texte générique déconnecté des données.
+     * Défis réellement saisis par les formateurs pour l'ensemble des séances passées
+     * (peut couvrir un centre, un cluster, une région ou toute la période du rapport
+     * selon le périmètre demandé), dédupliqués et en excluant les entrées vides ("RAS").
      */
-    private static List<String> distinctDefisDuJour(List<SessionCours> daySessions) {
+    private static List<String> distinctDefis(List<SessionCours> sessions) {
         java.util.LinkedHashSet<String> uniques = new java.util.LinkedHashSet<>();
-        for (SessionCours session : daySessions) {
+        for (SessionCours session : sessions) {
             String defi = buildDefis(session);
             if (defi != null && !defi.isBlank() && !"RAS".equalsIgnoreCase(defi.trim())) {
                 uniques.add(defi.trim());
@@ -319,19 +323,107 @@ public class RapportExecutionSeancePdfBuilder {
     }
 
     /**
-     * Sélectionne, parmi MESURE_REGLES, uniquement les mesures dont au moins un
-     * mot-clé apparaît dans les défis réellement rapportés ce jour-là.
+     * Regroupe par thème (voir MESURE_REGLES) les défis réellement saisis par TOUS les
+     * formateurs sur TOUTES les séances passées en paramètre, avec le nombre de séances
+     * concernées par chaque thème — c'est ce comptage qui fait office de "résumé" plutôt
+     * que de réafficher texte par texte chaque saisie individuelle.
      */
-    private static List<String> matchMesures(List<String> defisDuJour) {
-        String texte = String.join(" ", defisDuJour).toLowerCase(FR);
-        List<String> mesures = new ArrayList<>();
+    private static List<ThemeCount> themeCounts(List<SessionCours> sessions) {
+        List<ThemeCount> resultats = new ArrayList<>();
         for (MesureRule regle : MESURE_REGLES) {
-            boolean correspond = regle.motsCles().stream().anyMatch(texte::contains);
-            if (correspond) {
-                mesures.add(regle.mesure());
+            int nb = 0;
+            for (SessionCours session : sessions) {
+                String defi = buildDefis(session);
+                if (defi == null || defi.isBlank() || "RAS".equalsIgnoreCase(defi.trim())) continue;
+                String texte = defi.toLowerCase(FR);
+                if (regle.motsCles().stream().anyMatch(texte::contains)) {
+                    nb++;
+                }
+            }
+            if (nb > 0) {
+                resultats.add(new ThemeCount(regle.libelle(), regle.mesure(), nb));
             }
         }
-        return mesures;
+        return resultats;
+    }
+
+    /**
+     * Défis dont le texte ne correspond à AUCUN thème connu de MESURE_REGLES — on ne
+     * veut pas perdre cette information sous prétexte qu'elle ne rentre dans aucune
+     * case, donc on l'affiche telle quelle (dédupliquée) sous "Autres défis signalés".
+     */
+    private static List<String> defisNonClasses(List<SessionCours> sessions) {
+        List<String> autres = new ArrayList<>();
+        for (String defi : distinctDefis(sessions)) {
+            String texte = defi.toLowerCase(FR);
+            boolean classe = MESURE_REGLES.stream()
+                    .anyMatch(regle -> regle.motsCles().stream().anyMatch(texte::contains));
+            if (!classe) {
+                autres.add(defi);
+            }
+        }
+        return autres;
+    }
+
+    /**
+     * Section UNIQUE de synthèse (et non plus répétée par jour) : prend en compte tout
+     * ce que tous les formateurs ont saisi comme défis sur l'ensemble des séances du
+     * rapport (quel que soit le nombre de jours/centres couverts), et en fait un résumé
+     * thématique avec les mesures associées — au lieu d'un texte fixe ou d'une simple
+     * liste brute répétée à l'identique.
+     */
+    private PageCtx drawSyntheseDefisEtMesures(
+            PageCtx ctxIn, PDDocument document, PDType1Font titleFont, PDType1Font bodyFont,
+            float margin, String scope, List<SessionCours> sessions
+    ) throws IOException {
+        PageCtx ctx = ctxIn;
+        ctx.y = drawLine(ctx, "Synthèse : défis rencontrés et mesures proposées sur la période", titleFont, SKA_TEAL);
+        ctx.y -= 4f;
+
+        List<String> tousLesDefis = distinctDefis(sessions);
+        if (tousLesDefis.isEmpty()) {
+            ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 30f);
+            ctx.y = PdfTextUtil.drawWrapped(ctx.content,
+                    "Aucun défi majeur rapporté par les formateurs sur cette période.",
+                    bodyFont, 9f, margin, ctx.y, ctx.maxW, 12f, MUTED) - 4f;
+            return ctx;
+        }
+
+        int totalSeances = sessions.size();
+        List<ThemeCount> themes = themeCounts(sessions);
+        List<String> autres = defisNonClasses(sessions);
+
+        ctx.y = PdfTextUtil.drawWrapped(ctx.content,
+                "Résumé des défis saisis par l'ensemble des formateurs sur les " + totalSeances + " séance(s) de cette période :",
+                bodyFont, 9f, margin, ctx.y, ctx.maxW, 12f, MUTED) - 6f;
+
+        for (ThemeCount theme : themes) {
+            ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 30f);
+            String ligne = theme.libelle() + " — signalé sur " + theme.nbSeances() + " séance(s) sur " + totalSeances + ".";
+            ctx.y = PdfTextUtil.drawWrapped(ctx.content, "- " + ligne, bodyFont, 8.5f, margin, ctx.y, ctx.maxW, 11f, MUTED) - 4f;
+        }
+
+        if (!autres.isEmpty()) {
+            ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 30f);
+            ctx.y = PdfTextUtil.drawWrapped(ctx.content, "- Autres défis signalés :", bodyFont, 8.5f, margin, ctx.y, ctx.maxW, 11f, MUTED) - 2f;
+            for (String defi : autres) {
+                ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 30f);
+                ctx.y = PdfTextUtil.drawWrapped(ctx.content, "   · " + defi, bodyFont, 8.5f, margin, ctx.y, ctx.maxW, 11f, MUTED) - 4f;
+            }
+        }
+
+        if (!themes.isEmpty()) {
+            ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 40f);
+            ctx.y -= 8f;
+            ctx.y = drawLine(ctx, "Mesures proposées pour relever ces défis", titleFont, SKA_TEAL);
+            ctx.y -= 4f;
+            for (ThemeCount theme : themes) {
+                ctx = ensureSpace(ctx, document, titleFont, bodyFont, margin, scope, 30f);
+                ctx.y = PdfTextUtil.drawWrapped(ctx.content, "- " + theme.mesure(), bodyFont, 8.5f, margin, ctx.y, ctx.maxW, 11f, MUTED) - 4f;
+            }
+        }
+
+        return ctx;
     }
 
     private static String buildDefis(SessionCours session) {
@@ -386,14 +478,26 @@ public class RapportExecutionSeancePdfBuilder {
         return jour + " " + day.getDayOfMonth() + " " + mois + " " + day.getYear();
     }
 
-    private static String buildScopeLabel(String cluster, String region, LocalDate debut, LocalDate fin) {
+    private static String buildScopeLabel(String centre, String cluster, String region, LocalDate debut, LocalDate fin) {
         List<String> parts = new ArrayList<>();
+        if (centre != null && !centre.isBlank()) parts.add("Centre " + centre);
         if (cluster != null && !cluster.isBlank()) parts.add("Cluster " + cluster);
         if (region != null && !region.isBlank()) parts.add("Région " + region);
         if (debut != null && fin != null) {
             parts.add("Période " + debut.format(REPORT_DATE) + " - " + fin.format(REPORT_DATE));
         }
         return parts.isEmpty() ? null : String.join(" · ", parts);
+    }
+
+    /** Libellé "TG0xx — Nom du centre" utilisé pour afficher clairement le centre visé par un rapport. */
+    private static String centreScopeLabel(Centre centre) {
+        if (centre == null) return null;
+        String code = centre.getCodeCdej();
+        String nom = centre.getNom();
+        if ((code == null || code.isBlank()) && (nom == null || nom.isBlank())) return null;
+        if (code == null || code.isBlank()) return nom;
+        if (nom == null || nom.isBlank()) return code;
+        return code + " — " + nom;
     }
 
     private Map<String, String> metaHeader(LocalDate debut, LocalDate fin, int nbSeances) {
@@ -434,7 +538,7 @@ public class RapportExecutionSeancePdfBuilder {
         content.setNonStrokingColor(Color.WHITE);
         content.setFont(titleFont, 12);
         content.newLineAtOffset(margin + 34f, topY - 24f);
-        content.showText("SMART KIDS ACADEMY — SKA Program");
+        content.showText(RapportAnnuelUtil.SKA_BANNER);
         content.endText();
 
         float y = topY - 58f;
@@ -498,9 +602,7 @@ public class RapportExecutionSeancePdfBuilder {
                 footer.setNonStrokingColor(Color.WHITE);
                 footer.newLineAtOffset(margin, 10f);
                 footer.showText(PdfTextUtil.sanitize(
-                        RapportAnnuelUtil.SKA_FOOTER_LEFT + "  " + RapportAnnuelUtil.SKA_FOOTER_PHONE
-                                + "  " + RapportAnnuelUtil.SKA_FOOTER_WEB
-                                + "  ·  Rapport exécution séance  ·  Page " + (i + 1) + "/" + total
+                        RapportAnnuelUtil.buildFooterText("Rapport exécution séance  ·  Page " + (i + 1) + "/" + total)
                 ));
                 footer.endText();
             }

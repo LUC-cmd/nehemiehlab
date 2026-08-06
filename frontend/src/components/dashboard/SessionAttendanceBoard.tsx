@@ -76,7 +76,7 @@ function noteLabel(note?: number | null): string {
 }
 
 function noteTextColor(note?: number | null): string {
-  if (note == null) return 'text-dark-500';
+  if (note == null) return 'text-slate-500';
   const n = note > 10 ? note / 2 : note;
   if (n >= 8) return 'text-emerald-700';
   if (n >= 5) return 'text-amber-700';
@@ -355,7 +355,7 @@ export default function SessionAttendanceBoard({
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <p className="col-span-full text-xs text-dark-500 -mb-2">
+        <p className="col-span-full text-xs text-slate-500 -mb-2">
           {supervisionMode ? (
             <span className="inline-flex items-center gap-1.5 text-sky-700">
               <Eye className="w-3.5 h-3.5" />
@@ -365,34 +365,34 @@ export default function SessionAttendanceBoard({
             'Feuille de présence : activez chaque enfant présent, saisissez note et projet en face de son nom. Tout alimente le rapport annuel.'
           )}
         </p>
-        <div className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/15 to-emerald-900/10 p-4">
+        <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4">
           <div className="flex items-center gap-2 text-emerald-700 text-xs font-semibold uppercase tracking-wide">
             <UserCheck className="w-4 h-4" /> Présents
           </div>
-          <p className="text-3xl font-bold text-white mt-1">{stats.present}</p>
-          <p className="text-xs text-emerald-400/80 mt-0.5">sur {stats.total} élèves</p>
+          <p className="text-3xl font-bold text-slate-900 mt-1">{stats.present}</p>
+          <p className="text-xs text-emerald-600/80 mt-0.5">sur {stats.total} élèves</p>
         </div>
-        <div className="rounded-2xl border border-sky-500/25 bg-gradient-to-br from-sky-500/15 to-sky-900/10 p-4">
+        <div className="rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 to-white p-4">
           <div className="flex items-center gap-2 text-sky-700 text-xs font-semibold uppercase tracking-wide">
             <Hammer className="w-4 h-4" /> En travail
           </div>
-          <p className="text-3xl font-bold text-white mt-1">{stats.working}</p>
-          <p className="text-xs text-sky-400/80 mt-0.5">projet en cours</p>
+          <p className="text-3xl font-bold text-slate-900 mt-1">{stats.working}</p>
+          <p className="text-xs text-sky-600/80 mt-0.5">projet en cours</p>
         </div>
-        <div className="rounded-2xl border border-rose-500/25 bg-gradient-to-br from-rose-500/15 to-rose-900/10 p-4">
+        <div className="rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4">
           <div className="flex items-center gap-2 text-rose-700 text-xs font-semibold uppercase tracking-wide">
             <UserX className="w-4 h-4" /> Absents
           </div>
-          <p className="text-3xl font-bold text-white mt-1">{stats.absent}</p>
-          <p className="text-xs text-rose-400/80 mt-0.5">à signaler</p>
+          <p className="text-3xl font-bold text-slate-900 mt-1">{stats.absent}</p>
+          <p className="text-xs text-rose-600/80 mt-0.5">à signaler</p>
         </div>
-        <div className="rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-500/15 to-violet-900/10 p-4">
+        <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-4">
           <div className="flex items-center gap-2 text-violet-700 text-xs font-semibold uppercase tracking-wide">
             <TrendingUp className="w-4 h-4" /> Taux
           </div>
           <div className="flex items-end gap-2 mt-1">
-            <p className="text-3xl font-bold text-white">{stats.rate}%</p>
-            <div className="flex-1 h-2 rounded-full bg-violet-950/50 mb-2 overflow-hidden">
+            <p className="text-3xl font-bold text-slate-900">{stats.rate}%</p>
+            <div className="flex-1 h-2 rounded-full bg-violet-100 mb-2 overflow-hidden">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-violet-400 to-fuchsia-400 transition-all duration-500"
                 style={{ width: `${stats.rate}%` }}
@@ -400,20 +400,20 @@ export default function SessionAttendanceBoard({
             </div>
           </div>
         </div>
-        <div className="rounded-2xl border border-amber-500/25 bg-gradient-to-br from-amber-500/15 to-amber-900/10 p-4 col-span-2 lg:col-span-1">
+        <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 col-span-2 lg:col-span-1">
           <div className="flex items-center gap-2 text-amber-700 text-xs font-semibold uppercase tracking-wide">
             <Star className="w-4 h-4" /> Moyenne
           </div>
-          <p className="text-3xl font-bold text-white mt-1">
+          <p className="text-3xl font-bold text-slate-900 mt-1">
             {stats.avg != null ? stats.avg.toFixed(1) : '—'}
-            <span className="text-lg text-amber-400/70 font-medium"> /10</span>
+            <span className="text-lg text-amber-600/70 font-medium"> /10</span>
           </p>
-          <p className="text-xs text-amber-400/80 mt-0.5">participation</p>
+          <p className="text-xs text-amber-600/80 mt-0.5">participation</p>
         </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-        <div className="inline-flex flex-wrap p-1 rounded-xl bg-dark-800/80 border border-dark-700 gap-0.5">
+        <div className="inline-flex flex-wrap p-1 rounded-xl bg-slate-100 border border-slate-200 gap-0.5">
           {([
             { id: 'all' as const, label: 'Tous', icon: Users },
             { id: 'present' as const, label: 'Présents', icon: UserCheck },
@@ -426,8 +426,8 @@ export default function SessionAttendanceBoard({
               onClick={() => setTab(id)}
               className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 tab === id
-                  ? 'bg-primary-500/20 text-primary-700 shadow-sm border border-primary-500/30'
-                  : 'text-dark-400 hover:text-dark-200'
+                  ? 'bg-primary-100 text-primary-700 shadow-sm border border-primary-200'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               <Icon className="w-3.5 h-3.5" />
@@ -436,7 +436,7 @@ export default function SessionAttendanceBoard({
           ))}
         </div>
         <div className="relative max-w-xs w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             type="search"
             placeholder="Rechercher un élève…"
@@ -448,16 +448,16 @@ export default function SessionAttendanceBoard({
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-dark-600 py-16 text-center">
-          <Users className="w-10 h-10 text-dark-600 mx-auto mb-3" />
-          <p className="text-dark-400 text-sm">Aucun élève ne correspond à ce filtre.</p>
+        <div className="rounded-2xl border border-dashed border-slate-200 py-16 text-center">
+          <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-500 text-sm">Aucun élève ne correspond à ce filtre.</p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-dark-700 overflow-hidden">
+        <div className="rounded-2xl border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse min-w-[980px]">
               <thead>
-                <tr className="bg-dark-800/80 border-b border-dark-700 text-dark-400 text-[10px] uppercase tracking-wide">
+                <tr className="bg-slate-100 border-b border-slate-200 text-slate-500 text-[10px] uppercase tracking-wide">
                   <th className="text-left font-semibold px-3 py-2.5 w-10">#</th>
                   <th className="text-left font-semibold px-3 py-2.5 min-w-[190px]">Élève</th>
                   <th className="text-center font-semibold px-3 py-2.5 w-[116px]">Présence</th>
@@ -482,7 +482,7 @@ export default function SessionAttendanceBoard({
                   {showAlertColumn && <th className="text-center font-semibold px-3 py-2.5 w-12">Alerte</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-dark-800">
+              <tbody className="divide-y divide-slate-100">
                 {filtered.map((ev, idx) => {
                   const noteVal = displayNote10(ev.note);
                   const working = isWorking(ev);
@@ -499,9 +499,9 @@ export default function SessionAttendanceBoard({
                       <tr
                         className={`border-l-4 ${rowBorder} transition-colors ${
                           ev.present ? 'bg-emerald-500/[0.03]' : 'bg-transparent'
-                        } hover:bg-dark-800/40`}
+                        } hover:bg-slate-50`}
                       >
-                        <td className="px-3 py-2 text-dark-500 text-xs align-top">{idx + 1}</td>
+                        <td className="px-3 py-2 text-slate-500 text-xs align-top">{idx + 1}</td>
 
                         <td className="px-3 py-2 align-top">
                           <div className="flex items-center gap-2.5">
@@ -517,15 +517,15 @@ export default function SessionAttendanceBoard({
                               {initials(ev.eleve.prenom, ev.eleve.nom)}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-semibold text-white leading-tight truncate">
+                              <p className="font-semibold text-slate-900 leading-tight truncate">
                                 {formatFullName(ev.eleve.prenom, ev.eleve.nom)}
                               </p>
-                              <p className="text-[10px] text-dark-500 truncate mt-0.5">
+                              <p className="text-[10px] text-slate-500 truncate mt-0.5">
                                 {ev.eleve.classe ? `${ev.eleve.classe} · ` : ''}
                                 {ev.eleve.age} ans · {ev.eleve.sexe === 'F' ? 'Fille' : 'Garçon'}
                               </p>
                               {ev.projetFinal && (
-                                <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 border border-amber-500/30">
+                                <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
                                   <Award className="w-2.5 h-2.5" /> Projet final
                                 </span>
                               )}
@@ -547,8 +547,8 @@ export default function SessionAttendanceBoard({
                             }
                             className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-wide transition-all ${
                               ev.present
-                                ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-700'
-                                : 'border-dark-600 bg-dark-800/80 text-dark-400'
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                : 'border-slate-200 bg-slate-100 text-slate-500'
                             } ${
                               displayOnly
                                 ? 'cursor-default'
@@ -561,12 +561,12 @@ export default function SessionAttendanceBoard({
                             {ev.present ? 'Présent' : 'Absent'}
                           </button>
                           {ev.present && ev.heureArrivee && (
-                            <p className="text-[9px] text-dark-500 mt-1">
+                            <p className="text-[9px] text-slate-500 mt-1">
                               depuis {new Date(ev.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                             </p>
                           )}
                           {savingIds.has(ev.id) && (
-                            <p className="text-[9px] text-sky-400 mt-1 flex items-center justify-center gap-1">
+                            <p className="text-[9px] text-sky-600 mt-1 flex items-center justify-center gap-1">
                               <Loader2 className="w-2.5 h-2.5 animate-spin" /> Enregistrement…
                             </p>
                           )}
@@ -574,7 +574,7 @@ export default function SessionAttendanceBoard({
                             <button
                               type="button"
                               onClick={() => void persistEvaluation(ev)}
-                              className="text-[9px] text-rose-400 mt-1 underline decoration-dotted"
+                              className="text-[9px] text-rose-600 mt-1 underline decoration-dotted"
                               title="Cliquer pour réessayer l'enregistrement"
                             >
                               ⚠ Non enregistré — réessayer
@@ -585,7 +585,7 @@ export default function SessionAttendanceBoard({
                         <td className="px-3 py-2 align-top text-center">
                           <span
                             className={`font-mono text-xs font-semibold ${
-                              ev.present ? (session.statut === 'EN_COURS' ? 'text-emerald-700' : 'text-white') : 'text-dark-600'
+                              ev.present ? (session.statut === 'EN_COURS' ? 'text-emerald-700' : 'text-slate-800') : 'text-slate-300'
                             }`}
                           >
                             {formatHMS(dureeSec)}
@@ -594,7 +594,7 @@ export default function SessionAttendanceBoard({
 
                         <td className="px-3 py-2 align-top text-center">
                           {!ev.present ? (
-                            <span className="text-dark-600 text-xs">—</span>
+                            <span className="text-slate-300 text-xs">—</span>
                           ) : displayOnly ? (
                             <span className={`text-sm font-bold ${noteTextColor(ev.note)}`}>
                               {noteVal !== '' ? noteVal : '—'}
@@ -622,9 +622,9 @@ export default function SessionAttendanceBoard({
 
                         <td className="px-3 py-2 align-top">
                           {!ev.present ? (
-                            <span className="text-dark-600 text-xs italic">Marquer présent pour saisir</span>
+                            <span className="text-slate-300 text-xs italic">Marquer présent pour saisir</span>
                           ) : displayOnly ? (
-                            <span className="text-dark-200 text-sm">{ev.projetTravaille || '—'}</span>
+                            <span className="text-slate-800 text-sm">{ev.projetTravaille || '—'}</span>
                           ) : (
                             <input
                               type="text"
@@ -646,7 +646,7 @@ export default function SessionAttendanceBoard({
 
                         <td className="px-3 py-2 align-top text-center">
                           {!ev.present ? (
-                            <span className="text-dark-700">—</span>
+                            <span className="text-slate-300">—</span>
                           ) : ev.projetFichierUrl ? (
                             <div className="flex items-center justify-center gap-1">
                               <button
@@ -654,7 +654,7 @@ export default function SessionAttendanceBoard({
                                 onClick={() => void handleDownloadProjetFichier(ev)}
                                 disabled={downloadingEvalId === ev.id}
                                 title={ev.projetFichierNom || 'Voir le fichier'}
-                                className="p-1.5 rounded text-sky-700 hover:bg-sky-500/10"
+                                className="p-1.5 rounded text-sky-700 hover:bg-sky-50"
                               >
                                 {downloadingEvalId === ev.id ? (
                                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -667,18 +667,18 @@ export default function SessionAttendanceBoard({
                                   type="button"
                                   onClick={() => void handleRemoveProjetFichier(ev)}
                                   title="Retirer le fichier"
-                                  className="p-1.5 rounded text-dark-500 hover:text-rose-400 hover:bg-rose-500/10"
+                                  className="p-1.5 rounded text-slate-500 hover:text-rose-600 hover:bg-rose-50"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               )}
                             </div>
                           ) : displayOnly ? (
-                            <span className="text-dark-700">—</span>
+                            <span className="text-slate-300">—</span>
                           ) : (
                             <label
                               title="Ajouter un fichier (photo, vidéo, .sb3)"
-                              className={`inline-flex p-1.5 rounded text-dark-400 hover:text-sky-700 hover:bg-sky-500/10 cursor-pointer ${
+                              className={`inline-flex p-1.5 rounded text-slate-500 hover:text-sky-700 hover:bg-sky-50 cursor-pointer ${
                                 uploadingEvalId === ev.id ? 'opacity-60 pointer-events-none' : ''
                               }`}
                             >
@@ -703,9 +703,9 @@ export default function SessionAttendanceBoard({
 
                         <td className="px-3 py-2 align-top">
                           {!ev.present ? (
-                            <span className="text-dark-700 text-xs">—</span>
+                            <span className="text-slate-300 text-xs">—</span>
                           ) : displayOnly ? (
-                            <span className="text-dark-300 text-sm">{ev.commentaire || '—'}</span>
+                            <span className="text-slate-700 text-sm">{ev.commentaire || '—'}</span>
                           ) : (
                             <input
                               type="text"
@@ -733,8 +733,8 @@ export default function SessionAttendanceBoard({
                             title="Type de projet, problème et solution"
                             className={`p-1.5 rounded ${
                               !ev.present
-                                ? 'text-dark-700 cursor-not-allowed'
-                                : 'text-dark-400 hover:text-primary-700 hover:bg-primary-500/10'
+                                ? 'text-slate-300 cursor-not-allowed'
+                                : 'text-slate-500 hover:text-primary-700 hover:bg-primary-50'
                             }`}
                           >
                             {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -747,7 +747,7 @@ export default function SessionAttendanceBoard({
                               type="button"
                               onClick={() => setAlertTarget(ev)}
                               title="Signaler / alerter"
-                              className="p-1.5 rounded text-amber-400/80 hover:text-amber-700 hover:bg-amber-500/10"
+                              className="p-1.5 rounded text-amber-500 hover:text-amber-700 hover:bg-amber-50"
                             >
                               <AlertTriangle className="w-4 h-4" />
                             </button>
@@ -756,27 +756,27 @@ export default function SessionAttendanceBoard({
                       </tr>
 
                       {isExpanded && ev.present && (
-                        <tr className="bg-dark-900/60 border-l-4 border-l-dark-700">
+                        <tr className="bg-slate-50 border-l-4 border-l-slate-200">
                           <td />
                           <td colSpan={showAlertColumn ? 8 : 7} className="px-3 py-3">
-                            <div className="rounded-xl border border-dark-700 bg-dark-800/40 p-3 space-y-3">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
                               <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-wide text-dark-500 mb-1.5">
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
                                   Type de projet
                                 </p>
                                 {displayOnly ? (
                                   <span
                                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${
                                       ev.projetFinal
-                                        ? 'bg-amber-500/15 text-amber-700 border border-amber-500/30'
-                                        : 'bg-sky-500/15 text-sky-700 border border-sky-500/30'
+                                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                        : 'bg-sky-50 text-sky-700 border border-sky-200'
                                     }`}
                                   >
                                     {ev.projetFinal ? <Award className="w-3.5 h-3.5" /> : <FlaskConical className="w-3.5 h-3.5" />}
                                     {ev.projetFinal ? 'Projet final' : 'Pratique'}
                                   </span>
                                 ) : (
-                                  <div className="inline-flex rounded-xl border border-dark-700 p-0.5 bg-dark-900/60">
+                                  <div className="inline-flex rounded-xl border border-slate-200 p-0.5 bg-slate-50">
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -792,8 +792,8 @@ export default function SessionAttendanceBoard({
                                       }}
                                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                                         !ev.projetFinal
-                                          ? 'bg-sky-500/20 text-sky-700 border border-sky-500/30'
-                                          : 'text-dark-400 hover:text-dark-200'
+                                          ? 'bg-sky-100 text-sky-700 border border-sky-200'
+                                          : 'text-slate-500 hover:text-slate-700'
                                       }`}
                                     >
                                       <FlaskConical className="w-3.5 h-3.5" />
@@ -809,8 +809,8 @@ export default function SessionAttendanceBoard({
                                       }}
                                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                                         ev.projetFinal
-                                          ? 'bg-amber-500/20 text-amber-700 border border-amber-500/30'
-                                          : 'text-dark-400 hover:text-dark-200'
+                                          ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                                          : 'text-slate-500 hover:text-slate-700'
                                       }`}
                                     >
                                       <Award className="w-3.5 h-3.5" />
@@ -823,11 +823,11 @@ export default function SessionAttendanceBoard({
                               {ev.projetFinal && (
                                 <div className="grid sm:grid-cols-2 gap-3">
                                   <div>
-                                    <label className="text-[10px] font-semibold uppercase tracking-wide text-dark-500 mb-1.5 block">
+                                    <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">
                                       Problème
                                     </label>
                                     {displayOnly ? (
-                                      <p className="text-dark-200 text-sm">{ev.projetProbleme || '—'}</p>
+                                      <p className="text-slate-800 text-sm">{ev.projetProbleme || '—'}</p>
                                     ) : (
                                       <textarea
                                         rows={2}
@@ -846,11 +846,11 @@ export default function SessionAttendanceBoard({
                                     )}
                                   </div>
                                   <div>
-                                    <label className="text-[10px] font-semibold uppercase tracking-wide text-dark-500 mb-1.5 block">
+                                    <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">
                                       Solution
                                     </label>
                                     {displayOnly ? (
-                                      <p className="text-dark-200 text-sm">{ev.projetSolution || '—'}</p>
+                                      <p className="text-slate-800 text-sm">{ev.projetSolution || '—'}</p>
                                     ) : (
                                       <textarea
                                         rows={2}
@@ -911,7 +911,7 @@ export default function SessionAttendanceBoard({
               <option value="URGENTE">Urgente</option>
             </select>
           </div>
-          <label className="flex items-start gap-2 text-sm text-dark-300 cursor-pointer">
+          <label className="flex items-start gap-2 text-sm text-slate-700 cursor-pointer">
             <input
               type="checkbox"
               className="mt-1"
@@ -920,7 +920,7 @@ export default function SessionAttendanceBoard({
             />
             <span>
               Inclure dans le rapport de fin de formation
-              <span className="block text-xs text-dark-500 mt-0.5">
+              <span className="block text-xs text-slate-500 mt-0.5">
                 Le logiciel intègre automatiquement cette alerte dans les observations du rapport annuel.
               </span>
             </span>

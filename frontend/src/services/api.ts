@@ -678,6 +678,31 @@ export const notificationService = {
 };
 
 // ============================================================
+//  Services Agenda (formateur)
+// ============================================================
+export const agendaService = {
+  getMine: () => api.get<import('../types').FormateurAgendaEntry[]>('/agenda'),
+  create: (data: {
+    centreId: number;
+    jourSemaine: number;
+    heureDebut: string;
+    heureFin: string;
+    notes?: string;
+  }) => api.post<import('../types').FormateurAgendaEntry>('/agenda', data),
+  update: (
+    id: number,
+    data: Partial<{
+      centreId: number;
+      jourSemaine: number;
+      heureDebut: string;
+      heureFin: string;
+      notes: string;
+    }>,
+  ) => api.put<import('../types').FormateurAgendaEntry>(`/agenda/${id}`, data),
+  remove: (id: number) => api.delete(`/agenda/${id}`),
+};
+
+// ============================================================
 //  Services Signalements
 // ============================================================
 export const signalementService = {

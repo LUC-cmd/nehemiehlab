@@ -49,10 +49,10 @@ export default function SessionHorairesCard({ session, readOnly = false, onUpdat
   const isClosed = session.statut === 'CLOTUREE';
 
   return (
-    <div className="rounded-2xl border border-dark-700 bg-dark-900/50 p-4 mb-5 space-y-4">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 mb-5 space-y-4">
       <div className="flex items-center gap-2">
-        <Clock className="w-4 h-4 text-sky-400" />
-        <h4 className="text-sm font-bold text-white">Horaires & localisation</h4>
+        <Clock className="w-4 h-4 text-sky-600" />
+        <h4 className="text-sm font-bold text-slate-900">Horaires & localisation</h4>
       </div>
 
       {!readOnly ? (
@@ -76,10 +76,10 @@ export default function SessionHorairesCard({ session, readOnly = false, onUpdat
               onChange={(e) => setHeureFin(e.target.value)}
             />
             {!isClosed && !session.manuelle && (
-              <p className="text-[11px] text-dark-500 mt-1">Renseignée automatiquement à la clôture.</p>
+              <p className="text-[11px] text-slate-500 mt-1">Renseignée automatiquement à la clôture.</p>
             )}
             {!isClosed && session.manuelle && (
-              <p className="text-[11px] text-dark-500 mt-1">
+              <p className="text-[11px] text-slate-500 mt-1">
                 Séance manuelle : vous pouvez indiquer l'heure de fin précise dès maintenant.
               </p>
             )}
@@ -98,13 +98,13 @@ export default function SessionHorairesCard({ session, readOnly = false, onUpdat
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 gap-3 text-sm">
-          <div className="rounded-xl bg-dark-800/60 border border-dark-700 p-3">
-            <p className="text-[10px] uppercase text-dark-500 font-semibold">Début</p>
-            <p className="text-white font-medium mt-0.5">{formatSessionDateTime(session.heureDebut)}</p>
+          <div className="rounded-xl bg-white border border-slate-200 p-3">
+            <p className="text-[10px] uppercase text-slate-500 font-semibold">Début</p>
+            <p className="text-slate-900 font-medium mt-0.5">{formatSessionDateTime(session.heureDebut)}</p>
           </div>
-          <div className="rounded-xl bg-dark-800/60 border border-dark-700 p-3">
-            <p className="text-[10px] uppercase text-dark-500 font-semibold">Fin</p>
-            <p className="text-white font-medium mt-0.5">
+          <div className="rounded-xl bg-white border border-slate-200 p-3">
+            <p className="text-[10px] uppercase text-slate-500 font-semibold">Fin</p>
+            <p className="text-slate-900 font-medium mt-0.5">
               {session.heureFin ? formatSessionDateTime(session.heureFin) : '—'}
             </p>
           </div>
@@ -114,8 +114,8 @@ export default function SessionHorairesCard({ session, readOnly = false, onUpdat
       <div className="grid sm:grid-cols-2 gap-3 text-xs">
         <div className={`rounded-xl border p-3 flex gap-2 ${
           session.latitudeDebut != null
-            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
-            : 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            : 'border-amber-200 bg-amber-50 text-amber-700'
         }`}>
           <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
           <div>
@@ -129,8 +129,8 @@ export default function SessionHorairesCard({ session, readOnly = false, onUpdat
         </div>
         <div className={`rounded-xl border p-3 flex gap-2 ${
           session.latitudeFin != null
-            ? 'border-sky-500/30 bg-sky-500/10 text-sky-200'
-            : 'border-dark-600 bg-dark-800/40 text-dark-500'
+            ? 'border-sky-200 bg-sky-50 text-sky-700'
+            : 'border-slate-200 bg-slate-100 text-slate-500'
         }`}>
           <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
           <div>
