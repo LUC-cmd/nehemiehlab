@@ -29,6 +29,7 @@ public class RoleAccessController {
                 feat("formateurs", "Formateurs", "voir"),
                 feat("eleves", "Élèves", "voir"),
                 feat("sessions", "Sessions", "voir"),
+                feat("agenda", "Mon agenda", "voir"),
                 feat("formations", "Formations / journal", "voir"),
                 feat("supports-cours", "Supports de cours / modules", "voir"),
                 feat("transactions", "Transactions / paiements", "voir"),
