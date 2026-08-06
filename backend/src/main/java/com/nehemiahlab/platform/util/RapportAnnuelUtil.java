@@ -11,6 +11,22 @@ public final class RapportAnnuelUtil {
     public static final String SKA_FOOTER_PHONE = "contact +228 97 25 53 53";
     public static final String SKA_FOOTER_WEB = "site https://ska-management.com/";
 
+    /** Bandeau d'en-tete affiche en haut de chaque page des rapports PDF SKA. */
+    public static final String SKA_BANNER = "Smart Kids Academy Programme — SKA Program";
+
+    /**
+     * Construit le texte de pied de page standard SKA (contact + site) suivi
+     * d'un suffixe specifique au rapport (ex. "Rapport annuel formateur  ·  Page 1/3").
+     */
+    public static String buildFooterText(String suffix) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(SKA_FOOTER_LEFT).append("  ").append(SKA_FOOTER_PHONE).append("  ").append(SKA_FOOTER_WEB);
+        if (suffix != null && !suffix.isBlank()) {
+            sb.append("  ·  ").append(suffix);
+        }
+        return sb.toString();
+    }
+
     public static String niveauFromNote(Double note) {
         if (note == null) return "—";
         double n = note > 10 ? note / 2.0 : note;
