@@ -29,6 +29,31 @@ export function writeCache<T>(rawKey: string, data: T): void {
   }
 }
 
+/**
+ * Purge tout le cache de lecture (préfixe nh_cache:). À appeler à la
+ * déconnexion : un même téléphone/tablette est souvent partagé entre
+ * plusieurs formateurs sur le terrain, et sans ce nettoyage le cache du
+ * compte précédent (centres, séances...) restait disponible en repli et
+ * pouvait s'afficher pour le compte suivant après une nouvelle connexion.
+ * N'affecte pas les brouillons hors ligne ni la file de mutations en attente
+ * (autres préfixes de clés, gérés séparément) : aucune perte de données de
+ * terrain non synchronisées.
+ */
+export function clearAllCache(): void {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(CACHE_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // Ignore (quota / mode privé)
+  }
+}
+
 export async function fetchWithOfflineCache<T>(
   rawKey: string,
   fetcher: () => Promise<T>,
