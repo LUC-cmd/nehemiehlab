@@ -530,9 +530,10 @@ public class SessionController {
         if (!canModifySession(user, session)) {
             return ResponseEntity.status(403).body(Map.of("message", "Action non autorisée."));
         }
-        if ("CLOTUREE".equals(session.getStatut())) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Session déjà clôturée."));
-        }
+        // Les présences/notes restent modifiables après clôture (erreur de saisie sur le
+        // terrain, oubli...) — seules les horaires (heureDebut/heureFin) avaient déjà ce
+        // droit via updateHoraires. On trace qui corrige quoi et quand (stampModification)
+        // pour garder un historique visible, comme pour les autres modifications post-clôture.
 
         for (EvaluationRequest req : requests) {
             EvaluationSession eval = evaluationSessionRepository.findById(req.getId()).orElse(null);
@@ -586,6 +587,14 @@ public class SessionController {
 
                 evaluationSessionRepository.save(eval);
             }
+        }
+
+        // Correction après clôture : on trace qui a modifié et quand, pour que le
+        // formateur/directeur voie que ces présences ont été ajustées a posteriori
+        // (même logique que stampModification dans updateHoraires).
+        if ("CLOTUREE".equals(session.getStatut())) {
+            stampModification(session, user);
+            sessionCoursRepository.save(session);
         }
 
         // Renvoie l'état serveur à jour (heure d'arrivée, durée, note...) pour que le
