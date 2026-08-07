@@ -1,3 +1,5 @@
+import { clearAllCache } from './offlineCache';
+
 const KEYS = ['nehemiah_token', 'nehemiah_refresh', 'nehemiah_user'] as const;
 
 function read(key: string): string | null {
@@ -59,4 +61,8 @@ export function persistAuthSession(token: string, refreshToken: string, userJson
 
 export function clearAuthSession(): void {
   KEYS.forEach(remove);
+  // Un même téléphone/tablette est souvent partagé entre plusieurs formateurs sur le
+  // terrain : sans ce nettoyage, le cache de lecture (centres, séances...) du compte
+  // précédent restait disponible en repli et pouvait s'afficher pour le compte suivant.
+  clearAllCache();
 }
