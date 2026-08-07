@@ -1711,6 +1711,16 @@ export default function SessionsPage() {
             
             {selectedSession?.statut === 'CLOTUREE' && !detailLoading && (
               <div className="flex flex-wrap items-center gap-3">
+                {canEditTerrain && (
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateEvaluations()}
+                    className="btn-ghost flex items-center gap-2 text-primary-400 hover:bg-primary-500/10"
+                    title="Corriger une présence, une note ou un projet sur cette séance clôturée"
+                  >
+                    <Save className="w-4 h-4" /> Sauvegarder les corrections
+                  </button>
+                )}
                 {(canEditTerrain || isDirecteur) && !selectedOfflineDraftId && (
                   <button
                     type="button"
@@ -1859,6 +1869,8 @@ export default function SessionsPage() {
                 <p className="text-xs text-dark-500 mt-0.5 mb-3">
                   {isDirecteur
                     ? 'Le directeur consulte uniquement — seul le formateur sur le terrain saisit les données.'
+                    : selectedSession.statut === 'CLOTUREE'
+                    ? 'Séance clôturée : vous pouvez encore corriger une présence, une note ou un projet en cas d\'erreur de saisie.'
                     : 'Marquez la présence, la note /10, le projet et une alerte si besoin.'}
                 </p>
               </div>
@@ -1866,7 +1878,7 @@ export default function SessionsPage() {
                 <SessionAttendanceBoard
                   evaluations={evaluations}
                   session={selectedSession}
-                  readOnly={selectedSession.statut === 'CLOTUREE' || !canEditTerrain}
+                  readOnly={!canEditTerrain}
                   supervisionMode={isDirecteur && selectedSession.statut === 'EN_COURS'}
                   canSignal={canEditTerrain && selectedSession.statut === 'EN_COURS' && !selectedOfflineDraftId}
                   sessionId={selectedSession.id > 0 ? selectedSession.id : undefined}
