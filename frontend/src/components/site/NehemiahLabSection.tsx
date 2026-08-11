@@ -23,6 +23,7 @@ export default function NehemiahLabSection() {
           badge={NEHEMIAH_LAB.name}
           title={NEHEMIAH_LAB.headline}
           description={NEHEMIAH_LAB.tagline}
+          badgeCase="none"
         />
 
         <motion.div
