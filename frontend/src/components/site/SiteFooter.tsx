@@ -70,6 +70,7 @@ export default function SiteFooter({ onContactClick }: Props) {
               <p className="text-white/75 text-sm leading-relaxed mb-4">
                 Smart Kids Academy est un programme de <span className="text-white font-medium">{SITE_INFO.parentOrg}</span>.
                 {NEHEMIAH_LAB.tagline} — nous préparons la jeunesse togolaise aux métiers et compétences de demain.
+                Un programme d'éducation Technologique et Entrepreneuriale qui prépare les Enfants et les Jeunes aux réalités du monde actuel et futur.
               </p>
               <p className="text-xs text-white/50 uppercase tracking-widest font-semibold">
                 Éducation · Innovation · Excellence
