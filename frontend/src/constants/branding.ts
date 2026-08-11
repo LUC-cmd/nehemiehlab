@@ -117,7 +117,7 @@ export const NEHEMIAH_LAB = {
   name: 'Nehemiah Lab',
   orgLine: 'Nehemiah Youth Empowerment · Églises Partenaire de Compassion',
   tagline: "Un accompagnement sérieux pour les jeunes porteurs d'idée",
-  headline: 'Du projet à la mise en oeuvre',
+  headline: "Du projet à la mise en oeuvre, de l'idée au projet concrétisé",
   intro:
     'Deux fois par an, Nehemiah Lab sélectionne des projets et accompagne les jeunes dans leur progression, étape par étape.',
   mission:
