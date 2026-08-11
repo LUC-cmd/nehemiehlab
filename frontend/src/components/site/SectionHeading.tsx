@@ -6,9 +6,11 @@ interface Props {
   title: string;
   description?: string;
   className?: string;
+  /** Mettre à 'none' pour afficher le badge tel quel (ex: nom propre) au lieu de tout en majuscules. */
+  badgeCase?: 'uppercase' | 'none';
 }
 
-export default function SectionHeading({ badge, title, description, className = '' }: Props) {
+export default function SectionHeading({ badge, title, description, className = '', badgeCase = 'uppercase' }: Props) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 32 }}
@@ -22,7 +24,9 @@ export default function SectionHeading({ badge, title, description, className = 
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true }}
         transition={{ delay: 0.1, duration: 0.5 }}
-        className="inline-block text-[#004b57] text-sm sm:text-base font-semibold uppercase tracking-[0.2em] mb-5"
+        className={`inline-block text-[#004b57] text-sm sm:text-base font-semibold tracking-[0.2em] mb-5 ${
+          badgeCase === 'none' ? '' : 'uppercase'
+        }`}
       >
         {badge}
       </motion.span>
