@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import type { EvaluationSession, SessionCours } from '../../types';
 import { formatFullName } from '../../utils/displayName';
 import { signalementService, sessionService } from '../../services/api';
+import { toDatetimeLocalValue, datetimeLocalToIso } from '../../utils/datetime';
 import { fetchSecureMediaBlobUrl } from '../../utils/media';
 import Modal from '../ui/Modal';
 
@@ -63,6 +64,12 @@ function buildEvaluationPayload(ev: EvaluationSession) {
     projetFinal: ev.present ? (ev.projetFinal ?? false) : false,
     projetProbleme: ev.present && ev.projetFinal ? ev.projetProbleme : undefined,
     projetSolution: ev.present && ev.projetFinal ? ev.projetSolution : undefined,
+    // Heures d'arrivée/de départ : envoyées telles quelles pour que le serveur
+    // recalcule la durée automatiquement (aucune saisie manuelle d'un nombre
+    // d'heures n'est demandée au formateur). Si le formateur vient de corriger
+    // l'une des deux via le panneau détaillé, c'est cette valeur qui est reprise.
+    heureArrivee: ev.present ? ev.heureArrivee : undefined,
+    heureDepart: ev.present ? ev.heureDepart : undefined,
   };
 }
 
@@ -760,6 +767,86 @@ export default function SessionAttendanceBoard({
                           <td />
                           <td colSpan={showAlertColumn ? 8 : 7} className="px-3 py-3">
                             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+                              <div>
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                                  Heure d&apos;arrivée / Heure de départ
+                                </p>
+                                {displayOnly ? (
+                                  <p className="text-slate-700 text-sm">
+                                    {ev.heureArrivee ? new Date(ev.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                                    {' → '}
+                                    {ev.heureDepart ? new Date(ev.heureDepart).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                                    {' · '}{formatHMS(dureeSec)}
+                                  </p>
+                                ) : (
+                                  <div className="grid sm:grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">
+                                        Arrivée
+                                      </label>
+                                      <input
+                                        type="datetime-local"
+                                        className="input-field text-sm py-1.5"
+                                        value={toDatetimeLocalValue(ev.heureArrivee)}
+                                        onChange={(e) => {
+                                          const iso = datetimeLocalToIso(e.target.value);
+                                          onEvaluationsChange((prev) =>
+                                            prev.map((p) => {
+                                              if (p.id !== ev.id) return p;
+                                              const updated = { ...p, heureArrivee: iso };
+                                              if (updated.heureDepart) {
+                                                const secondes = Math.max(0, Math.round(
+                                                  (new Date(updated.heureDepart).getTime() - new Date(iso).getTime()) / 1000,
+                                                ));
+                                                updated.dureeSecondes = secondes;
+                                                updated.dureeMinutes = Math.floor(secondes / 60);
+                                              }
+                                              return updated;
+                                            }),
+                                          );
+                                          scheduleSave(ev.id);
+                                        }}
+                                        onBlur={() => flushSave(ev.id)}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">
+                                        Départ
+                                      </label>
+                                      <input
+                                        type="datetime-local"
+                                        className="input-field text-sm py-1.5"
+                                        value={toDatetimeLocalValue(ev.heureDepart)}
+                                        onChange={(e) => {
+                                          const iso = datetimeLocalToIso(e.target.value);
+                                          onEvaluationsChange((prev) =>
+                                            prev.map((p) => {
+                                              if (p.id !== ev.id) return p;
+                                              const updated = { ...p, heureDepart: iso };
+                                              if (updated.heureArrivee) {
+                                                const secondes = Math.max(0, Math.round(
+                                                  (new Date(iso).getTime() - new Date(updated.heureArrivee).getTime()) / 1000,
+                                                ));
+                                                updated.dureeSecondes = secondes;
+                                                updated.dureeMinutes = Math.floor(secondes / 60);
+                                              }
+                                              return updated;
+                                            }),
+                                          );
+                                          scheduleSave(ev.id);
+                                        }}
+                                        onBlur={() => flushSave(ev.id)}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                                <p className="mt-1.5 text-[10px] text-slate-500">
+                                  La durée ({formatHMS(dureeSec)}) est calculée automatiquement à partir de ces deux
+                                  heures — corrigez-les si besoin, aucune saisie manuelle du nombre d&apos;heures n&apos;est
+                                  nécessaire.
+                                </p>
+                              </div>
+
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
                                   Type de projet
