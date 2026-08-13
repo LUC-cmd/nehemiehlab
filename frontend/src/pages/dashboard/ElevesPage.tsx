@@ -425,10 +425,10 @@ export default function ElevesPage() {
                     <td className="p-4">
                       {eleve.performanceMoyenne !== undefined && eleve.performanceMoyenne !== null ? (
                         <div className="flex items-center gap-2">
-                          <span className={`font-bold ${eleve.performanceMoyenne >= 10 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          <span className={`font-bold ${eleve.performanceMoyenne >= 5 ? 'text-emerald-400' : 'text-red-400'}`}>
                             {eleve.performanceMoyenne}
                           </span>
-                          <span className="text-dark-400 text-xs">/ 20</span>
+                          <span className="text-dark-400 text-xs">/ 10</span>
                         </div>
                       ) : (
                         <span className="text-dark-500 italic text-xs">Non évalué</span>
