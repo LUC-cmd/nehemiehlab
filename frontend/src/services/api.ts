@@ -272,7 +272,7 @@ export const userService = {
     telephone?: string; dateNaissance?: string; lieuNaissance?: string; adresse?: string;
   }) => api.post('/users/creer-compte', data),
   updateProfile: (id: number, data: Partial<{
-    nom: string; prenom: string; telephone: string; telephoneSecondaire: string;
+    nom: string; prenom: string; email: string; telephone: string; telephoneSecondaire: string;
     numeroCompteBancaire: string; numeroMobileMoney: string;
     operateurMobileMoney: string; banqueNom: string; rib: string; codeAgence: string; intituleCompte: string;
     motDePasse: string; ancienMotDePasse: string;
@@ -591,6 +591,8 @@ export const sessionService = {
     projetFinal?: boolean;
     projetProbleme?: string;
     projetSolution?: string;
+    heureArrivee?: string;
+    heureDepart?: string;
   }[]) => api.put(`/sessions/${id}/evaluations`, data),
   updateContexte: (id: number, data: {
     moduleFait?: string;
