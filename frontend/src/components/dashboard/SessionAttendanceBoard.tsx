@@ -12,7 +12,7 @@ import { signalementService, sessionService } from '../../services/api';
 import { fetchSecureMediaBlobUrl } from '../../utils/media';
 import Modal from '../ui/Modal';
 
-type FilterTab = 'all' | 'present' | 'absent' | 'working';
+type FilterTab = 'all' | 'present' | 'retard' | 'absent' | 'working';
 
 type Props = {
   evaluations: EvaluationSession[];
@@ -66,6 +66,7 @@ function buildEvaluationPayload(ev: EvaluationSession) {
   return {
     id: ev.id,
     present: ev.present,
+    enRetard: ev.present ? !!ev.enRetard : false,
     note: ev.present ? ev.note : undefined,
     commentaire: ev.commentaire,
     projetTravaille: ev.projetTravaille,
@@ -233,6 +234,7 @@ export default function SessionAttendanceBoard({
     const total = evaluations.length;
     const present = evaluations.filter((e) => e.present).length;
     const absent = total - present;
+    const retards = evaluations.filter((e) => e.present && e.enRetard).length;
     const working = evaluations.filter(isWorking).length;
     const notes = evaluations
       .filter((e) => e.present && e.note != null)
@@ -242,13 +244,14 @@ export default function SessionAttendanceBoard({
       });
     const avg = notes.length ? notes.reduce((a, b) => a + b, 0) / notes.length : null;
     const rate = total ? Math.round((present / total) * 100) : 0;
-    return { total, present, absent, working, avg, rate };
+    return { total, present, absent, retards, working, avg, rate };
   }, [evaluations]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return evaluations.filter((ev) => {
       if (tab === 'present' && !ev.present) return false;
+      if (tab === 'retard' && !(ev.present && ev.enRetard)) return false;
       if (tab === 'absent' && ev.present) return false;
       if (tab === 'working' && !isWorking(ev)) return false;
       if (!q) return true;
@@ -257,20 +260,27 @@ export default function SessionAttendanceBoard({
     });
   }, [evaluations, tab, search]);
 
-  const togglePresence = (ev: EvaluationSession) => {
+  // Trois états possibles : Absent / Présent / Présent en retard. "Retard" est
+  // purement informatif — la durée comptée reste la même (début → fin de séance)
+  // — mais permet de compter les retards sur la fiche/rapport de l'enfant.
+  const setPresenceStatus = (ev: EvaluationSession, status: 'ABSENT' | 'PRESENT' | 'RETARD') => {
     if (readOnly) return;
+    const nowPresent = status !== 'ABSENT';
+    const nowRetard = status === 'RETARD';
+    if (ev.present === nowPresent && (!nowPresent || !!ev.enRetard === nowRetard)) return;
     const updated: EvaluationSession = {
       ...ev,
-      present: !ev.present,
-      note: !ev.present ? ev.note : undefined,
-      dureeMinutes: !ev.present ? ev.dureeMinutes : undefined,
-      dureeSecondes: !ev.present ? ev.dureeSecondes : undefined,
-      projetFinal: !ev.present ? ev.projetFinal : false,
-      projetProbleme: !ev.present ? ev.projetProbleme : undefined,
-      projetSolution: !ev.present ? ev.projetSolution : undefined,
+      present: nowPresent,
+      enRetard: nowRetard,
+      note: nowPresent ? ev.note : undefined,
+      dureeMinutes: nowPresent ? ev.dureeMinutes : undefined,
+      dureeSecondes: nowPresent ? ev.dureeSecondes : undefined,
+      projetFinal: nowPresent ? ev.projetFinal : false,
+      projetProbleme: nowPresent ? ev.projetProbleme : undefined,
+      projetSolution: nowPresent ? ev.projetSolution : undefined,
     };
     onEvaluationsChange((prev) => prev.map((p) => (p.id === ev.id ? updated : p)));
-    if (!ev.present) setExpandedId(null);
+    if (!nowPresent) setExpandedId(null);
     // Le bouton de présence doit être un vrai bouton d'activation : la présence est
     // enregistrée côté serveur tout de suite, pas seulement en mémoire locale, et
     // pas via l'objet potentiellement pas encore à jour dans le state React.
@@ -362,7 +372,7 @@ export default function SessionAttendanceBoard({
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <p className="col-span-full text-xs text-slate-500 -mb-2">
           {supervisionMode ? (
             <span className="inline-flex items-center gap-1.5 text-sky-700">
@@ -387,6 +397,13 @@ export default function SessionAttendanceBoard({
           <p className="text-3xl font-bold text-slate-900 mt-1">{stats.working}</p>
           <p className="text-xs text-sky-600/80 mt-0.5">projet en cours</p>
         </div>
+        <div className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-4">
+          <div className="flex items-center gap-2 text-orange-700 text-xs font-semibold uppercase tracking-wide">
+            <Clock className="w-4 h-4" /> Retards
+          </div>
+          <p className="text-3xl font-bold text-slate-900 mt-1">{stats.retards}</p>
+          <p className="text-xs text-orange-600/80 mt-0.5">présents en retard</p>
+        </div>
         <div className="rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4">
           <div className="flex items-center gap-2 text-rose-700 text-xs font-semibold uppercase tracking-wide">
             <UserX className="w-4 h-4" /> Absents
@@ -408,7 +425,7 @@ export default function SessionAttendanceBoard({
             </div>
           </div>
         </div>
-        <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 col-span-2 lg:col-span-1">
+        <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4">
           <div className="flex items-center gap-2 text-amber-700 text-xs font-semibold uppercase tracking-wide">
             <Star className="w-4 h-4" /> Moyenne
           </div>
@@ -425,6 +442,7 @@ export default function SessionAttendanceBoard({
           {([
             { id: 'all' as const, label: 'Tous', icon: Users },
             { id: 'present' as const, label: 'Présents', icon: UserCheck },
+            { id: 'retard' as const, label: 'Retards', icon: Clock },
             { id: 'working' as const, label: 'En travail', icon: Hammer },
             { id: 'absent' as const, label: 'Absents', icon: UserX },
           ]).map(({ id, label, icon: Icon }) => (
@@ -542,32 +560,50 @@ export default function SessionAttendanceBoard({
                         </td>
 
                         <td className="px-3 py-2 align-top text-center">
-                          <button
-                            type="button"
-                            disabled={displayOnly}
-                            onClick={() => togglePresence(ev)}
-                            title={
-                              displayOnly
-                                ? undefined
-                                : ev.present
-                                ? 'Cliquer pour marquer absent'
-                                : "Cliquer pour activer la présence"
-                            }
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-wide transition-all ${
-                              ev.present
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                : 'border-slate-200 bg-slate-100 text-slate-500'
-                            } ${
-                              displayOnly
-                                ? 'cursor-default'
-                                : ev.present
-                                ? 'hover:bg-emerald-500/25 cursor-pointer'
-                                : 'hover:border-rose-500/40 hover:text-rose-700 cursor-pointer'
-                            }`}
-                          >
-                            {ev.present ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
-                            {ev.present ? 'Présent' : 'Absent'}
-                          </button>
+                          <div className="inline-flex rounded-lg border border-slate-200 divide-x divide-slate-200 overflow-hidden">
+                            <button
+                              type="button"
+                              disabled={displayOnly}
+                              onClick={() => setPresenceStatus(ev, 'ABSENT')}
+                              title={displayOnly ? undefined : 'Marquer absent'}
+                              className={`p-1.5 transition-all ${
+                                !ev.present
+                                  ? 'bg-rose-50 text-rose-700'
+                                  : 'bg-white text-slate-300 hover:bg-slate-50 hover:text-slate-500'
+                              } ${displayOnly ? 'cursor-default' : 'cursor-pointer'}`}
+                            >
+                              <UserX className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={displayOnly}
+                              onClick={() => setPresenceStatus(ev, 'PRESENT')}
+                              title={displayOnly ? undefined : 'Marquer présent'}
+                              className={`p-1.5 transition-all ${
+                                ev.present && !ev.enRetard
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : 'bg-white text-slate-300 hover:bg-slate-50 hover:text-slate-500'
+                              } ${displayOnly ? 'cursor-default' : 'cursor-pointer'}`}
+                            >
+                              <UserCheck className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={displayOnly}
+                              onClick={() => setPresenceStatus(ev, 'RETARD')}
+                              title={displayOnly ? undefined : 'Marquer présent en retard'}
+                              className={`p-1.5 transition-all ${
+                                ev.present && ev.enRetard
+                                  ? 'bg-amber-50 text-amber-700'
+                                  : 'bg-white text-slate-300 hover:bg-slate-50 hover:text-slate-500'
+                              } ${displayOnly ? 'cursor-default' : 'cursor-pointer'}`}
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <p className="text-[9px] font-bold uppercase tracking-wide mt-1 text-slate-500">
+                            {!ev.present ? 'Absent' : ev.enRetard ? 'Retard' : 'Présent'}
+                          </p>
                           {savingIds.has(ev.id) && (
                             <p className="text-[9px] text-sky-600 mt-1 flex items-center justify-center gap-1">
                               <Loader2 className="w-2.5 h-2.5 animate-spin" /> Enregistrement…
@@ -764,8 +800,13 @@ export default function SessionAttendanceBoard({
                           <td colSpan={showAlertColumn ? 8 : 7} className="px-3 py-3">
                             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
                               <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5 flex items-center gap-1.5">
                                   Durée de présence
+                                  {ev.enRetard && (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 text-[9px] normal-case tracking-normal font-bold">
+                                      <Clock className="w-2.5 h-2.5" /> Arrivé en retard
+                                    </span>
+                                  )}
                                 </p>
                                 <p className="text-slate-700 text-sm">
                                   {session.heureDebut ? new Date(session.heureDebut).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}
