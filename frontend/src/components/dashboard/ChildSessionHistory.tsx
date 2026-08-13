@@ -7,7 +7,7 @@ import type { ChildSessionRow } from '../../types';
 
 export type { ChildSessionRow };
 
-type FilterTab = 'all' | 'present' | 'absent';
+type FilterTab = 'all' | 'present' | 'retard' | 'absent';
 type Theme = 'light' | 'dark';
 
 function displayNote10(note?: number | null): number | null {
@@ -55,6 +55,7 @@ export default function ChildSessionHistory({ sessions, childName, theme = 'ligh
     const total = sessions.length;
     const present = sessions.filter((s) => s.present).length;
     const absent = total - present;
+    const retards = sessions.filter((s) => s.present && s.enRetard).length;
     const rate = total ? Math.round((present / total) * 100) : 0;
     const notes = sessions
       .filter((s) => s.present && s.note != null)
@@ -63,13 +64,14 @@ export default function ChildSessionHistory({ sessions, childName, theme = 'ligh
     const totalMins = sessions
       .filter((s) => s.present && s.dureeMinutes)
       .reduce((acc, s) => acc + (s.dureeMinutes || 0), 0);
-    return { total, present, absent, rate, avg, totalMins };
+    return { total, present, absent, retards, rate, avg, totalMins };
   }, [sessions]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return sessions.filter((s) => {
       if (tab === 'present' && !s.present) return false;
+      if (tab === 'retard' && !(s.present && s.enRetard)) return false;
       if (tab === 'absent' && s.present) return false;
       if (!q) return true;
       return (
@@ -127,7 +129,7 @@ export default function ChildSessionHistory({ sessions, childName, theme = 'ligh
       </div>
 
       {/* KPI */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
           {
             label: 'Séances',
@@ -142,6 +144,13 @@ export default function ChildSessionHistory({ sessions, childName, theme = 'ligh
             sub: `${stats.absent} absence${stats.absent > 1 ? 's' : ''}`,
             icon: UserCheck,
             color: isDark ? 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10' : 'text-emerald-700 border-emerald-200 bg-emerald-50',
+          },
+          {
+            label: 'Retards',
+            value: stats.retards,
+            sub: 'arrivées tardives',
+            icon: Clock,
+            color: isDark ? 'text-orange-300 border-orange-500/25 bg-orange-500/10' : 'text-orange-700 border-orange-200 bg-orange-50',
           },
           {
             label: 'Moyenne',
@@ -175,6 +184,7 @@ export default function ChildSessionHistory({ sessions, childName, theme = 'ligh
           {([
             { id: 'all' as const, label: 'Toutes', icon: Sparkles },
             { id: 'present' as const, label: 'Présent', icon: UserCheck },
+            { id: 'retard' as const, label: 'Retard', icon: Clock },
             { id: 'absent' as const, label: 'Absent', icon: UserX },
           ]).map(({ id, label, icon: Icon }) => (
             <button
@@ -229,7 +239,9 @@ export default function ChildSessionHistory({ sessions, childName, theme = 'ligh
                   {/* Point timeline */}
                   <div
                     className={`absolute left-2 sm:left-4 top-6 w-4 h-4 rounded-full border-2 z-10 ${
-                      s.present
+                      s.present && s.enRetard
+                        ? 'bg-orange-500 border-orange-300 shadow-lg shadow-orange-500/30'
+                        : s.present
                         ? 'bg-emerald-500 border-emerald-300 shadow-lg shadow-emerald-500/30'
                         : isDark ? 'bg-dark-800 border-rose-400' : 'bg-white border-rose-400'
                     }`}
@@ -287,7 +299,11 @@ export default function ChildSessionHistory({ sessions, childName, theme = 'ligh
 
                         <div
                           className={`shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-xl border font-bold text-sm ${
-                            s.present
+                            s.present && s.enRetard
+                              ? isDark
+                                ? 'bg-orange-500/15 border-orange-500/30 text-orange-300'
+                                : 'bg-orange-50 border-orange-200 text-orange-800'
+                              : s.present
                               ? isDark
                                 ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
                                 : 'bg-emerald-50 border-emerald-200 text-emerald-800'
@@ -296,8 +312,14 @@ export default function ChildSessionHistory({ sessions, childName, theme = 'ligh
                                 : 'bg-rose-50 border-rose-200 text-rose-700'
                           }`}
                         >
-                          {s.present ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
-                          {s.present ? 'Présent' : 'Absent'}
+                          {s.present && s.enRetard ? (
+                            <Clock className="w-5 h-5" />
+                          ) : s.present ? (
+                            <CheckCircle2 className="w-5 h-5" />
+                          ) : (
+                            <XCircle className="w-5 h-5" />
+                          )}
+                          {s.present && s.enRetard ? 'Retard' : s.present ? 'Présent' : 'Absent'}
                         </div>
                       </div>
 
