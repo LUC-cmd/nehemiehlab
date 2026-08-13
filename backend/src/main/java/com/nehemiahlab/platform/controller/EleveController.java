@@ -156,6 +156,7 @@ public class EleveController {
                     row.put("date", s.getHeureDebut());
                     row.put("statut", s.getStatut());
                     row.put("present", ev.isPresent());
+                    row.put("enRetard", ev.isEnRetard());
                     row.put("note", ev.getNote());
                     row.put("commentaire", ev.getCommentaire());
                     row.put("projetTravaille", ev.getProjetTravaille());
