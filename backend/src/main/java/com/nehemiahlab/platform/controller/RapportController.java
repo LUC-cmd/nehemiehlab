@@ -1137,7 +1137,8 @@ public class RapportController {
         long retards = evals.stream().filter(EvaluationSession::isEnRetard).count();
         double avgNote = evals.stream()
                 .filter(e -> e.getNote() != null)
-                .mapToDouble(EvaluationSession::getNote)
+                // Notes historiques pouvaient etre /20 -- normaliser en /10 pour l'affichage
+                .mapToDouble(e -> e.getNote() > 10 ? e.getNote() / 2.0 : e.getNote())
                 .average()
                 .orElse(0);
 
@@ -1212,7 +1213,7 @@ public class RapportController {
             y = PdfTextUtil.drawWrapped(content,
                     "Age: " + eleve.getAge() + " ans | Sexe: " + (eleve.getSexe() != null ? eleve.getSexe() : "-")
                             + " | Heures cumulees: " + (eleve.getTotalHeures() != null ? String.format("%.1f", eleve.getTotalHeures()) : "0")
-                            + " h | Note moyenne ( /20 ): " + String.format("%.1f", avgNote),
+                            + " h | Note moyenne ( /10 ): " + String.format("%.1f", avgNote),
                     bodyFont, 9.5f, margin, y, maxW, 13f, muted) - 8f;
 
             y = drawSectionTitle(content, "3. Assiduite en seance", titleFont, margin, y, ink);
