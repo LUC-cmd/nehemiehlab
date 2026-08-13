@@ -278,6 +278,26 @@ public class UserController {
         }
 
         User user = userOpt.get();
+        // Correction d'un email mal saisi à la création du compte : uniquement le
+        // Directeur peut corriger l'email de n'importe quel compte du système (le
+        // propre profil de l'utilisateur ne permet pas de changer son propre email
+        // ici, pour éviter qu'un compte se verrouille lui-même en cas d'erreur de
+        // frappe — c'est le rôle du Directeur de corriger ce genre d'erreur).
+        if (body.containsKey("email")) {
+            if (current.getRole() != Role.DIRECTEUR) {
+                return ResponseEntity.status(403).body(Map.of(
+                        "message", "Seul le Directeur peut modifier l'adresse email d'un compte."));
+            }
+            String nouvelEmail = body.get("email") == null ? "" : body.get("email").trim().toLowerCase();
+            if (!InputSanitizer.isSafeEmail(nouvelEmail)) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Format d'email invalide."));
+            }
+            if (!nouvelEmail.equalsIgnoreCase(user.getEmail())
+                    && userRepository.existsByEmailIgnoreCase(nouvelEmail)) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Cet email est déjà utilisé."));
+            }
+            user.setEmail(nouvelEmail);
+        }
         if (body.containsKey("nom")) user.setNom(InputSanitizer.clean(body.get("nom")));
         if (body.containsKey("prenom")) user.setPrenom(InputSanitizer.clean(body.get("prenom")));
         if (body.containsKey("telephone")) user.setTelephone(InputSanitizer.digitsOnly(body.get("telephone"), 15));
