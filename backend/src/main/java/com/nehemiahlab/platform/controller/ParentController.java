@@ -121,7 +121,9 @@ public class ParentController {
         int count = 0;
         for (EvaluationSession eval : evals) {
             if (eval.getNote() != null) {
-                total += eval.getNote();
+                // Notes historiques pouvaient etre /20 -- normaliser en /10 pour l'affichage
+                double note = eval.getNote() > 10 ? eval.getNote() / 2.0 : eval.getNote();
+                total += note;
                 count++;
             }
         }
