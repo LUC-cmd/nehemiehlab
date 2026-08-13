@@ -591,8 +591,6 @@ export const sessionService = {
     projetFinal?: boolean;
     projetProbleme?: string;
     projetSolution?: string;
-    heureArrivee?: string;
-    heureDepart?: string;
   }[]) => api.put(`/sessions/${id}/evaluations`, data),
   updateContexte: (id: number, data: {
     moduleFait?: string;
