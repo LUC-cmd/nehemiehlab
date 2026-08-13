@@ -585,6 +585,7 @@ export const sessionService = {
   updateEvaluations: (id: number, data: {
     id: number;
     present: boolean;
+    enRetard?: boolean;
     note?: number;
     commentaire?: string;
     projetTravaille?: string;
