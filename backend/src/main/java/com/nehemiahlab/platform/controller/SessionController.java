@@ -536,6 +536,9 @@ public class SessionController {
             if (eval != null && eval.getSessionCours() != null && eval.getSessionCours().getId().equals(id)) {
                 boolean nowPresent = req.isPresent();
                 eval.setPresent(nowPresent);
+                // Retard : purement informatif (compté sur la fiche/rapport de l'enfant),
+                // n'affecte pas la durée qui reste uniforme début -> fin de séance.
+                eval.setEnRetard(nowPresent && req.isEnRetard());
 
                 if (!nowPresent) {
                     eval.setNote(null);
@@ -776,6 +779,7 @@ public class SessionController {
     public static class EvaluationRequest {
         private Long id;
         private boolean present;
+        private boolean enRetard;
         private Double note;
         private String commentaire;
         private String projetTravaille;
