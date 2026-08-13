@@ -569,6 +569,28 @@ public class SessionController {
                     } else {
                         eval.setNote(null);
                     }
+
+                    // Correction manuelle de l'heure d'arrivée/de départ : le formateur peut
+                    // ajuster directement devant chaque enfant si l'heure captée automatiquement
+                    // ne correspond pas au réel. On ne recalcule PAS un nombre d'heures saisi à la
+                    // main : la durée est toujours dérivée automatiquement de (départ − arrivée).
+                    if (req.getHeureArrivee() != null && !req.getHeureArrivee().isBlank()) {
+                        LocalDateTime manuelleArrivee = parseDateTime(req.getHeureArrivee());
+                        if (manuelleArrivee != null) {
+                            eval.setHeureArrivee(manuelleArrivee);
+                        }
+                    }
+                    if (req.getHeureDepart() != null && !req.getHeureDepart().isBlank()) {
+                        LocalDateTime manuelleDepart = parseDateTime(req.getHeureDepart());
+                        if (manuelleDepart != null) {
+                            eval.setHeureDepart(manuelleDepart);
+                        }
+                    }
+                    if (eval.getHeureArrivee() != null && eval.getHeureDepart() != null) {
+                        long secondes = Math.max(0, Duration.between(eval.getHeureArrivee(), eval.getHeureDepart()).getSeconds());
+                        eval.setDureeSecondes(secondes);
+                        eval.setDureeMinutes(secondes / 60);
+                    }
                 }
                 eval.setCommentaire(InputSanitizer.cleanNullable(req.getCommentaire()));
                 eval.setProjetTravaille(InputSanitizer.cleanNullable(req.getProjetTravaille()));
@@ -779,6 +801,12 @@ public class SessionController {
         private boolean projetFinal;
         private String projetProbleme;
         private String projetSolution;
+        // Correction manuelle de l'heure d'arrivée/de départ d'un enfant sur cette séance
+        // (le formateur peut ajuster si l'auto-détection au clic "Présent" ne correspond
+        // pas à la réalité du terrain). La durée est recalculée automatiquement à partir
+        // de ces deux heures — le formateur n'a plus à saisir un nombre d'heures à la main.
+        private String heureArrivee;
+        private String heureDepart;
     }
 
     @Data
