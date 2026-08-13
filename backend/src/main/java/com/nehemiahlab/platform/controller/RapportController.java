@@ -1134,6 +1134,7 @@ public class RapportController {
         long totalSeances = evals.size();
         long presentes = evals.stream().filter(EvaluationSession::isPresent).count();
         long absences = totalSeances - presentes;
+        long retards = evals.stream().filter(EvaluationSession::isEnRetard).count();
         double avgNote = evals.stream()
                 .filter(e -> e.getNote() != null)
                 .mapToDouble(EvaluationSession::getNote)
@@ -1170,6 +1171,7 @@ public class RapportController {
 
         String bilanPresence = presentes + " presence(s) sur " + totalSeances + " seance(s) evaluee(s)"
                 + (totalSeances > 0 ? " (" + Math.round(100.0 * presentes / totalSeances) + "%)." : ".")
+                + (retards > 0 ? " Dont " + retards + " arrivee(s) en retard." : "")
                 + (absences > 0
                 ? " Les absences (" + absences + ") peuvent expliquer un projet incomplet ou une participation irreguliere."
                 : " L'assiduite est satisfaisante.");
