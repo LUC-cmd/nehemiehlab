@@ -9,7 +9,6 @@ import toast from 'react-hot-toast';
 import type { EvaluationSession, SessionCours } from '../../types';
 import { formatFullName } from '../../utils/displayName';
 import { signalementService, sessionService } from '../../services/api';
-import { toDatetimeLocalValue, datetimeLocalToIso } from '../../utils/datetime';
 import { fetchSecureMediaBlobUrl } from '../../utils/media';
 import Modal from '../ui/Modal';
 
@@ -33,11 +32,20 @@ function initials(prenom?: string, nom?: string) {
   return `${p}${n}`.toUpperCase() || '?';
 }
 
-/** Durée en secondes : chrono en direct si la séance est en cours, sinon valeur figée à la clôture. */
+/**
+ * Durée en secondes : identique pour tous les enfants présents, calculée à partir des
+ * heures de la séance elle-même (début → fin), et non plus d'une heure individuelle par
+ * enfant. Chrono en direct si la séance est en cours, sinon valeur figée à la clôture.
+ */
 function computeDureeSecondes(ev: EvaluationSession, session: SessionCours, tick: number): number | null {
   if (!ev.present) return null;
-  if (session.statut === 'EN_COURS' && ev.heureArrivee) {
-    return Math.max(0, Math.floor((tick - new Date(ev.heureArrivee).getTime()) / 1000));
+  if (!session.heureDebut) return null;
+  const debut = new Date(session.heureDebut).getTime();
+  if (session.statut === 'EN_COURS') {
+    return Math.max(0, Math.floor((tick - debut) / 1000));
+  }
+  if (session.heureFin) {
+    return Math.max(0, Math.floor((new Date(session.heureFin).getTime() - debut) / 1000));
   }
   if (ev.dureeSecondes != null) return ev.dureeSecondes;
   if (ev.dureeMinutes != null) return ev.dureeMinutes * 60;
@@ -64,12 +72,6 @@ function buildEvaluationPayload(ev: EvaluationSession) {
     projetFinal: ev.present ? (ev.projetFinal ?? false) : false,
     projetProbleme: ev.present && ev.projetFinal ? ev.projetProbleme : undefined,
     projetSolution: ev.present && ev.projetFinal ? ev.projetSolution : undefined,
-    // Heures d'arrivée/de départ : envoyées telles quelles pour que le serveur
-    // recalcule la durée automatiquement (aucune saisie manuelle d'un nombre
-    // d'heures n'est demandée au formateur). Si le formateur vient de corriger
-    // l'une des deux via le panneau détaillé, c'est cette valeur qui est reprise.
-    heureArrivee: ev.present ? ev.heureArrivee : undefined,
-    heureDepart: ev.present ? ev.heureDepart : undefined,
   };
 }
 
@@ -261,7 +263,6 @@ export default function SessionAttendanceBoard({
       ...ev,
       present: !ev.present,
       note: !ev.present ? ev.note : undefined,
-      heureArrivee: !ev.present ? ev.heureArrivee || new Date().toISOString() : undefined,
       dureeMinutes: !ev.present ? ev.dureeMinutes : undefined,
       dureeSecondes: !ev.present ? ev.dureeSecondes : undefined,
       projetFinal: !ev.present ? ev.projetFinal : false,
@@ -567,11 +568,6 @@ export default function SessionAttendanceBoard({
                             {ev.present ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
                             {ev.present ? 'Présent' : 'Absent'}
                           </button>
-                          {ev.present && ev.heureArrivee && (
-                            <p className="text-[9px] text-slate-500 mt-1">
-                              depuis {new Date(ev.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          )}
                           {savingIds.has(ev.id) && (
                             <p className="text-[9px] text-sky-600 mt-1 flex items-center justify-center gap-1">
                               <Loader2 className="w-2.5 h-2.5 animate-spin" /> Enregistrement…
@@ -769,81 +765,17 @@ export default function SessionAttendanceBoard({
                             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
-                                  Heure d&apos;arrivée / Heure de départ
+                                  Durée de présence
                                 </p>
-                                {displayOnly ? (
-                                  <p className="text-slate-700 text-sm">
-                                    {ev.heureArrivee ? new Date(ev.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}
-                                    {' → '}
-                                    {ev.heureDepart ? new Date(ev.heureDepart).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}
-                                    {' · '}{formatHMS(dureeSec)}
-                                  </p>
-                                ) : (
-                                  <div className="grid sm:grid-cols-2 gap-3">
-                                    <div>
-                                      <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">
-                                        Arrivée
-                                      </label>
-                                      <input
-                                        type="datetime-local"
-                                        className="input-field text-sm py-1.5"
-                                        value={toDatetimeLocalValue(ev.heureArrivee)}
-                                        onChange={(e) => {
-                                          const iso = datetimeLocalToIso(e.target.value);
-                                          onEvaluationsChange((prev) =>
-                                            prev.map((p) => {
-                                              if (p.id !== ev.id) return p;
-                                              const updated = { ...p, heureArrivee: iso };
-                                              if (updated.heureDepart) {
-                                                const secondes = Math.max(0, Math.round(
-                                                  (new Date(updated.heureDepart).getTime() - new Date(iso).getTime()) / 1000,
-                                                ));
-                                                updated.dureeSecondes = secondes;
-                                                updated.dureeMinutes = Math.floor(secondes / 60);
-                                              }
-                                              return updated;
-                                            }),
-                                          );
-                                          scheduleSave(ev.id);
-                                        }}
-                                        onBlur={() => flushSave(ev.id)}
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">
-                                        Départ
-                                      </label>
-                                      <input
-                                        type="datetime-local"
-                                        className="input-field text-sm py-1.5"
-                                        value={toDatetimeLocalValue(ev.heureDepart)}
-                                        onChange={(e) => {
-                                          const iso = datetimeLocalToIso(e.target.value);
-                                          onEvaluationsChange((prev) =>
-                                            prev.map((p) => {
-                                              if (p.id !== ev.id) return p;
-                                              const updated = { ...p, heureDepart: iso };
-                                              if (updated.heureArrivee) {
-                                                const secondes = Math.max(0, Math.round(
-                                                  (new Date(iso).getTime() - new Date(updated.heureArrivee).getTime()) / 1000,
-                                                ));
-                                                updated.dureeSecondes = secondes;
-                                                updated.dureeMinutes = Math.floor(secondes / 60);
-                                              }
-                                              return updated;
-                                            }),
-                                          );
-                                          scheduleSave(ev.id);
-                                        }}
-                                        onBlur={() => flushSave(ev.id)}
-                                      />
-                                    </div>
-                                  </div>
-                                )}
+                                <p className="text-slate-700 text-sm">
+                                  {session.heureDebut ? new Date(session.heureDebut).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                                  {' → '}
+                                  {session.heureFin ? new Date(session.heureFin).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                                  {' · '}{formatHMS(dureeSec)}
+                                </p>
                                 <p className="mt-1.5 text-[10px] text-slate-500">
-                                  La durée ({formatHMS(dureeSec)}) est calculée automatiquement à partir de ces deux
-                                  heures — corrigez-les si besoin, aucune saisie manuelle du nombre d&apos;heures n&apos;est
-                                  nécessaire.
+                                  La durée correspond aux horaires de la séance et est identique pour tous les
+                                  enfants présents.
                                 </p>
                               </div>
 
