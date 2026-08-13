@@ -43,6 +43,9 @@ export default function UtilisateursPage() {
   const [confirmDesactiverId, setConfirmDesactiverId] = useState<number | null>(null);
   const [editAncienneteUser, setEditAncienneteUser] = useState<User | null>(null);
   const [ancienneteValue, setAncienneteValue] = useState('');
+  const [editEmailUser, setEditEmailUser] = useState<User | null>(null);
+  const [emailValue, setEmailValue] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
   const [confirmResetCoordinateurs, setConfirmResetCoordinateurs] = useState(false);
   const [resettingCoordinateurs, setResettingCoordinateurs] = useState(false);
   const [coordinateurResetResults, setCoordinateurResetResults] = useState<
@@ -189,6 +192,29 @@ export default function UtilisateursPage() {
   const openEditAnciennete = (u: User) => {
     setEditAncienneteUser(u);
     setAncienneteValue(u.dateEntree || '');
+  };
+
+  // Un email mal saisi à la création d'un compte bloquait l'utilisateur (identifiants
+  // envoyés à la mauvaise adresse) sans aucun moyen de le corriger dans l'interface.
+  // Seul le Directeur peut corriger l'email de n'importe quel compte du système.
+  const openEditEmail = (u: User) => {
+    setEditEmailUser(u);
+    setEmailValue(u.email || '');
+  };
+
+  const saveEmail = async () => {
+    if (!editEmailUser) return;
+    setSavingEmail(true);
+    try {
+      await userService.updateProfile(editEmailUser.id, { email: emailValue.trim().toLowerCase() });
+      toast.success('Email mis à jour.');
+      setEditEmailUser(null);
+      fetchUsers();
+    } catch (err) {
+      toast.error(describeApiError(err, "Erreur lors de la mise à jour de l'email."));
+    } finally {
+      setSavingEmail(false);
+    }
   };
 
   // Reinitialise le mot de passe de TOUS les comptes coordinateur (email avec la
@@ -390,7 +416,21 @@ export default function UtilisateursPage() {
                       <span className="text-white font-medium">{formatFullName(u.prenom, u.nom)}</span>
                     </div>
                   </td>
-                  <td className="text-dark-300">{u.email}</td>
+                  <td className="text-dark-300">
+                    <span className="inline-flex items-center gap-1.5">
+                      {u.email}
+                      {isDir && (
+                        <button
+                          type="button"
+                          onClick={() => openEditEmail(u)}
+                          title="Modifier l'email"
+                          className="text-dark-500 hover:text-[#5ED9FF] transition-colors"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      )}
+                    </span>
+                  </td>
                   <td>{getRoleBadge(u.role)}</td>
                   <td>
                     <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
@@ -683,6 +723,47 @@ export default function UtilisateursPage() {
             <p className="mt-1.5 text-xs text-slate-500">
               Utilisée pour calculer l&apos;ancienneté affichée. Laissez vide pour revenir à la date de création
               du compte ({editAncienneteUser?.createdAt ? new Date(editAncienneteUser.createdAt).toLocaleDateString('fr-FR') : '—'}).
+            </p>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={editEmailUser != null}
+        title="Modifier l'email"
+        subtitle={editEmailUser ? formatFullName(editEmailUser.prenom, editEmailUser.nom) : undefined}
+        size="sm"
+        onClose={() => setEditEmailUser(null)}
+        footer={
+          <>
+            <button type="button" onClick={() => setEditEmailUser(null)} className="btn-ghost w-full sm:w-auto justify-center">
+              Annuler
+            </button>
+            <button
+              type="button"
+              disabled={savingEmail || !emailValue.trim()}
+              onClick={saveEmail}
+              className="btn-primary w-full sm:w-auto justify-center disabled:opacity-60"
+            >
+              {savingEmail ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="label">Adresse email</label>
+            <input
+              type="email"
+              required
+              placeholder="Ex: email@nehemiahlab.com"
+              className="input-field"
+              value={emailValue}
+              onChange={(e) => setEmailValue(e.target.value)}
+            />
+            <p className="mt-1.5 text-xs text-slate-500">
+              À utiliser en cas d&apos;erreur de saisie à la création du compte. La personne devra se connecter
+              avec cette nouvelle adresse.
             </p>
           </div>
         </div>
