@@ -160,6 +160,8 @@ export interface EvaluationSession {
   sessionCours: SessionCours;
   eleve: Eleve;
   present: boolean;
+  /** true = l'enfant est arrivé en retard (informatif, n'affecte pas la durée) */
+  enRetard?: boolean;
   /** Note de participation sur 10 */
   note?: number;
   commentaire?: string;
@@ -355,6 +357,7 @@ export interface ChildSessionRow {
   date: string;
   statut?: string;
   present: boolean;
+  enRetard?: boolean;
   note?: number | null;
   commentaire?: string;
   projetTravaille?: string;
