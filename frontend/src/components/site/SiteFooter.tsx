@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Phone, Mail, MapPin, Clock, ArrowRight } from 'lucide-react';
-import { LOGO_SRC, BRAND_TEAL, BRAND_TEAL_DEEP, PAGE_BG, SITE_INFO, PROGRAMS, NEHEMIAH_LAB } from '../../constants/branding';
+import { LOGO_SRC, BRAND_TEAL, BRAND_TEAL_DEEP, PAGE_BG, SITE_INFO, PROGRAMS } from '../../constants/branding';
 import { useInscriptionFormateursOuverte } from '../../hooks/useInscriptionFormateursOuverte';
 
 interface Props {
@@ -69,7 +69,6 @@ export default function SiteFooter({ onContactClick }: Props) {
               <img src={LOGO_SRC} alt="Smart Kids Academy" className="h-14 w-auto rounded-lg mb-5" />
               <p className="text-white/75 text-sm leading-relaxed mb-4">
                 Smart Kids Academy est un programme de <span className="text-white font-medium">{SITE_INFO.parentOrg}</span>.
-                {NEHEMIAH_LAB.tagline} — nous préparons la jeunesse togolaise aux métiers et compétences de demain.
                 Un programme d'éducation Technologique et Entrepreneuriale qui prépare les Enfants et les Jeunes aux réalités du monde actuel et futur.
               </p>
               <p className="text-xs text-white/50 uppercase tracking-widest font-semibold">
