@@ -29,6 +29,10 @@ public class EvaluationSession {
     @Builder.Default
     private boolean present = false;
 
+    /** true = l'enfant est arrivé en retard (informatif seulement, n'affecte pas la durée comptée) */
+    @Builder.Default
+    private boolean enRetard = false;
+
     /** Note de participation sur 10 (obligatoire si présent) */
     private Double note;
 
