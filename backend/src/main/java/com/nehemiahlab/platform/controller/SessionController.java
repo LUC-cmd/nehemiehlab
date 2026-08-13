@@ -367,7 +367,7 @@ public class SessionController {
                 }
             }
 
-            // Cumul heures enfants (arrivée → fin ; gère les retards)
+            // Cumul heures enfants : duree = debut -> fin de seance pour tous.
             for (EvaluationSession eval : evals) {
                 if (!eval.isPresent()) {
                     eval.setHeureDepart(null);
@@ -376,15 +376,11 @@ public class SessionController {
                     evaluationSessionRepository.save(eval);
                     continue;
                 }
-                LocalDateTime arrivee = eval.getHeureArrivee() != null
-                        ? eval.getHeureArrivee()
-                        : session.getHeureDebut();
-                if (arrivee.isBefore(session.getHeureDebut())) {
-                    arrivee = session.getHeureDebut();
-                }
-                if (arrivee.isAfter(fin)) {
-                    arrivee = fin;
-                }
+                // Duree uniforme pour tous les enfants presents : debut -> fin de la
+                // seance, sans tenir compte de l'heure exacte a laquelle le formateur a
+                // clique "Present" (un enfant arrive en retard compte quand meme la duree
+                // complete de la seance).
+                LocalDateTime arrivee = session.getHeureDebut();
                 long secondes = Math.max(0, Duration.between(arrivee, fin).getSeconds());
                 long minutes = secondes / 60;
                 eval.setHeureArrivee(arrivee);
@@ -538,7 +534,6 @@ public class SessionController {
         for (EvaluationRequest req : requests) {
             EvaluationSession eval = evaluationSessionRepository.findById(req.getId()).orElse(null);
             if (eval != null && eval.getSessionCours() != null && eval.getSessionCours().getId().equals(id)) {
-                boolean wasPresent = eval.isPresent();
                 boolean nowPresent = req.isPresent();
                 eval.setPresent(nowPresent);
 
@@ -552,13 +547,21 @@ public class SessionController {
                     eval.setProjetProbleme(null);
                     eval.setProjetSolution(null);
                 } else {
-                    // Passage OFF → ON : enregistre l'arrivée (retard possible)
-                    if (!wasPresent || eval.getHeureArrivee() == null) {
-                        LocalDateTime arrivee = LocalDateTime.now();
-                        if (session.getHeureDebut() != null && arrivee.isBefore(session.getHeureDebut())) {
-                            arrivee = session.getHeureDebut();
-                        }
-                        eval.setHeureArrivee(arrivee);
+                    // La durée de présence est désormais uniforme pour tous les enfants
+                    // présents : début → fin de la séance, sans heure individuelle par
+                    // enfant (un enfant marqué présent en retard compte quand même la
+                    // durée complète de la séance). Pendant que la séance est EN_COURS,
+                    // le frontend calcule cette durée en direct à partir des horaires de
+                    // la séance ; à la clôture, cloturerSession la fige pour tout le monde.
+                    // Si le formateur corrige une présence APRES la clôture (session déjà
+                    // CLOTUREE), il n'y aura pas de nouvel appel à cloturerSession : on
+                    // fige donc la durée ici aussi, avec les mêmes horaires de séance.
+                    if ("CLOTUREE".equals(session.getStatut()) && session.getHeureDebut() != null && session.getHeureFin() != null) {
+                        long secondes = Math.max(0, Duration.between(session.getHeureDebut(), session.getHeureFin()).getSeconds());
+                        eval.setHeureArrivee(session.getHeureDebut());
+                        eval.setHeureDepart(session.getHeureFin());
+                        eval.setDureeSecondes(secondes);
+                        eval.setDureeMinutes(secondes / 60);
                     }
                     if (req.getNote() != null) {
                         double n = req.getNote();
@@ -568,28 +571,6 @@ public class SessionController {
                         eval.setNote(n);
                     } else {
                         eval.setNote(null);
-                    }
-
-                    // Correction manuelle de l'heure d'arrivée/de départ : le formateur peut
-                    // ajuster directement devant chaque enfant si l'heure captée automatiquement
-                    // ne correspond pas au réel. On ne recalcule PAS un nombre d'heures saisi à la
-                    // main : la durée est toujours dérivée automatiquement de (départ − arrivée).
-                    if (req.getHeureArrivee() != null && !req.getHeureArrivee().isBlank()) {
-                        LocalDateTime manuelleArrivee = parseDateTime(req.getHeureArrivee());
-                        if (manuelleArrivee != null) {
-                            eval.setHeureArrivee(manuelleArrivee);
-                        }
-                    }
-                    if (req.getHeureDepart() != null && !req.getHeureDepart().isBlank()) {
-                        LocalDateTime manuelleDepart = parseDateTime(req.getHeureDepart());
-                        if (manuelleDepart != null) {
-                            eval.setHeureDepart(manuelleDepart);
-                        }
-                    }
-                    if (eval.getHeureArrivee() != null && eval.getHeureDepart() != null) {
-                        long secondes = Math.max(0, Duration.between(eval.getHeureArrivee(), eval.getHeureDepart()).getSeconds());
-                        eval.setDureeSecondes(secondes);
-                        eval.setDureeMinutes(secondes / 60);
                     }
                 }
                 eval.setCommentaire(InputSanitizer.cleanNullable(req.getCommentaire()));
@@ -801,12 +782,6 @@ public class SessionController {
         private boolean projetFinal;
         private String projetProbleme;
         private String projetSolution;
-        // Correction manuelle de l'heure d'arrivée/de départ d'un enfant sur cette séance
-        // (le formateur peut ajuster si l'auto-détection au clic "Présent" ne correspond
-        // pas à la réalité du terrain). La durée est recalculée automatiquement à partir
-        // de ces deux heures — le formateur n'a plus à saisir un nombre d'heures à la main.
-        private String heureArrivee;
-        private String heureDepart;
     }
 
     @Data
