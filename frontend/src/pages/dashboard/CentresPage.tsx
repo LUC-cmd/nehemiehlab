@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAccess } from '../../context/AccessContext';
-import { centreService, userService, clusterService } from '../../services/api';
-import type { Centre, Cluster, User } from '../../types';
+import { centreService, userService, clusterService, sessionService } from '../../services/api';
+import type { Centre, Cluster, User, SessionCours } from '../../types';
 import { centreLabel } from '../../utils/centreLabel';
 import { formatFullName } from '../../utils/displayName';
 import {
@@ -48,6 +48,9 @@ function describeApiError(err: unknown, fallback: string): string {
   if (err instanceof Error && err.message) return err.message;
   return fallback;
 }
+
+// Objectif d'heures de formation par centre (fixe, identique pour tous les centres).
+const HEURES_OBJECTIF_CENTRE = 63;
 
 function MultiValueField({
   label,
@@ -149,6 +152,7 @@ export default function CentresPage() {
   const { hasRole, user, role } = useAuth();
   const { hasFeature } = useAccess();
   const [centres, setCentres] = useState<Centre[]>([]);
+  const [sessions, setSessions] = useState<SessionCours[]>([]);
   const [formateurs, setFormateurs] = useState<User[]>([]);
   const [coordinateurs, setCoordinateurs] = useState<User[]>([]);
   const [clusters, setClusters] = useState<Cluster[]>([]);
@@ -231,6 +235,15 @@ export default function CentresPage() {
         ? await centreService.getAll()
         : await centreService.getMesCentres();
       setCentres(centresRes.data);
+
+      if (hasRole('FORMATEUR')) {
+        try {
+          const sessionsRes = await sessionService.getAll();
+          setSessions(sessionsRes.data);
+        } catch {
+          setSessions([]);
+        }
+      }
 
       if (isDirecteur) {
         const [formateursRes, coordRes, clustersRes] = await Promise.all([
@@ -1161,6 +1174,27 @@ export default function CentresPage() {
                 </div>
 
                 <div className="space-y-3 pt-3 border-t border-slate-200">
+                  {hasRole('FORMATEUR') && (() => {
+                    const totalMinutes = sessions
+                      .filter((s) => s.centre?.id === centre.id && s.statut === 'CLOTUREE')
+                      .reduce((sum, s) => sum + (s.dureeReelleMinutes || 0), 0);
+                    const totalHeures = totalMinutes / 60;
+                    const pct = Math.min(100, Math.round((totalHeures / HEURES_OBJECTIF_CENTRE) * 100));
+                    return (
+                      <div>
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                          Heures de formation
+                        </span>
+                        <div className="mt-1.5 flex items-center justify-between text-xs text-slate-600">
+                          <span className="font-bold text-primary-700">{totalHeures.toFixed(1)} h</span>
+                          <span>/ {HEURES_OBJECTIF_CENTRE} h</span>
+                        </div>
+                        <div className="mt-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                          <div className="h-full rounded-full bg-primary-500" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div>
                     <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                       Coordinateur
