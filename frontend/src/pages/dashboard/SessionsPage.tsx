@@ -30,7 +30,7 @@ import SessionAttendanceBoard from '../../components/dashboard/SessionAttendance
 import SessionDetailHero from '../../components/dashboard/SessionDetailHero';
 import ModuleSupportsPanel from '../../components/dashboard/ModuleSupportsPanel';
 import SessionHorairesCard from '../../components/dashboard/SessionHorairesCard';
-import { datetimeLocalToIso, nowForDatetimeLocal } from '../../utils/datetime';
+import { datetimeLocalToIso, nowForDatetimeLocal, computeSessionDureeMinutes } from '../../utils/datetime';
 import { formatCoords } from '../../utils/geo';
 import { requireSessionGeolocation, warmUpSessionGeolocation } from '../../utils/sessionGeo';
 import GeolocationRequiredModal from '../../components/ui/GeolocationRequiredModal';
@@ -1305,11 +1305,7 @@ export default function SessionsPage() {
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 border-t border-slate-100 pt-3">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
-                        {isClosed && s.dureeReelleMinutes
-                          ? s.dureeReelleMinutes
-                          : isClosed
-                            ? 0
-                            : s.dureePrevueMinutes}{' '}
+                        {isClosed ? computeSessionDureeMinutes(s) : s.dureePrevueMinutes}{' '}
                         min / {s.dureePrevueMinutes} min
                       </span>
                       <span className="flex items-center gap-1">
@@ -1373,7 +1369,7 @@ export default function SessionsPage() {
                   {centres.map((centre) => {
                     const totalMinutes = sessions
                       .filter((s) => s.centre?.id === centre.id && s.statut === 'CLOTUREE')
-                      .reduce((sum, s) => sum + (s.dureeReelleMinutes || 0), 0);
+                      .reduce((sum, s) => sum + computeSessionDureeMinutes(s), 0);
                     const totalHeures = totalMinutes / 60;
                     const pct = Math.min(100, Math.round((totalHeures / HEURES_OBJECTIF_CENTRE) * 100));
                     return (
