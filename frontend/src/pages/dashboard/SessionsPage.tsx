@@ -119,6 +119,9 @@ export default function SessionsPage() {
   // Filters for Directeur
   const [selectedRegion, setSelectedRegion] = useState<string>('');
   const [selectedFormateurId, setSelectedFormateurId] = useState<string>('');
+  // Centre choisi par un formateur (ou coordinateur/cluster) ayant plusieurs
+  // centres, pour ne voir que les séances de ce centre-la sur cette page.
+  const [selectedFormateurCentreId, setSelectedFormateurCentreId] = useState<string>('');
   const [selectedCentreId, setSelectedCentreId] = useState<string>('');
   const [confirmClotureId, setConfirmClotureId] = useState<number | string | null>(null);
   // Empêche le double-clic sur "Lancer le chrono" : avant ce correctif, rien
@@ -973,7 +976,10 @@ export default function SessionsPage() {
 
   /** Sessions filtrées pour la liste */
   const displayedSessions = useMemo(() => {
-    if (!isDirecteur) return sessions;
+    if (!isDirecteur) {
+      if (!selectedFormateurCentreId) return sessions;
+      return sessions.filter((s) => s.centre?.id === Number(selectedFormateurCentreId));
+    }
     if (!selectedRegion) return [];
     return sessions.filter((s) => {
       if (s.centre?.region !== selectedRegion) return false;
@@ -981,7 +987,7 @@ export default function SessionsPage() {
       if (selectedCentreId && s.centre?.id !== Number(selectedCentreId)) return false;
       return true;
     });
-  }, [isDirecteur, sessions, selectedRegion, selectedFormateurId, selectedCentreId]);
+  }, [isDirecteur, sessions, selectedRegion, selectedFormateurId, selectedCentreId, selectedFormateurCentreId]);
 
   /** Session EN_COURS = formateur déjà sur le terrain */
   const liveSession = useMemo(() => {
@@ -1345,6 +1351,21 @@ export default function SessionsPage() {
 
           {!isDirecteur && (
             <>
+            {centres.length > 1 && (
+              <div className="card border border-slate-200 bg-white p-4">
+                <label className="label">Filtrer par centre</label>
+                <select
+                  className="input-field max-w-sm"
+                  value={selectedFormateurCentreId}
+                  onChange={(e) => setSelectedFormateurCentreId(e.target.value)}
+                >
+                  <option value="">Tous mes centres</option>
+                  {centres.map((centre) => (
+                    <option key={centre.id} value={centre.id}>{centreLabel(centre)}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {isFormateur && centres.length > 0 && (
               <div className="mb-2">
                 <p className="text-sm font-semibold text-slate-700 mb-2">Heures de formation par centre</p>
