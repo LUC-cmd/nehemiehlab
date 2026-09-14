@@ -42,6 +42,12 @@ function computeDureeSecondes(ev: EvaluationSession, session: SessionCours, tick
   if (!session.heureDebut) return null;
   const debut = new Date(session.heureDebut).getTime();
   if (session.statut === 'EN_COURS') {
+    // Une seance saisie manuellement (a posteriori) peut avoir un debut situe
+    // il y a plusieurs heures/jours : il ne faut pas afficher un chrono en
+    // direct (maintenant - debut), qui donnerait des durees absurdes (ex: 55h
+    // pour une seance de 4h). Le chrono en direct n'a de sens que pour une
+    // seance reellement demarree a l'instant, jamais pour une saisie manuelle.
+    if (session.manuelle) return null;
     return Math.max(0, Math.floor((tick - debut) / 1000));
   }
   if (session.heureFin) {
@@ -560,45 +566,45 @@ export default function SessionAttendanceBoard({
                         </td>
 
                         <td className="px-3 py-2 align-top text-center">
-                          <div className="inline-flex rounded-lg border border-slate-200 divide-x divide-slate-200 overflow-hidden">
+                          <div className="inline-flex items-center gap-0.5 rounded-full bg-slate-100 p-0.5">
                             <button
                               type="button"
                               disabled={displayOnly}
                               onClick={() => setPresenceStatus(ev, 'ABSENT')}
                               title={displayOnly ? undefined : 'Marquer absent'}
-                              className={`p-1.5 transition-all ${
+                              className={`p-1 rounded-full transition-all ${
                                 !ev.present
-                                  ? 'bg-rose-50 text-rose-700'
-                                  : 'bg-white text-slate-300 hover:bg-slate-50 hover:text-slate-500'
+                                  ? 'bg-rose-500 text-white shadow-sm'
+                                  : 'text-slate-400 hover:text-slate-600'
                               } ${displayOnly ? 'cursor-default' : 'cursor-pointer'}`}
                             >
-                              <UserX className="w-3.5 h-3.5" />
+                              <UserX className="w-3 h-3" />
                             </button>
                             <button
                               type="button"
                               disabled={displayOnly}
                               onClick={() => setPresenceStatus(ev, 'PRESENT')}
                               title={displayOnly ? undefined : 'Marquer présent'}
-                              className={`p-1.5 transition-all ${
+                              className={`p-1 rounded-full transition-all ${
                                 ev.present && !ev.enRetard
-                                  ? 'bg-emerald-50 text-emerald-700'
-                                  : 'bg-white text-slate-300 hover:bg-slate-50 hover:text-slate-500'
+                                  ? 'bg-emerald-500 text-white shadow-sm'
+                                  : 'text-slate-400 hover:text-slate-600'
                               } ${displayOnly ? 'cursor-default' : 'cursor-pointer'}`}
                             >
-                              <UserCheck className="w-3.5 h-3.5" />
+                              <UserCheck className="w-3 h-3" />
                             </button>
                             <button
                               type="button"
                               disabled={displayOnly}
                               onClick={() => setPresenceStatus(ev, 'RETARD')}
                               title={displayOnly ? undefined : 'Marquer présent en retard'}
-                              className={`p-1.5 transition-all ${
+                              className={`p-1 rounded-full transition-all ${
                                 ev.present && ev.enRetard
-                                  ? 'bg-amber-50 text-amber-700'
-                                  : 'bg-white text-slate-300 hover:bg-slate-50 hover:text-slate-500'
+                                  ? 'bg-amber-500 text-white shadow-sm'
+                                  : 'text-slate-400 hover:text-slate-600'
                               } ${displayOnly ? 'cursor-default' : 'cursor-pointer'}`}
                             >
-                              <Clock className="w-3.5 h-3.5" />
+                              <Clock className="w-3 h-3" />
                             </button>
                           </div>
                           <p className="text-[9px] font-bold uppercase tracking-wide mt-1 text-slate-500">
