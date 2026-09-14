@@ -1305,8 +1305,12 @@ export default function SessionsPage() {
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 border-t border-slate-100 pt-3">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
-                        {isClosed ? computeSessionDureeMinutes(s) : s.dureePrevueMinutes}{' '}
-                        min / {s.dureePrevueMinutes} min
+                        {new Date(s.heureDebut).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                        {isClosed && s.heureFin
+                          ? ` – ${new Date(s.heureFin).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+                          : ''}
+                        {' · '}
+                        {isClosed ? formatElapsed(computeSessionDureeMinutes(s)) : `${s.dureePrevueMinutes} min prévues`}
                       </span>
                       <span className="flex items-center gap-1">
                         <UserIcon className="w-3.5 h-3.5" />
@@ -1461,9 +1465,21 @@ export default function SessionsPage() {
                         {isClosed ? 'CLÔTURÉE' : 'EN COURS'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 text-xs text-slate-500 border-t border-slate-100 pt-3 mt-3">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {new Date(s.heureDebut).toLocaleDateString('fr-FR')}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 border-t border-slate-100 pt-3 mt-3">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {new Date(s.heureDebut).toLocaleDateString('fr-FR')}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        {new Date(s.heureDebut).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                        {isClosed && s.heureFin
+                          ? ` – ${new Date(s.heureFin).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+                          : ''}
+                      </span>
+                      <span className="font-semibold text-slate-700">
+                        {isClosed ? formatElapsed(computeSessionDureeMinutes(s)) : `${s.dureePrevueMinutes} min prévues`}
+                      </span>
                     </div>
                   </div>
                 );
