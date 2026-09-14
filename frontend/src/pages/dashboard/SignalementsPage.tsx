@@ -275,7 +275,7 @@ export default function SignalementsPage() {
       </div>
 
       {isDirecteur && (
-        <form onSubmit={handleBroadcast} className="card border border-primary-500/35 bg-gradient-to-br from-primary-600/15 via-dark-900 to-primary-900/10 overflow-hidden relative">
+        <form onSubmit={handleBroadcast} className="card border border-primary-200 bg-primary-50/50 overflow-hidden relative">
           <motion.div
             aria-hidden
             className="absolute -top-20 -right-20 w-56 h-56 rounded-full bg-primary-500/10 blur-3xl"
@@ -283,11 +283,11 @@ export default function SignalementsPage() {
             transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
           />
           <div className="relative z-[1]">
-            <div className="flex items-center gap-2 text-white font-bold mb-1">
-              <Megaphone className="w-5 h-5 text-primary-300" />
+            <div className="flex items-center gap-2 text-slate-900 font-bold mb-1">
+              <Megaphone className="w-5 h-5 text-primary-600" />
               Diffuser une alerte
             </div>
-            <p className="text-xs text-dark-300 mb-4">
+            <p className="text-xs text-slate-500 mb-4">
               Chaque destinataire reçoit notification in-app, email et rappel bureau PC jusqu&apos;à lecture.
             </p>
 
@@ -305,12 +305,12 @@ export default function SignalementsPage() {
                     whileTap={{ scale: 0.98 }}
                     className={`text-left rounded-xl border p-3 transition-all ${
                       active
-                        ? 'border-primary-400/60 bg-primary-500/20 shadow-lg shadow-primary-900/20 ring-2 ring-primary-400/30'
-                        : 'border-dark-700 bg-dark-900/50 hover:border-primary-500/30'
+                        ? 'border-primary-400 bg-primary-50 shadow-sm ring-2 ring-primary-200'
+                        : 'border-slate-200 bg-white hover:border-primary-300 hover:bg-primary-50/40'
                     }`}
                   >
-                    <p className={`text-sm font-bold ${active ? 'text-primary-100' : 'text-white'}`}>{p.label}</p>
-                    <p className="text-[10px] text-dark-400 mt-1 leading-snug">{p.subtitle}</p>
+                    <p className={`text-sm font-bold ${active ? 'text-primary-700' : 'text-slate-900'}`}>{p.label}</p>
+                    <p className="text-[10px] text-slate-500 mt-1 leading-snug">{p.subtitle}</p>
                   </motion.button>
                 );
               })}
@@ -347,31 +347,31 @@ export default function SignalementsPage() {
         </form>
       )}
 
-      <div className="card border border-dark-700 bg-gradient-to-r from-dark-900 to-dark-800">
-        <div className="flex items-center gap-2 text-white font-bold mb-4">
-          <ShieldAlert className="w-5 h-5 text-red-400" />
+      <div className="card border border-slate-200 bg-white">
+        <div className="flex items-center gap-2 text-slate-900 font-bold mb-4">
+          <ShieldAlert className="w-5 h-5 text-red-500" />
           Dashboard Alerte centre en direct
         </div>
         <div className="grid md:grid-cols-5 gap-3">
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-            <div className="text-xs text-red-200">Urgentes non traitées</div>
-            <div className="text-2xl font-bold text-red-300">{liveStats.urgentPending}</div>
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+            <div className="text-xs text-red-700">Urgentes non traitées</div>
+            <div className="text-2xl font-bold text-red-700">{liveStats.urgentPending}</div>
           </div>
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-            <div className="text-xs text-amber-100">Non traitées</div>
-            <div className="text-2xl font-bold text-amber-300">{liveStats.pending}</div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div className="text-xs text-amber-700">Non traitées</div>
+            <div className="text-2xl font-bold text-amber-700">{liveStats.pending}</div>
           </div>
-          <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3">
-            <div className="text-xs text-blue-100">Alertes centre</div>
-            <div className="text-2xl font-bold text-blue-300">{liveStats.centreAlertsCount}</div>
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+            <div className="text-xs text-blue-700">Alertes centre</div>
+            <div className="text-2xl font-bold text-blue-700">{liveStats.centreAlertsCount}</div>
           </div>
-          <div className="rounded-lg border border-primary-500/30 bg-primary-500/10 p-3">
-            <div className="text-xs text-primary-100">État équipements</div>
-            <div className="text-2xl font-bold text-primary-300">{liveStats.equipementsMentions}</div>
+          <div className="rounded-lg border border-primary-200 bg-primary-50 p-3">
+            <div className="text-xs text-primary-700">État équipements</div>
+            <div className="text-2xl font-bold text-primary-700">{liveStats.equipementsMentions}</div>
           </div>
-          <div className="rounded-lg border border-orange-500/30 bg-orange-500/10 p-3">
-            <div className="text-xs text-orange-100">Défis signalés</div>
-            <div className="text-2xl font-bold text-orange-300">{liveStats.defisMentions}</div>
+          <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+            <div className="text-xs text-orange-700">Défis signalés</div>
+            <div className="text-2xl font-bold text-orange-700">{liveStats.defisMentions}</div>
           </div>
         </div>
         <div className="grid md:grid-cols-4 gap-3 mt-4">
@@ -592,7 +592,7 @@ export default function SignalementsPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+            <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
               {s.cibleType === 'ENFANT' && (
                 <button
                   type="button"
@@ -620,7 +620,7 @@ export default function SignalementsPage() {
                     </ValidationActionButton>
                   ) : null}
                   {isDirecteur && (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap justify-end gap-1.5 min-w-0">
                       {(Object.keys(ALERT_PRESETS) as AlertPresetId[]).map((presetId) => {
                         const p = ALERT_PRESETS[presetId];
                         const variant =
