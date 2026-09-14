@@ -182,7 +182,23 @@ export const NAV_FALLBACK: NavItemDef[] = [
 export function buildNavForRole(role: Role, hasFeature: (f: FeatureId | string) => boolean): NavItemDef[] {
   const base = NAV_BY_ROLE[role] ?? [];
   const seen = new Set(base.map((i) => i.page));
-  const extras = NAV_FALLBACK.filter((i) => !seen.has(i.page) && hasFeature(i.page));
+  // Certaines pages font doublon avec une page deja presente dans le menu de
+  // base d'un role (ex: "mes-centres" et "centres" affichent le meme
+  // composant CentresPage) : inutile de les ajouter une deuxieme fois.
+  const redundantForRole: Partial<Record<Role, DashboardPage[]>> = {
+    DIRECTEUR: ['mes-centres'],
+  };
+  const excluded = new Set(redundantForRole[role] ?? []);
+  // On verifie aussi PAGE_ROLES (pas seulement hasFeature) pour ne jamais
+  // ajouter au menu une page que ce role n'a de toute facon pas le droit
+  // d'ouvrir (sinon le lien mene a un ecran "acces refuse").
+  const extras = NAV_FALLBACK.filter(
+    (i) =>
+      !seen.has(i.page) &&
+      !excluded.has(i.page) &&
+      hasFeature(i.page) &&
+      (PAGE_ROLES[i.page]?.includes(role) ?? false),
+  );
   return [...base, ...extras].filter((i) => hasFeature(i.page));
 }
 
