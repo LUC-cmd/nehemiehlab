@@ -60,14 +60,14 @@ public class SessionController {
         List<SessionCours> sessions;
 
         if (user.getRole() == Role.FORMATEUR) {
-            sessions = sessionCoursRepository.findByFormateurIdOrderByCreatedAtDesc(user.getId());
+            sessions = sessionCoursRepository.findByFormateurIdOrderByHeureDebutDesc(user.getId());
         } else if (user.getRole() == Role.COORDINATEUR || user.getRole() == Role.RESPONSABLE_CLUSTER) {
             List<Long> centreIds = centreAccessService.accessibleCentreIds(user);
-            sessions = sessionCoursRepository.findAllByOrderByCreatedAtDesc().stream()
+            sessions = sessionCoursRepository.findAllByOrderByHeureDebutDesc().stream()
                     .filter(s -> s.getCentre() != null && centreIds.contains(s.getCentre().getId()))
                     .toList();
         } else {
-            sessions = sessionCoursRepository.findAllByOrderByCreatedAtDesc();
+            sessions = sessionCoursRepository.findAllByOrderByHeureDebutDesc();
         }
 
         // Une seule requête groupée pour toutes les séances au lieu d'une requête par
