@@ -34,6 +34,7 @@ import {
   type LatLng,
 } from '../../utils/geo';
 import { cleanPhoneInput } from '../../utils/formInputs';
+import { computeSessionDureeMinutes } from '../../utils/datetime';
 
 // Extrait le message d'erreur precis renvoye par le backend (ex: "Ce coordinateur
 // gere deja le centre X.") au lieu d'un texte generique qui ne dit pas au directeur
@@ -1177,7 +1178,7 @@ export default function CentresPage() {
                   {hasRole('FORMATEUR') && (() => {
                     const totalMinutes = sessions
                       .filter((s) => s.centre?.id === centre.id && s.statut === 'CLOTUREE')
-                      .reduce((sum, s) => sum + (s.dureeReelleMinutes || 0), 0);
+                      .reduce((sum, s) => sum + computeSessionDureeMinutes(s), 0);
                     const totalHeures = totalMinutes / 60;
                     const pct = Math.min(100, Math.round((totalHeures / HEURES_OBJECTIF_CENTRE) * 100));
                     return (
