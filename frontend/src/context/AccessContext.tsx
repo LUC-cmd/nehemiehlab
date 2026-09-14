@@ -50,14 +50,19 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
     refresh();
   }, [refresh, user?.id]);
 
+  // Le Directeur ne peut pas configurer ses propres permissions (il n'est pas
+  // dans CONFIGURABLE_ROLES) : le systeme de features sert uniquement a ce
+  // qu'il restreigne les AUTRES roles. Le bloquer lui-meme par une feature
+  // manquante (ex: liste renvoyee par le backend incomplete) le mettrait dans
+  // une impasse sans recours. Le Directeur a donc toujours acces a tout.
   const hasFeature = useCallback(
-    (feature: FeatureId | string) => features.has(feature),
-    [features],
+    (feature: FeatureId | string) => role === 'DIRECTEUR' || features.has(feature),
+    [features, role],
   );
 
   const canSeePage = useCallback(
-    (page: DashboardPage) => features.has(page),
-    [features],
+    (page: DashboardPage) => role === 'DIRECTEUR' || features.has(page),
+    [features, role],
   );
 
   const value = useMemo(
