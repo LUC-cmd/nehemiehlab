@@ -275,16 +275,16 @@ export default function SignalementsPage() {
       </div>
 
       {isDirecteur && (
-        <form onSubmit={handleBroadcast} className="card border border-violet-500/35 bg-gradient-to-br from-violet-600/15 via-dark-900 to-fuchsia-900/10 overflow-hidden relative">
+        <form onSubmit={handleBroadcast} className="card border border-primary-500/35 bg-gradient-to-br from-primary-600/15 via-dark-900 to-primary-900/10 overflow-hidden relative">
           <motion.div
             aria-hidden
-            className="absolute -top-20 -right-20 w-56 h-56 rounded-full bg-violet-500/10 blur-3xl"
+            className="absolute -top-20 -right-20 w-56 h-56 rounded-full bg-primary-500/10 blur-3xl"
             animate={{ scale: [1, 1.08, 1], opacity: [0.4, 0.65, 0.4] }}
             transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
           />
           <div className="relative z-[1]">
             <div className="flex items-center gap-2 text-white font-bold mb-1">
-              <Megaphone className="w-5 h-5 text-violet-300" />
+              <Megaphone className="w-5 h-5 text-primary-300" />
               Diffuser une alerte
             </div>
             <p className="text-xs text-dark-300 mb-4">
@@ -305,11 +305,11 @@ export default function SignalementsPage() {
                     whileTap={{ scale: 0.98 }}
                     className={`text-left rounded-xl border p-3 transition-all ${
                       active
-                        ? 'border-violet-400/60 bg-violet-500/20 shadow-lg shadow-violet-900/20 ring-2 ring-violet-400/30'
-                        : 'border-dark-700 bg-dark-900/50 hover:border-violet-500/30'
+                        ? 'border-primary-400/60 bg-primary-500/20 shadow-lg shadow-primary-900/20 ring-2 ring-primary-400/30'
+                        : 'border-dark-700 bg-dark-900/50 hover:border-primary-500/30'
                     }`}
                   >
-                    <p className={`text-sm font-bold ${active ? 'text-violet-100' : 'text-white'}`}>{p.label}</p>
+                    <p className={`text-sm font-bold ${active ? 'text-primary-100' : 'text-white'}`}>{p.label}</p>
                     <p className="text-[10px] text-dark-400 mt-1 leading-snug">{p.subtitle}</p>
                   </motion.button>
                 );
@@ -335,7 +335,7 @@ export default function SignalementsPage() {
             </div>
             <ValidationActionButton
               type="submit"
-              variant="violet"
+              variant="primary"
               icon={Send}
               loading={broadcastSending}
               size="lg"
@@ -592,7 +592,7 @@ export default function SignalementsPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-4 shrink-0">
+            <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
               {s.cibleType === 'ENFANT' && (
                 <button
                   type="button"
@@ -624,10 +624,10 @@ export default function SignalementsPage() {
                       {(Object.keys(ALERT_PRESETS) as AlertPresetId[]).map((presetId) => {
                         const p = ALERT_PRESETS[presetId];
                         const variant =
-                          presetId === 'TOUS' ? 'violet'
+                          presetId === 'TOUS' ? 'danger'
                             : presetId === 'COMPTABLE' ? 'warning'
                               : presetId === 'FORMATEUR_COMPTABLE' ? 'primary'
-                                : 'sky';
+                                : 'success';
                         return (
                           <ValidationActionButton
                             key={presetId}
