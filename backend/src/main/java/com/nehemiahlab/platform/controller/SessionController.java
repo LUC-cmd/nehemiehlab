@@ -6,8 +6,6 @@ import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.security.SecureFileStorage;
 import com.nehemiahlab.platform.service.CentreAccessService;
 import com.nehemiahlab.platform.service.ModuleCoursService;
-import com.nehemiahlab.platform.service.SeanceDureeRepartition;
-import com.nehemiahlab.platform.service.SeanceRepartitionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -55,9 +53,6 @@ public class SessionController {
 
     @Autowired
     private ModuleCoursService moduleCoursService;
-
-    @Autowired
-    private SeanceRepartitionService seanceRepartitionService;
 
     @GetMapping
     public ResponseEntity<?> getSessions(Authentication auth) {
@@ -234,13 +229,9 @@ public class SessionController {
             }
         }
 
-        Integer dureePrevue = request.getDureePrevueMinutes() != null && request.getDureePrevueMinutes() > 0
-                ? request.getDureePrevueMinutes()
-                : SeanceDureeRepartition.BLOC_MINUTES;
-
         SessionCours session = SessionCours.builder()
                 .titre(InputSanitizer.clean(request.getTitre()))
-                .dureePrevueMinutes(dureePrevue)
+                .dureePrevueMinutes(request.getDureePrevueMinutes())
                 .heureDebut(heureDebut)
                 .statut("EN_COURS")
                 .centre(centre)
@@ -275,43 +266,6 @@ public class SessionController {
         return ResponseEntity.ok(session);
     }
 
-    @PostMapping("/repartir-existantes")
-    @PreAuthorize("hasRole('DIRECTEUR')")
-    public ResponseEntity<?> repartirSeancesExistantes(@RequestBody Map<String, Object> body) {
-        Centre centre = null;
-        if (body != null && body.get("centreId") != null) {
-            try {
-                Long centreId = Long.valueOf(body.get("centreId").toString());
-                centre = centreRepository.findById(centreId).orElse(null);
-            } catch (NumberFormatException ignored) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Identifiant de centre invalide."));
-            }
-        }
-        if (centre == null && body != null && body.get("codeCdej") != null) {
-            String code = body.get("codeCdej").toString().trim();
-            if (!code.isBlank()) {
-                centre = centreRepository.findByCodeCdejIgnoreCase(code).orElse(null);
-            }
-        }
-        if (centre == null) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Indiquez le centre (centreId) ou le code CDEJ."));
-        }
-        try {
-            SeanceRepartitionService.HistoriqueResult result = seanceRepartitionService.repartirSeancesExistantes(centre);
-            return ResponseEntity.ok(Map.of(
-                    "seancesAvant", result.seancesAvant(),
-                    "seancesApres", result.seancesApres(),
-                    "minutesReportees", result.minutesReportees(),
-                    "message", "Séances redistribuées en blocs de 3 h. Notes et présences conservées."
-            ));
-        } catch (org.springframework.web.server.ResponseStatusException ex) {
-            return ResponseEntity.status(ex.getStatusCode()).body(Map.of(
-                    "message", ex.getReason() != null ? ex.getReason() : "Impossible de redistribuer les séances."
-            ));
-        }
-    }
-
     @PutMapping("/{id}/cloturer")
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR')")
     public ResponseEntity<?> cloturerSession(
@@ -335,8 +289,8 @@ public class SessionController {
                     ));
                 }
             }
-            LocalDateTime finHorloge = parseDateTime(body != null ? body.get("heureFin") : null);
-            if (finHorloge == null) {
+            LocalDateTime fin = parseDateTime(body != null ? body.get("heureFin") : null);
+            if (fin == null) {
                 // Une seance manuelle (saisie a posteriori, ex: hier) n'a pas de
                 // sens a cloturer "maintenant" : ca fausserait completement la
                 // duree ainsi que les heures cumulees du formateur et des enfants,
@@ -347,9 +301,9 @@ public class SessionController {
                     return ResponseEntity.badRequest().body(Map.of(
                             "message", "Indiquez l'heure de fin de la séance avant de clôturer une saisie manuelle."));
                 }
-                finHorloge = LocalDateTime.now();
+                fin = LocalDateTime.now();
             }
-            if (session.getHeureDebut() != null && finHorloge.isBefore(session.getHeureDebut())) {
+            if (session.getHeureDebut() != null && fin.isBefore(session.getHeureDebut())) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "message", "L'heure de fin doit être postérieure à l'heure de début."
                 ));
@@ -357,7 +311,14 @@ public class SessionController {
 
             // Le client peut regrouper ici le contexte de fin de séance (module, état des
             // équipements, défis) et la géolocalisation de fin, au lieu de faire deux
-            // appels PUT/POST séparés avant celui-ci.
+            // appels PUT/POST séparés avant celui-ci. Deux raisons à ce regroupement :
+            // 1) ça évite un aller-retour réseau entier à chaque clôture (contribuait à la
+            //    lenteur ressentie par les formateurs, notamment sur connexion instable) ;
+            // 2) ça évite une vraie perte de données : sessionCoursRepository.save() fait
+            //    un UPDATE complet de la ligne (pas de @DynamicUpdate), donc deux appels
+            //    PUT/POST concurrents sur la même séance (ex: contexte + localisation en
+            //    parallèle) peuvent s'écraser l'un l'autre si l'un a lu la ligne avant que
+            //    l'autre n'ait sauvegardé. Un seul save() ici élimine ce risque.
             if (body != null) {
                 Object moduleCoursIdRaw = body.get("moduleCoursId");
                 if (moduleCoursIdRaw != null) {
@@ -389,73 +350,56 @@ public class SessionController {
                 stampModification(session, user);
             }
 
-            long minutesHorloge = session.getHeureDebut() != null
-                    ? Math.max(0, Duration.between(session.getHeureDebut(), finHorloge).toMinutes())
-                    : 0;
-            SeanceRepartitionService.Result repartition = seanceRepartitionService.appliquer(session, minutesHorloge, evals);
-            session = repartition.session();
+            session.setHeureFin(fin);
+            session.setStatut("CLOTUREE");
+            long dureeSeance = Math.max(0, Duration.between(session.getHeureDebut(), fin).toMinutes());
+            session.setDureeReelleMinutes(dureeSeance);
+            sessionCoursRepository.save(session);
 
-            cumulerHeuresSeance(session, evals);
-            if (repartition.seanceSoiree() != null) {
-                cumulerHeuresSeance(repartition.seanceSoiree(), repartition.evaluationsSoiree());
+            // Cumul heures formateur (début → fin de séance)
+            if (session.getFormateur() != null) {
+                User formateur = userRepository.findById(session.getFormateur().getId()).orElse(null);
+                if (formateur != null) {
+                    double heures = dureeSeance / 60.0;
+                    double current = formateur.getTotalHeuresSeances() != null ? formateur.getTotalHeuresSeances() : 0.0;
+                    formateur.setTotalHeuresSeances(Math.round((current + heures) * 100.0) / 100.0);
+                    userRepository.save(formateur);
+                }
             }
 
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("session", session);
-            payload.put("seanceSoiree", repartition.seanceSoiree());
-            payload.put("minutesReportees", repartition.minutesReportees());
-            payload.put("doubleCreneau", repartition.doubleCreneau());
-            payload.put("id", session.getId());
-            payload.put("statut", session.getStatut());
-            return ResponseEntity.ok(payload);
-        }
-        return ResponseEntity.ok(session);
-    }
-
-    private void cumulerHeuresSeance(SessionCours session, List<EvaluationSession> evals) {
-        LocalDateTime fin = session.getHeureFin();
-        long dureeSeance = session.getDureeReelleMinutes() != null
-                ? session.getDureeReelleMinutes()
-                : (session.getHeureDebut() != null && fin != null
-                ? Math.max(0, Duration.between(session.getHeureDebut(), fin).toMinutes())
-                : 0);
-        if (session.getFormateur() != null) {
-            User formateur = userRepository.findById(session.getFormateur().getId()).orElse(null);
-            if (formateur != null && dureeSeance > 0) {
-                double heures = dureeSeance / 60.0;
-                double current = formateur.getTotalHeuresSeances() != null ? formateur.getTotalHeuresSeances() : 0.0;
-                formateur.setTotalHeuresSeances(Math.round((current + heures) * 100.0) / 100.0);
-                userRepository.save(formateur);
-            }
-        }
-        for (EvaluationSession eval : evals) {
-            if (!eval.isPresent()) {
-                eval.setHeureDepart(null);
-                eval.setDureeMinutes(0L);
-                eval.setDureeSecondes(0L);
+            // Cumul heures enfants : duree = debut -> fin de seance pour tous.
+            for (EvaluationSession eval : evals) {
+                if (!eval.isPresent()) {
+                    eval.setHeureDepart(null);
+                    eval.setDureeMinutes(0L);
+                    eval.setDureeSecondes(0L);
+                    evaluationSessionRepository.save(eval);
+                    continue;
+                }
+                // Duree uniforme pour tous les enfants presents : debut -> fin de la
+                // seance, sans tenir compte de l'heure exacte a laquelle le formateur a
+                // clique "Present" (un enfant arrive en retard compte quand meme la duree
+                // complete de la seance).
+                LocalDateTime arrivee = session.getHeureDebut();
+                long secondes = Math.max(0, Duration.between(arrivee, fin).getSeconds());
+                long minutes = secondes / 60;
+                eval.setHeureArrivee(arrivee);
+                eval.setHeureDepart(fin);
+                eval.setDureeMinutes(minutes);
+                eval.setDureeSecondes(secondes);
                 evaluationSessionRepository.save(eval);
-                continue;
-            }
-            LocalDateTime arrivee = session.getHeureDebut();
-            long secondes = (arrivee != null && fin != null)
-                    ? Math.max(0, Duration.between(arrivee, fin).getSeconds())
-                    : 0;
-            long minutes = secondes / 60;
-            eval.setHeureArrivee(arrivee);
-            eval.setHeureDepart(fin);
-            eval.setDureeMinutes(minutes);
-            eval.setDureeSecondes(secondes);
-            evaluationSessionRepository.save(eval);
 
-            if (eval.getEleve() != null && minutes > 0) {
-                Eleve eleve = eleveRepository.findById(eval.getEleve().getId()).orElse(null);
-                if (eleve != null) {
-                    double current = eleve.getTotalHeures() != null ? eleve.getTotalHeures() : 0.0;
-                    eleve.setTotalHeures(Math.round((current + (minutes / 60.0)) * 100.0) / 100.0);
-                    eleveRepository.save(eleve);
+                if (eval.getEleve() != null && minutes > 0) {
+                    Eleve eleve = eleveRepository.findById(eval.getEleve().getId()).orElse(null);
+                    if (eleve != null) {
+                        double current = eleve.getTotalHeures() != null ? eleve.getTotalHeures() : 0.0;
+                        eleve.setTotalHeures(Math.round((current + (minutes / 60.0)) * 100.0) / 100.0);
+                        eleveRepository.save(eleve);
+                    }
                 }
             }
         }
+        return ResponseEntity.ok(session);
     }
 
     @PostMapping("/{id}/localisation/debut")

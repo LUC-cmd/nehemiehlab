@@ -78,7 +78,7 @@ export default function SessionsPage() {
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSession, setNewSession] = useState({
-    titre: '', centreId: '', duree: '180', moduleCoursId: '', etatEquipements: '', defisSession: '',
+    titre: '', centreId: '', duree: '120', moduleCoursId: '', etatEquipements: '', defisSession: '',
     heureDebut: nowForDatetimeLocal(),
     // Séance déjà terminée qu'on saisit après coup (pas de géolocalisation requise).
     manuelle: false,
@@ -124,11 +124,14 @@ export default function SessionsPage() {
   const [selectedFormateurCentreId, setSelectedFormateurCentreId] = useState<string>('');
   const [selectedCentreId, setSelectedCentreId] = useState<string>('');
   const [confirmClotureId, setConfirmClotureId] = useState<number | string | null>(null);
-  // Empêche le double-clic sur "Lancer le chrono"
+  // Empêche le double-clic sur "Lancer le chrono" : avant ce correctif, rien
+  // n'indiquait que la demande était en cours (la géolocalisation peut prendre
+  // plusieurs secondes), donc les formateurs cliquaient plusieurs fois et
+  // plusieurs séances étaient créées pour un seul démarrage voulu.
   const [creatingSession, setCreatingSession] = useState(false);
+  // Suppression définitive d'une séance : pour éviter un clic accidentel, le
+  // formateur doit retaper le nom exact du module avant que "Supprimer" s'active.
   const [deleteSessionTarget, setDeleteSessionTarget] = useState<SessionCours | null>(null);
-  const [confirmRepartir, setConfirmRepartir] = useState(false);
-  const [repartirLoading, setRepartirLoading] = useState(false);
   const [geoModal, setGeoModal] = useState<{
     open: boolean;
     phase: 'debut' | 'fin';
@@ -710,26 +713,6 @@ export default function SessionsPage() {
     setConfirmClotureId(selectedOfflineDraftId || selectedSession.id);
   };
 
-  const confirmRepartirExistantes = async () => {
-    if (!selectedCentreId) return;
-    setConfirmRepartir(false);
-    setRepartirLoading(true);
-    try {
-      const { data } = await sessionService.repartirExistantes({ centreId: Number(selectedCentreId) });
-      toast.success(
-        `${data.seancesAvant} séance(s) redistribuée(s) en ${data.seancesApres} séance(s) de 3 h.`
-        + (data.minutesReportees ? ` Reste ${data.minutesReportees} min pour la suite.` : ''),
-      );
-      await fetchInitialData();
-    } catch (err) {
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        || 'Impossible de redistribuer les séances.';
-      toast.error(message);
-    } finally {
-      setRepartirLoading(false);
-    }
-  };
-
   const confirmCloturer = async () => {
     if (!selectedSession) return;
     if (selectedOfflineDraftId && confirmClotureId !== selectedOfflineDraftId) return;
@@ -788,7 +771,7 @@ export default function SessionsPage() {
         // posteriori), on transmet l'heure de fin déjà enregistrée via le bloc
         // « Horaires » : sans ça, le serveur clôturerait avec l'heure actuelle, ce
         // qui fausserait complètement la durée et les heures cumulées.
-        const closeRes = await sessionService.cloturer(selectedSession.id, {
+        await sessionService.cloturer(selectedSession.id, {
           heureFin: selectedSession.manuelle ? selectedSession.heureFin : undefined,
           moduleCoursId: contextForm.moduleCoursId ? Number(contextForm.moduleCoursId) : undefined,
           etatEquipements: contextForm.etatEquipements,
@@ -797,19 +780,9 @@ export default function SessionsPage() {
           longitude: geoFin?.longitude,
           precisionMetres: geoFin?.precisionMetres,
         });
-        const closeData = closeRes.data as {
-          doubleCreneau?: boolean;
-          minutesReportees?: number;
-        } | undefined;
-        if (closeData?.doubleCreneau) {
-          toast.success('Journée ≥ 6 h : séance matin, pause 30 min, séance soirée. Notes conservées.');
-        } else if ((closeData?.minutesReportees || 0) > 0) {
-          toast.success(`3 h enregistrées. ${closeData?.minutesReportees} min passent sur la prochaine séance.`);
-        } else {
-          toast.success(
-            geoFin ? 'Session clôturée avec localisation de fin.' : 'Séance manuelle clôturée.',
-          );
-        }
+        toast.success(
+          geoFin ? 'Session clôturée avec localisation de fin.' : 'Séance manuelle clôturée.',
+        );
         setConfirmClotureId(null);
         setShowSessionDetail(false);
         refreshSessionsOnly();
@@ -1170,16 +1143,6 @@ export default function SessionsPage() {
                 </option>
               ))}
             </select>
-            {selectedCentreId && (
-              <button
-                type="button"
-                disabled={repartirLoading}
-                onClick={() => setConfirmRepartir(true)}
-                className="btn-ghost mt-2 w-full text-xs justify-center"
-              >
-                Découper les séances déjà enregistrées en blocs de 3 h
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -1581,16 +1544,6 @@ export default function SessionsPage() {
               <option value="">Sélectionner...</option>
               {centres.map(c => <option key={c.id} value={c.id}>{centreLabel(c)}</option>)}
             </select>
-            {(() => {
-              const centre = centres.find((c) => String(c.id) === newSession.centreId);
-              const report = centre?.minutesReportees || 0;
-              if (report <= 0) return null;
-              return (
-                <p className="text-xs text-amber-300 mt-1">
-                  {report} min reportées seront ajoutées à cette séance à la clôture.
-                </p>
-              );
-            })()}
           </div>
           <div>
             <label className="label">Titre de la session</label>
@@ -1728,7 +1681,6 @@ export default function SessionsPage() {
             </div>
             <p className="text-xs text-dark-500 mt-1">
               Choisissez les heures puis les minutes (ex : 4 Heures + 30 min pour 4h30).
-              Compte 3 h par séance, au plus deux le même jour (matin vers 8 h, pause 30 min, soirée). Au-delà de 6 h, le reste passe à la suivante.
             </p>
           </div>
           <div>
@@ -2037,16 +1989,6 @@ export default function SessionsPage() {
         requireTypedConfirmation={deleteSessionTarget ? resolveModuleLabel(deleteSessionTarget) : ''}
         onConfirm={confirmDeleteSession}
         onCancel={() => setDeleteSessionTarget(null)}
-      />
-
-      <ConfirmDialog
-        open={confirmRepartir}
-        title="Découper les séances déjà enregistrées ?"
-        message="Les séances clôturées de ce centre seront remplacées par des séances de 3 h (souvent matin 8 h–11 h et soirée après 30 min de pause). Les notes, présences et commentaires sont recopiés. Le temps au-delà de 6 h par jour est reporté jusqu’à tout placer. Cette action ne se relance pas si tout est déjà en blocs de 3 h."
-        confirmLabel="Découper en 3 h"
-        danger
-        onConfirm={() => { void confirmRepartirExistantes(); }}
-        onCancel={() => setConfirmRepartir(false)}
       />
 
       <GeolocationRequiredModal

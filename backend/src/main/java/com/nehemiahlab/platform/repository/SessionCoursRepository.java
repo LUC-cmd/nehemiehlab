@@ -9,7 +9,6 @@ import java.util.Optional;
 @Repository
 public interface SessionCoursRepository extends JpaRepository<SessionCours, Long> {
     List<SessionCours> findByCentreIdOrderByCreatedAtDesc(Long centreId);
-    List<SessionCours> findByCentreIdOrderByHeureDebutAsc(Long centreId);
     List<SessionCours> findByFormateurIdOrderByCreatedAtDesc(Long formateurId);
     // Tri par date reelle de la seance (heureDebut) et non par date d'enregistrement :
     // une seance datee du 13 mais saisie le 20 doit apparaitre a sa place chronologique
