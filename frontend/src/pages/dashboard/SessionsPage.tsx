@@ -1425,6 +1425,19 @@ export default function SessionsPage() {
                 </div>
               </div>
             )}
+            {isFormateur && selectedFormateurCentreId && (
+              <div className="mb-3">
+                <button
+                  type="button"
+                  disabled={repartirLoading}
+                  onClick={() => handleRepartirHistorique(Number(selectedFormateurCentreId))}
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-primary-800 bg-primary-50 border border-primary-200 rounded-lg px-3 py-2 hover:bg-primary-100 disabled:opacity-60"
+                >
+                  {repartirLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
+                  Découper les séances déjà enregistrées en blocs de 3 h
+                </button>
+              </div>
+            )}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-2">
               {isFormateur && offlineDrafts.map((draft) => {
                 const isClosed = draft.statut === 'CLOTUREE';

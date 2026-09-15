@@ -83,6 +83,33 @@ public class SeanceRepartitionService {
     }
 
     @Transactional
+    public int repartirCentresDuFormateurSiBesoin(Long formateurId) {
+        if (formateurId == null) {
+            return 0;
+        }
+        int centresTraites = 0;
+        for (Centre centre : centreRepository.findByFormateurId(formateurId)) {
+            try {
+                if (!aDesSeancesLongues(centre.getId())) {
+                    continue;
+                }
+                HistoriqueResult result = repartirSeancesExistantes(centre);
+                centresTraites++;
+                log.info("Centre {} : {} séance(s) redistribuée(s) en {} séance(s) de 3 h (reste {} min).",
+                        centre.getNom(), result.seancesAvant(), result.seancesApres(), result.minutesReportees());
+            } catch (ResponseStatusException ex) {
+                if (ex.getStatusCode() != HttpStatus.CONFLICT && ex.getStatusCode() != HttpStatus.BAD_REQUEST) {
+                    throw ex;
+                }
+            }
+        }
+        if (centresTraites > 0) {
+            resoudreConflitsFormateur(formateurId);
+        }
+        return centresTraites;
+    }
+
+    @Transactional
     public HistoriqueResult repartirSeancesExistantes(Centre centre) {
         if (centre == null || centre.getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Centre obligatoire.");
@@ -97,8 +124,7 @@ public class SeanceRepartitionService {
         if (cloturees.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Aucune séance clôturée à découper pour ce centre.");
         }
-        boolean dejaFait = cloturees.stream().allMatch(s ->
-                s.getDureeReelleMinutes() != null && s.getDureeReelleMinutes() <= SeanceDureeRepartition.BLOC_MINUTES);
+        boolean dejaFait = cloturees.stream().allMatch(s -> minutesSession(s) <= SeanceDureeRepartition.BLOC_MINUTES);
         if (dejaFait) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Ces séances sont déjà en blocs de 3 h. Aucune modification.");
@@ -242,11 +268,11 @@ public class SeanceRepartitionService {
     }
 
     private static int minutesSession(SessionCours session) {
-        if (session.getDureeReelleMinutes() != null && session.getDureeReelleMinutes() > 0) {
-            return session.getDureeReelleMinutes().intValue();
-        }
         if (session.getHeureDebut() != null && session.getHeureFin() != null) {
             return (int) Math.max(0, Duration.between(session.getHeureDebut(), session.getHeureFin()).toMinutes());
+        }
+        if (session.getDureeReelleMinutes() != null && session.getDureeReelleMinutes() > 0) {
+            return session.getDureeReelleMinutes().intValue();
         }
         return session.getDureePrevueMinutes() != null ? session.getDureePrevueMinutes() : 0;
     }

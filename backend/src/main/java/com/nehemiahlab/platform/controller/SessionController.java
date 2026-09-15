@@ -68,6 +68,11 @@ public class SessionController {
         List<SessionCours> sessions;
 
         if (user.getRole() == Role.FORMATEUR) {
+            try {
+                seanceRepartitionService.repartirCentresDuFormateurSiBesoin(user.getId());
+            } catch (Exception ignored) {
+                // La liste doit s'afficher même si le découpage échoue.
+            }
             sessions = sessionCoursRepository.findByFormateurIdOrderByHeureDebutDesc(user.getId());
         } else if (user.getRole() == Role.COORDINATEUR || user.getRole() == Role.RESPONSABLE_CLUSTER) {
             List<Long> centreIds = centreAccessService.accessibleCentreIds(user);

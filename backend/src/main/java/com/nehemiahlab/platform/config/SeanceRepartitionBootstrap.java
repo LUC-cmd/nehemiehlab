@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
  * Ne touche pas aux comptes ni aux mots de passe. Idempotent si déjà en 3 h.
  */
 @Component
-@ConditionalOnProperty(name = "app.seances.repartir-au-demarrage", havingValue = "true")
+@ConditionalOnProperty(name = "app.seances.repartir-au-demarrage", havingValue = "true", matchIfMissing = true)
 public class SeanceRepartitionBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(SeanceRepartitionBootstrap.class);
