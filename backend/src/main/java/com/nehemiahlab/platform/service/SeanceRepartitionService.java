@@ -170,7 +170,12 @@ public class SeanceRepartitionService {
             String titre = creneau.type() == SeanceDureeRepartition.TypeCreneau.MATIN
                     ? SeanceDureeRepartition.titreMatin(origine.getTitre())
                     : SeanceDureeRepartition.titreSoiree(origine.getTitre());
-            SessionCours created = copierSession(origine, titre, creneau.heureDebut(), creneau.heureFin());
+            SessionCours created = copierSession(
+                    origine,
+                    titre,
+                    creneau.heureDebut(),
+                    creneau.heureFin(),
+                    !projetFinalDejaCopie[creneau.sourceIndex()]);
             created.setCreatedAt(creneau.heureDebut());
             sessionCoursRepository.save(created);
             boolean copierProjetFinal = !projetFinalDejaCopie[creneau.sourceIndex()];
@@ -184,14 +189,12 @@ public class SeanceRepartitionService {
         }
         evaluationSessionRepository.flush();
         sessionCoursRepository.deleteAll(cloturees);
-
-        int reste = SeanceDureeRepartition.minutesRestantesHistorique(totalMinutes);
-        managed.setMinutesReportees(reste);
-        centreRepository.save(managed);
+        sessionCoursRepository.flush();
 
         recalculerHeuresEleves(eleveIds);
         recalculerHeuresFormateurs(formateurIds);
 
+        int reste = SeanceDureeRepartition.minutesRestantesHistorique(totalMinutes);
         return new HistoriqueResult(cloturees.size(), nouvelles.size(), reste);
     }
 
@@ -277,9 +280,19 @@ public class SeanceRepartitionService {
         return session.getDureePrevueMinutes() != null ? session.getDureePrevueMinutes() : 0;
     }
 
-    private SessionCours copierSession(SessionCours origine, String titre, LocalDateTime debut, LocalDateTime fin) {
+    private SessionCours copierSession(
+            SessionCours origine,
+            String titre,
+            LocalDateTime debut,
+            LocalDateTime fin,
+            boolean copierRapport
+    ) {
+        String titreOk = titre == null ? "Séance" : titre.trim();
+        if (titreOk.length() > 240) {
+            titreOk = titreOk.substring(0, 237) + "...";
+        }
         return SessionCours.builder()
-                .titre(titre)
+                .titre(titreOk)
                 .centre(origine.getCentre())
                 .formateur(origine.getFormateur())
                 .heureDebut(debut)
@@ -297,7 +310,7 @@ public class SeanceRepartitionService {
                 .longitudeFin(origine.getLongitudeFin())
                 .precisionFinMetres(origine.getPrecisionFinMetres())
                 .dureeReelleMinutes((long) SeanceDureeRepartition.BLOC_MINUTES)
-                .rapportUrl(origine.getRapportUrl())
+                .rapportUrl(copierRapport ? origine.getRapportUrl() : null)
                 .manuelle(origine.isManuelle())
                 .build();
     }
@@ -322,8 +335,8 @@ public class SeanceRepartitionService {
                     .projetFinal(copierProjetFinal && source.isProjetFinal())
                     .projetProbleme(copierProjetFinal ? source.getProjetProbleme() : null)
                     .projetSolution(copierProjetFinal ? source.getProjetSolution() : null)
-                    .projetFichierUrl(source.getProjetFichierUrl())
-                    .projetFichierNom(source.getProjetFichierNom())
+                    .projetFichierUrl(copierProjetFinal ? source.getProjetFichierUrl() : null)
+                    .projetFichierNom(copierProjetFinal ? source.getProjetFichierNom() : null)
                     .heureArrivee(present ? debut : null)
                     .heureDepart(present ? fin : null)
                     .dureeMinutes(present ? (long) SeanceDureeRepartition.BLOC_MINUTES : 0L)

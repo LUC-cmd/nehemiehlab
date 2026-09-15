@@ -195,7 +195,10 @@ api.interceptors.response.use(
       if (error.response?.status === 403) {
         toast.error("Accès refusé — vous n'avez pas les permissions nécessaires.", { id: 'http-403' });
       } else if (error.response?.status === 500) {
-        toast.error('Erreur serveur. Veuillez réessayer plus tard.', { id: 'http-500' });
+        const failedUrl = String(originalRequest.url || '');
+        if (!failedUrl.includes('repartir-historique')) {
+          toast.error('Erreur serveur. Veuillez réessayer plus tard.', { id: 'http-500' });
+        }
       }
     }
 
@@ -579,7 +582,7 @@ export const sessionService = {
     api.put(`/sessions/${id}/horaires`, data),
   delete: (id: number) => api.delete(`/sessions/${id}`),
   repartirHistorique: (centreId: number) =>
-    api.post(`/sessions/centres/${centreId}/repartir-historique`),
+    api.post(`/sessions/centres/${centreId}/repartir-historique`, {}, { timeout: 120000 }),
   localiserDebut: (id: number, data: { latitude: number; longitude: number; precisionMetres?: number }) =>
     api.post(`/sessions/${id}/localisation/debut`, data),
   localiserFin: (id: number, data: { latitude: number; longitude: number; precisionMetres?: number }) =>

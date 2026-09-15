@@ -130,6 +130,7 @@ export default function SessionsPage() {
   // plusieurs séances étaient créées pour un seul démarrage voulu.
   const [creatingSession, setCreatingSession] = useState(false);
   const [repartirLoading, setRepartirLoading] = useState(false);
+  const [confirmRepartirCentreId, setConfirmRepartirCentreId] = useState<number | null>(null);
   // Suppression définitive d'une séance : pour éviter un clic accidentel, le
   // formateur doit retaper le nom exact du module avant que "Supprimer" s'active.
   const [deleteSessionTarget, setDeleteSessionTarget] = useState<SessionCours | null>(null);
@@ -186,11 +187,6 @@ export default function SessionsPage() {
   const canEditTerrain = isFormateur && canManageSessions;
 
   const handleRepartirHistorique = async (centreId: number) => {
-    if (!window.confirm(
-      'Découper les séances déjà enregistrées de ce centre en blocs de 3 h ? Les notes et présences sont conservées. Les heures de début et de fin varient (pas toutes à la même minute).',
-    )) {
-      return;
-    }
     setRepartirLoading(true);
     try {
       const res = await sessionService.repartirHistorique(centreId);
@@ -198,9 +194,10 @@ export default function SessionsPage() {
       const sessionsRes = await sessionService.getAll();
       setSessions(sessionsRes.data);
     } catch (err) {
-      toast.error(describeApiError(err, 'Découpage impossible.'));
+      toast.error(describeApiError(err, 'Découpage impossible. Réessaie après le déploiement de l’API.'));
     } finally {
       setRepartirLoading(false);
+      setConfirmRepartirCentreId(null);
     }
   };
 
@@ -1289,7 +1286,7 @@ export default function SessionsPage() {
               <button
                 type="button"
                 disabled={repartirLoading}
-                onClick={() => handleRepartirHistorique(Number(selectedCentreId))}
+                onClick={() => setConfirmRepartirCentreId(Number(selectedCentreId))}
                 className="inline-flex items-center gap-2 text-sm font-semibold text-primary-800 bg-primary-50 border border-primary-200 rounded-lg px-3 py-2 hover:bg-primary-100 disabled:opacity-60"
               >
                 {repartirLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
@@ -1430,7 +1427,7 @@ export default function SessionsPage() {
                 <button
                   type="button"
                   disabled={repartirLoading}
-                  onClick={() => handleRepartirHistorique(Number(selectedFormateurCentreId))}
+                  onClick={() => setConfirmRepartirCentreId(Number(selectedFormateurCentreId))}
                   className="inline-flex items-center gap-2 text-sm font-semibold text-primary-800 bg-primary-50 border border-primary-200 rounded-lg px-3 py-2 hover:bg-primary-100 disabled:opacity-60"
                 >
                   {repartirLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
@@ -2035,6 +2032,15 @@ export default function SessionsPage() {
         requireTypedConfirmation={deleteSessionTarget ? resolveModuleLabel(deleteSessionTarget) : ''}
         onConfirm={confirmDeleteSession}
         onCancel={() => setDeleteSessionTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmRepartirCentreId != null}
+        title="Découper les séances en 3 h ?"
+        message="Les séances déjà enregistrées de ce centre seront redistribuées en blocs de 3 h. Les notes, présences et comptes restent. Les heures de début et de fin varieront un peu."
+        confirmLabel="Découper"
+        onConfirm={() => (confirmRepartirCentreId != null ? handleRepartirHistorique(confirmRepartirCentreId) : undefined)}
+        onCancel={() => !repartirLoading && setConfirmRepartirCentreId(null)}
       />
 
       <GeolocationRequiredModal

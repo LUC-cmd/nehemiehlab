@@ -68,11 +68,6 @@ public class SessionController {
         List<SessionCours> sessions;
 
         if (user.getRole() == Role.FORMATEUR) {
-            try {
-                seanceRepartitionService.repartirCentresDuFormateurSiBesoin(user.getId());
-            } catch (Exception ignored) {
-                // La liste doit s'afficher même si le découpage échoue.
-            }
             sessions = sessionCoursRepository.findByFormateurIdOrderByHeureDebutDesc(user.getId());
         } else if (user.getRole() == Role.COORDINATEUR || user.getRole() == Role.RESPONSABLE_CLUSTER) {
             List<Long> centreIds = centreAccessService.accessibleCentreIds(user);
@@ -178,10 +173,15 @@ public class SessionController {
         if (centre == null) {
             return ResponseEntity.notFound().build();
         }
-        if (user.getRole() == Role.FORMATEUR
-                && (centre.getFormateurs() == null
-                || centre.getFormateurs().stream().noneMatch(f -> f.getId().equals(user.getId())))) {
-            return ResponseEntity.status(403).body(Map.of("message", "Vous n'êtes pas formateur de ce centre."));
+        if (user.getRole() == Role.FORMATEUR) {
+            boolean assigne = centre.getFormateurs() != null
+                    && centre.getFormateurs().stream().anyMatch(f -> f.getId().equals(user.getId()));
+            boolean aDesSeances = sessionCoursRepository.findByFormateurIdOrderByHeureDebutDesc(user.getId())
+                    .stream()
+                    .anyMatch(s -> s.getCentre() != null && centreId.equals(s.getCentre().getId()));
+            if (!assigne && !aDesSeances) {
+                return ResponseEntity.status(403).body(Map.of("message", "Vous n'êtes pas formateur de ce centre."));
+            }
         }
         try {
             SeanceRepartitionService.HistoriqueResult result = seanceRepartitionService.repartirSeancesExistantes(centre);
@@ -189,6 +189,8 @@ public class SessionController {
                 for (User formateur : centre.getFormateurs()) {
                     seanceRepartitionService.resoudreConflitsFormateur(formateur.getId());
                 }
+            } else {
+                seanceRepartitionService.resoudreConflitsFormateur(user.getId());
             }
             return ResponseEntity.ok(Map.of(
                     "message", result.seancesAvant() + " séance(s) redistribuée(s) en "
@@ -200,7 +202,14 @@ public class SessionController {
         } catch (org.springframework.web.server.ResponseStatusException ex) {
             return ResponseEntity.status(ex.getStatusCode()).body(Map.of("message",
                     ex.getReason() != null ? ex.getReason() : "Découpage impossible."));
+        } catch (Exception ex) {
+            String detail = racineErreur(ex);
+            return ResponseEntity.status(500).body(Map.of(
+                    "message", "Le découpage a échoué : " + detail
+                            + ". Tes comptes et tes données existantes restent."
+            ));
         }
+    }
     }
 
     @PostMapping
@@ -816,6 +825,21 @@ public class SessionController {
         return formateurTrajetSeanceService.conflitHoraire(formateurId, centreId, debut, fin, sessionIdExclue)
                 .map(message -> ResponseEntity.badRequest().body(Map.of("message", message)))
                 .orElse(null);
+    }
+
+    private static String racineErreur(Throwable ex) {
+        Throwable t = ex;
+        while (t.getCause() != null && t.getCause() != t) {
+            t = t.getCause();
+        }
+        String msg = t.getMessage();
+        if (msg == null || msg.isBlank()) {
+            msg = ex.getClass().getSimpleName();
+        }
+        if (msg.length() > 280) {
+            msg = msg.substring(0, 277) + "...";
+        }
+        return msg;
     }
 
     private boolean canAccessSession(User user, SessionCours session) {
