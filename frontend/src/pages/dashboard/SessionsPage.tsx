@@ -129,6 +129,7 @@ export default function SessionsPage() {
   const [deleteSessionTarget, setDeleteSessionTarget] = useState<SessionCours | null>(null);
   const [confirmRepartir, setConfirmRepartir] = useState(false);
   const [repartirLoading, setRepartirLoading] = useState(false);
+  const [repartirCentreId, setRepartirCentreId] = useState<number | null>(null);
   const [geoModal, setGeoModal] = useState<{
     open: boolean;
     phase: 'debut' | 'fin';
@@ -711,11 +712,13 @@ export default function SessionsPage() {
   };
 
   const confirmRepartirExistantes = async () => {
-    if (!selectedCentreId) return;
+    const centreId = repartirCentreId ?? (selectedCentreId ? Number(selectedCentreId) : null);
+    if (!centreId) return;
     setConfirmRepartir(false);
+    setRepartirCentreId(null);
     setRepartirLoading(true);
     try {
-      const { data } = await sessionService.repartirExistantes({ centreId: Number(selectedCentreId) });
+      const { data } = await sessionService.repartirExistantes({ centreId });
       toast.success(
         `${data.seancesAvant} séance(s) redistribuée(s) en ${data.seancesApres} séance(s) de 3 h.`
         + (data.minutesReportees ? ` Reste ${data.minutesReportees} min pour la suite.` : ''),
@@ -1174,7 +1177,10 @@ export default function SessionsPage() {
               <button
                 type="button"
                 disabled={repartirLoading}
-                onClick={() => setConfirmRepartir(true)}
+                onClick={() => {
+                  setRepartirCentreId(Number(selectedCentreId));
+                  setConfirmRepartir(true);
+                }}
                 className="btn-ghost mt-2 w-full text-xs justify-center"
               >
                 Découper les séances déjà enregistrées en blocs de 3 h
@@ -1423,6 +1429,17 @@ export default function SessionsPage() {
                         <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 overflow-hidden">
                           <div className="h-full rounded-full bg-primary-500" style={{ width: `${pct}%` }} />
                         </div>
+                        <button
+                          type="button"
+                          disabled={repartirLoading}
+                          onClick={() => {
+                            setRepartirCentreId(centre.id);
+                            setConfirmRepartir(true);
+                          }}
+                          className="btn-ghost mt-3 w-full text-xs justify-center"
+                        >
+                          Découper en séances de 3 h
+                        </button>
                       </div>
                     );
                   })}
@@ -2046,7 +2063,10 @@ export default function SessionsPage() {
         confirmLabel="Découper en 3 h"
         danger
         onConfirm={() => { void confirmRepartirExistantes(); }}
-        onCancel={() => setConfirmRepartir(false)}
+        onCancel={() => {
+          setConfirmRepartir(false);
+          setRepartirCentreId(null);
+        }}
       />
 
       <GeolocationRequiredModal

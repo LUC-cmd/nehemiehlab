@@ -276,8 +276,12 @@ public class SessionController {
     }
 
     @PostMapping("/repartir-existantes")
-    @PreAuthorize("hasRole('DIRECTEUR')")
-    public ResponseEntity<?> repartirSeancesExistantes(@RequestBody Map<String, Object> body) {
+    @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR')")
+    public ResponseEntity<?> repartirSeancesExistantes(
+            @RequestBody Map<String, Object> body,
+            Authentication auth
+    ) {
+        User user = (User) auth.getPrincipal();
         Centre centre = null;
         if (body != null && body.get("centreId") != null) {
             try {
@@ -296,6 +300,10 @@ public class SessionController {
         if (centre == null) {
             return ResponseEntity.badRequest().body(Map.of(
                     "message", "Indiquez le centre (centreId) ou le code CDEJ."));
+        }
+        if (!centreAccessService.canAccessCentre(user, centre.getId())) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "message", "Vous n'êtes pas formateur de ce centre."));
         }
         try {
             SeanceRepartitionService.HistoriqueResult result = seanceRepartitionService.repartirSeancesExistantes(centre);
