@@ -148,7 +148,8 @@ public class SeanceRepartitionService {
             if (session.getFormateur() != null) {
                 formateurIds.add(session.getFormateur().getId());
             }
-            List<EvaluationSession> evals = evaluationSessionRepository.findBySessionCoursId(session.getId());
+            List<EvaluationSession> evals = evaluationSessionRepository
+                    .findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId());
             evalsParSource.add(evals);
             for (EvaluationSession eval : evals) {
                 if (eval.getEleve() != null) {
