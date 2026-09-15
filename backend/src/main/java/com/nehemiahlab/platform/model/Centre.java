@@ -73,6 +73,11 @@ public class Centre {
     @OrderColumn(name = "position")
     private List<String> telephones = new ArrayList<>();
 
+    /** Minutes au-delà de 3 h reportées sur la prochaine séance du centre */
+    @Builder.Default
+    @Column(name = "minutes_reportees", nullable = false)
+    private Integer minutesReportees = 0;
+
     /** Lieu précis de la formation SKA (village/quartier) */
     @Column(name = "lieu_formation")
     private String lieuFormation;

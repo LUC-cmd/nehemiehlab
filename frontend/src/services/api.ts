@@ -575,6 +575,13 @@ export const sessionService = {
     precisionMetres?: number;
   }) =>
     api.put(`/sessions/${id}/cloturer`, data ?? {}),
+  repartirExistantes: (data: { centreId?: number; codeCdej?: string }) =>
+    api.post<{
+      seancesAvant: number;
+      seancesApres: number;
+      minutesReportees: number;
+      message: string;
+    }>('/sessions/repartir-existantes', data),
   updateHoraires: (id: number, data: { heureDebut?: string; heureFin?: string }) =>
     api.put(`/sessions/${id}/horaires`, data),
   delete: (id: number) => api.delete(`/sessions/${id}`),

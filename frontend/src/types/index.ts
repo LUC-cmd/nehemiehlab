@@ -81,6 +81,7 @@ export interface Centre {
   telephoneCoordinateur?: string;
   telephoneFormateur?: string;
   codeCdej?: string;
+  minutesReportees?: number;
   lieuFormation?: string;
   emails?: string[];
   telephones?: string[];
