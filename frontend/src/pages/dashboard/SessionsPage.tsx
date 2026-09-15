@@ -17,7 +17,7 @@ import {
 } from '../../utils/offlineSessions';
 import {
   Plus, Timer, Clock, User as UserIcon, Save, Lock, UploadCloud, FileText, DownloadCloud,
-  Calendar, MapPin, Radio, CheckCircle2, XCircle, Users, X, Navigation, Loader2, Trash2,
+  Calendar, MapPin, Radio, CheckCircle2, XCircle, Users, X, Navigation, Loader2, Trash2, Scissors,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ModalContentSkeleton, TableSkeleton } from '../../components/ui/DashboardSkeletons';
@@ -129,6 +129,7 @@ export default function SessionsPage() {
   // plusieurs secondes), donc les formateurs cliquaient plusieurs fois et
   // plusieurs séances étaient créées pour un seul démarrage voulu.
   const [creatingSession, setCreatingSession] = useState(false);
+  const [repartirLoading, setRepartirLoading] = useState(false);
   // Suppression définitive d'une séance : pour éviter un clic accidentel, le
   // formateur doit retaper le nom exact du module avant que "Supprimer" s'active.
   const [deleteSessionTarget, setDeleteSessionTarget] = useState<SessionCours | null>(null);
@@ -183,6 +184,25 @@ export default function SessionsPage() {
   };
 
   const canEditTerrain = isFormateur && canManageSessions;
+
+  const handleRepartirHistorique = async (centreId: number) => {
+    if (!window.confirm(
+      'Découper les séances déjà enregistrées de ce centre en blocs de 3 h ? Les notes et présences sont conservées. Les heures de début et de fin varient (pas toutes à la même minute).',
+    )) {
+      return;
+    }
+    setRepartirLoading(true);
+    try {
+      const res = await sessionService.repartirHistorique(centreId);
+      toast.success(res.data?.message || 'Séances redistribuées en blocs de 3 h.');
+      const sessionsRes = await sessionService.getAll();
+      setSessions(sessionsRes.data);
+    } catch (err) {
+      toast.error(describeApiError(err, 'Découpage impossible.'));
+    } finally {
+      setRepartirLoading(false);
+    }
+  };
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -1264,6 +1284,19 @@ export default function SessionsPage() {
         </div>
       ) : (
         <>
+          {isDirecteur && selectedFormateurId && selectedCentreId && (
+            <div className="mb-3">
+              <button
+                type="button"
+                disabled={repartirLoading}
+                onClick={() => handleRepartirHistorique(Number(selectedCentreId))}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-primary-800 bg-primary-50 border border-primary-200 rounded-lg px-3 py-2 hover:bg-primary-100 disabled:opacity-60"
+              >
+                {repartirLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
+                Découper les séances déjà enregistrées en blocs de 3 h
+              </button>
+            </div>
+          )}
           {isDirecteur && selectedFormateurId && selectedCentreId && (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-2">
               {displayedSessions.map((s) => {

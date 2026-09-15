@@ -5,7 +5,9 @@ import com.nehemiahlab.platform.repository.*;
 import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.security.SecureFileStorage;
 import com.nehemiahlab.platform.service.CentreAccessService;
+import com.nehemiahlab.platform.service.FormateurTrajetSeanceService;
 import com.nehemiahlab.platform.service.ModuleCoursService;
+import com.nehemiahlab.platform.service.SeanceRepartitionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -53,6 +55,12 @@ public class SessionController {
 
     @Autowired
     private ModuleCoursService moduleCoursService;
+
+    @Autowired
+    private FormateurTrajetSeanceService formateurTrajetSeanceService;
+
+    @Autowired
+    private SeanceRepartitionService seanceRepartitionService;
 
     @GetMapping
     public ResponseEntity<?> getSessions(Authentication auth) {
@@ -157,6 +165,39 @@ public class SessionController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/centres/{centreId}/repartir-historique")
+    @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR')")
+    public ResponseEntity<?> repartirHistorique(@PathVariable Long centreId, Authentication auth) {
+        User user = (User) auth.getPrincipal();
+        Centre centre = centreRepository.findById(centreId).orElse(null);
+        if (centre == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (user.getRole() == Role.FORMATEUR
+                && (centre.getFormateurs() == null
+                || centre.getFormateurs().stream().noneMatch(f -> f.getId().equals(user.getId())))) {
+            return ResponseEntity.status(403).body(Map.of("message", "Vous n'êtes pas formateur de ce centre."));
+        }
+        try {
+            SeanceRepartitionService.HistoriqueResult result = seanceRepartitionService.repartirSeancesExistantes(centre);
+            if (centre.getFormateurs() != null) {
+                for (User formateur : centre.getFormateurs()) {
+                    seanceRepartitionService.resoudreConflitsFormateur(formateur.getId());
+                }
+            }
+            return ResponseEntity.ok(Map.of(
+                    "message", result.seancesAvant() + " séance(s) redistribuée(s) en "
+                            + result.seancesApres() + " séance(s) de 3 h. Notes et présences conservées.",
+                    "seancesAvant", result.seancesAvant(),
+                    "seancesApres", result.seancesApres(),
+                    "minutesReportees", result.minutesReportees()
+            ));
+        } catch (org.springframework.web.server.ResponseStatusException ex) {
+            return ResponseEntity.status(ex.getStatusCode()).body(Map.of("message",
+                    ex.getReason() != null ? ex.getReason() : "Découpage impossible."));
+        }
+    }
+
     @PostMapping
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR')")
     public ResponseEntity<?> createSession(@RequestBody SessionCours request, Authentication auth) {
@@ -216,6 +257,15 @@ public class SessionController {
 
         boolean manuelle = request.isManuelle();
         LocalDateTime heureDebut = request.getHeureDebut() != null ? request.getHeureDebut() : LocalDateTime.now();
+        LocalDateTime finPrevue = heureDebut;
+        if (request.getDureePrevueMinutes() != null && request.getDureePrevueMinutes() > 0) {
+            finPrevue = heureDebut.plusMinutes(request.getDureePrevueMinutes());
+        }
+        ResponseEntity<?> conflitTrajet = refuseSiConflitTrajet(
+                user.getId(), centre.getId(), heureDebut, finPrevue, null);
+        if (conflitTrajet != null) {
+            return conflitTrajet;
+        }
         if (manuelle) {
             // Saisie a posteriori d'une séance déjà terminée : pas de géolocalisation
             // exigée, mais une heure de début précise et non future est obligatoire.
@@ -307,6 +357,17 @@ public class SessionController {
                 return ResponseEntity.badRequest().body(Map.of(
                         "message", "L'heure de fin doit être postérieure à l'heure de début."
                 ));
+            }
+            if (session.getFormateur() != null && session.getCentre() != null) {
+                ResponseEntity<?> conflitTrajet = refuseSiConflitTrajet(
+                        session.getFormateur().getId(),
+                        session.getCentre().getId(),
+                        session.getHeureDebut(),
+                        fin,
+                        session.getId());
+                if (conflitTrajet != null) {
+                    return conflitTrajet;
+                }
             }
 
             // Le client peut regrouper ici le contexte de fin de séance (module, état des
@@ -682,6 +743,21 @@ public class SessionController {
             long minutes = Math.max(0, Duration.between(session.getHeureDebut(), session.getHeureFin()).toMinutes());
             session.setDureeReelleMinutes(minutes);
         }
+        if (session.getFormateur() != null && session.getCentre() != null && session.getHeureDebut() != null) {
+            LocalDateTime finEffective = session.getHeureFin();
+            if (finEffective == null && session.getDureePrevueMinutes() != null && session.getDureePrevueMinutes() > 0) {
+                finEffective = session.getHeureDebut().plusMinutes(session.getDureePrevueMinutes());
+            }
+            ResponseEntity<?> conflitTrajet = refuseSiConflitTrajet(
+                    session.getFormateur().getId(),
+                    session.getCentre().getId(),
+                    session.getHeureDebut(),
+                    finEffective,
+                    session.getId());
+            if (conflitTrajet != null) {
+                return conflitTrajet;
+            }
+        }
         stampModification(session, user);
         sessionCoursRepository.save(session);
         return ResponseEntity.ok(session);
@@ -723,6 +799,18 @@ public class SessionController {
         } catch (Exception ex) {
             return null;
         }
+    }
+
+    private ResponseEntity<?> refuseSiConflitTrajet(
+            Long formateurId,
+            Long centreId,
+            LocalDateTime debut,
+            LocalDateTime fin,
+            Long sessionIdExclue
+    ) {
+        return formateurTrajetSeanceService.conflitHoraire(formateurId, centreId, debut, fin, sessionIdExclue)
+                .map(message -> ResponseEntity.badRequest().body(Map.of("message", message)))
+                .orElse(null);
     }
 
     private boolean canAccessSession(User user, SessionCours session) {

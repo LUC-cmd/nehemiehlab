@@ -578,6 +578,8 @@ export const sessionService = {
   updateHoraires: (id: number, data: { heureDebut?: string; heureFin?: string }) =>
     api.put(`/sessions/${id}/horaires`, data),
   delete: (id: number) => api.delete(`/sessions/${id}`),
+  repartirHistorique: (centreId: number) =>
+    api.post(`/sessions/centres/${centreId}/repartir-historique`),
   localiserDebut: (id: number, data: { latitude: number; longitude: number; precisionMetres?: number }) =>
     api.post(`/sessions/${id}/localisation/debut`, data),
   localiserFin: (id: number, data: { latitude: number; longitude: number; precisionMetres?: number }) =>

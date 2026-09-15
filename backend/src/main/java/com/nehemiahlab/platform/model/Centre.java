@@ -57,6 +57,11 @@ public class Centre {
     @Column(name = "code_cdej", length = 32)
     private String codeCdej;
 
+    /** Minutes au-delà de 3 h reportées sur la prochaine séance du centre */
+    @Builder.Default
+    @Column(name = "minutes_reportees")
+    private Integer minutesReportees = 0;
+
     /** Emails du centre (un ou plusieurs) */
     @Builder.Default
     @ElementCollection(fetch = FetchType.EAGER)
