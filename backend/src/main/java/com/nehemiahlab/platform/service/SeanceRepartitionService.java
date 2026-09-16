@@ -67,10 +67,11 @@ public class SeanceRepartitionService {
                     log.info("Centre {} : {} séance(s) redistribuée(s) en {} séance(s) de 3 h (reste {} min).",
                             centre.getNom(), result.seancesAvant(), result.seancesApres(), result.minutesReportees());
                 } else {
-                    int recales = recalerHorairesScolaires(centre);
+                    int recales = compacteDatesPresence(centre);
+                    recales += recalerHorairesScolaires(centre);
                     if (recales > 0) {
                         centresTraites++;
-                        log.info("Centre {} : séances recadrées sur les dates réellement enregistrées.", centre.getNom());
+                        log.info("Centre {} : séances limitées aux jours de présence du formateur.", centre.getNom());
                     }
                 }
             } catch (ResponseStatusException ex) {
@@ -104,7 +105,8 @@ public class SeanceRepartitionService {
                     log.info("Centre {} : {} séance(s) redistribuée(s) en {} séance(s) de 3 h (reste {} min).",
                             centre.getNom(), result.seancesAvant(), result.seancesApres(), result.minutesReportees());
                 } else {
-                    int recales = recalerHorairesScolaires(centre);
+                    int recales = compacteDatesPresence(centre);
+                    recales += recalerHorairesScolaires(centre);
                     if (recales > 0) {
                         centresTraites++;
                     }
@@ -216,12 +218,17 @@ public class SeanceRepartitionService {
         }
         boolean dejaFait = cloturees.stream().allMatch(s -> minutesSession(s) <= SeanceDureeRepartition.BLOC_MINUTES);
         if (dejaFait) {
+            int avant = cloturees.size();
+            int compactes = compacteDatesPresence(managed);
             int recales = recalerHorairesScolaires(managed);
-            if (recales == 0) {
+            List<SessionCours> apres = sessionCoursRepository.findByCentreIdOrderByHeureDebutAsc(managed.getId()).stream()
+                    .filter(s -> "CLOTUREE".equals(s.getStatut()))
+                    .toList();
+            if (compactes == 0 && recales == 0) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "Ces séances sont déjà en blocs de 3 h entre 8 h et 17 h. Aucune modification.");
+                        "Ces séances sont déjà en blocs de 3 h sur les jours de présence du formateur.");
             }
-            return new HistoriqueResult(cloturees.size(), cloturees.size(), 0);
+            return new HistoriqueResult(avant, apres.size(), 0);
         }
 
         List<SeanceDureeRepartition.SeanceSource> sources = new ArrayList<>();
@@ -288,8 +295,133 @@ public class SeanceRepartitionService {
         recalculerHeuresEleves(eleveIds);
         recalculerHeuresFormateurs(formateurIds);
 
+        compacteDatesPresence(managed);
+        recalerHorairesScolaires(managed);
+        int apres = (int) sessionCoursRepository.findByCentreIdOrderByHeureDebutAsc(managed.getId()).stream()
+                .filter(s -> "CLOTUREE".equals(s.getStatut()))
+                .count();
         int reste = SeanceDureeRepartition.minutesNonPlacees(totalMinutes, creneaux.size());
-        return new HistoriqueResult(cloturees.size(), nouvelles.size(), reste);
+        return new HistoriqueResult(cloturees.size(), apres, reste);
+    }
+
+    public int compacteDatesTousLesCentres() {
+        int centres = 0;
+        for (Centre centre : centreRepository.findAll()) {
+            try {
+                int n = compacteDatesPresence(centre);
+                if (n > 0) {
+                    recalerHorairesScolaires(centre);
+                    centres++;
+                    log.info("Centre {} : séances ramenées aux jours de présence ({} modification(s)).",
+                            centre.getNom(), n);
+                }
+            } catch (Exception ex) {
+                log.error("Compactage ignoré pour le centre {} : {}", centre.getNom(), ex.getMessage());
+            }
+        }
+        return centres;
+    }
+
+    /**
+     * Enlève les jours inventés (lendemain du même module) et plafonne à 2 séances par jour réel.
+     * Les notes des séances conservées restent. Ne s'exécute pas à l'ouverture de la liste.
+     */
+    @Transactional
+    public int compacteDatesPresence(Centre centre) {
+        if (centre == null || centre.getId() == null) {
+            return 0;
+        }
+        List<SessionCours> cloturees = sessionCoursRepository.findByCentreIdOrderByHeureDebutAsc(centre.getId()).stream()
+                .filter(s -> "CLOTUREE".equals(s.getStatut()) && s.getHeureDebut() != null)
+                .sorted(Comparator.comparing(SessionCours::getHeureDebut))
+                .toList();
+        if (cloturees.isEmpty()) {
+            return 0;
+        }
+        Map<LocalDate, List<SessionCours>> parJour = new LinkedHashMap<>();
+        Map<LocalDate, String> titres = new LinkedHashMap<>();
+        for (SessionCours session : cloturees) {
+            LocalDate jour = session.getHeureDebut().toLocalDate();
+            parJour.computeIfAbsent(jour, d -> new ArrayList<>()).add(session);
+            titres.putIfAbsent(jour, SeanceDureeRepartition.baseTitre(session.getTitre()));
+        }
+        List<LocalDate> visites = SeanceDureeRepartition.datesDePresence(new ArrayList<>(parJour.keySet()), titres);
+        boolean tropParJour = parJour.values().stream()
+                .anyMatch(duJour -> duJour.size() > SeanceDureeRepartition.MAX_BLOCS_PAR_JOUR);
+        if (visites.size() == parJour.size() && !tropParJour) {
+            return 0;
+        }
+
+        List<SessionCours> file = new ArrayList<>(cloturees);
+        int idx = 0;
+        int changements = 0;
+        Set<Long> formateurIds = new HashSet<>();
+        Set<Long> eleveIds = new HashSet<>();
+        List<SessionCours> aSupprimer = new ArrayList<>();
+
+        for (int v = 0; v < visites.size(); v++) {
+            LocalDate jour = visites.get(v);
+            for (int p = 0; p < SeanceDureeRepartition.MAX_BLOCS_PAR_JOUR && idx < file.size(); p++, idx++) {
+                SessionCours session = file.get(idx);
+                LocalDateTime debut = SeanceDureeRepartition.matinScolaire(jour, jour.getDayOfYear() + p);
+                if (p > 0) {
+                    debut = debut.plusMinutes(SeanceDureeRepartition.BLOC_MINUTES
+                            + SeanceDureeRepartition.pauseMemeCentreMinutes(jour.getDayOfYear() + p));
+                }
+                if (!SeanceDureeRepartition.tientDansJourneeScolaire(debut)) {
+                    debut = SeanceDureeRepartition.matinScolaire(jour, jour.getDayOfYear() + p + 3);
+                }
+                LocalDateTime fin = debut.plusMinutes(SeanceDureeRepartition.BLOC_MINUTES);
+                boolean dateChangee = !session.getHeureDebut().toLocalDate().equals(jour);
+                boolean horaireChange = !debut.equals(session.getHeureDebut())
+                        || session.getHeureFin() == null
+                        || !fin.equals(session.getHeureFin());
+                if (dateChangee || horaireChange) {
+                    session.setHeureDebut(debut);
+                    session.setHeureFin(fin);
+                    session.setDureeReelleMinutes((long) SeanceDureeRepartition.BLOC_MINUTES);
+                    session.setTitre(p == 0
+                            ? SeanceDureeRepartition.titreMatin(session.getTitre())
+                            : SeanceDureeRepartition.titreSoiree(session.getTitre()));
+                    sessionCoursRepository.save(session);
+                    List<EvaluationSession> evals = evaluationSessionRepository
+                            .findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId());
+                    for (EvaluationSession eval : evals) {
+                        if (eval.isPresent()) {
+                            eval.setHeureArrivee(debut);
+                            eval.setHeureDepart(fin);
+                            evaluationSessionRepository.save(eval);
+                        }
+                    }
+                    changements++;
+                }
+            }
+        }
+        while (idx < file.size()) {
+            aSupprimer.add(file.get(idx++));
+        }
+        for (SessionCours session : aSupprimer) {
+            if (session.getFormateur() != null) {
+                formateurIds.add(session.getFormateur().getId());
+            }
+            List<EvaluationSession> evals = evaluationSessionRepository
+                    .findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId());
+            for (EvaluationSession eval : evals) {
+                if (eval.getEleve() != null) {
+                    eleveIds.add(eval.getEleve().getId());
+                }
+            }
+            evaluationSessionRepository.deleteAll(evals);
+            evaluationSessionRepository.flush();
+            sessionCoursRepository.delete(session);
+            changements++;
+        }
+        if (!aSupprimer.isEmpty()) {
+            sessionCoursRepository.flush();
+            recalculerHeuresEleves(eleveIds);
+            recalculerHeuresFormateurs(formateurIds);
+        }
+        return changements;
     }
 
     @Transactional

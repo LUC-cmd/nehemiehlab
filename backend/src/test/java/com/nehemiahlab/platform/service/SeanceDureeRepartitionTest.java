@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -103,5 +104,47 @@ class SeanceDureeRepartitionTest {
         assertEquals(java.time.LocalDate.of(2026, 3, 2), creneaux.get(0).heureDebut().toLocalDate());
         assertEquals(java.time.LocalDate.of(2026, 3, 2), creneaux.get(1).heureDebut().toLocalDate());
         assertEquals(java.time.LocalDate.of(2026, 3, 4), creneaux.get(2).heureDebut().toLocalDate());
+    }
+
+    @Test
+    void lendemainMemeModuleNestPasUnJourDePresence() {
+        List<java.time.LocalDate> dates = List.of(
+                java.time.LocalDate.of(2026, 9, 15),
+                java.time.LocalDate.of(2026, 9, 16)
+        );
+        Map<java.time.LocalDate, String> titres = Map.of(
+                java.time.LocalDate.of(2026, 9, 15), "Projet libre (Partie 1)",
+                java.time.LocalDate.of(2026, 9, 16), "Projet libre (Partie 1)"
+        );
+        assertEquals(List.of(java.time.LocalDate.of(2026, 9, 15)),
+                SeanceDureeRepartition.datesDePresence(dates, titres));
+    }
+
+    @Test
+    void joursReelsAvecTrouSontConserves() {
+        List<java.time.LocalDate> dates = List.of(
+                java.time.LocalDate.of(2026, 8, 12),
+                java.time.LocalDate.of(2026, 8, 15),
+                java.time.LocalDate.of(2026, 8, 17)
+        );
+        Map<java.time.LocalDate, String> titres = Map.of(
+                java.time.LocalDate.of(2026, 8, 12), "Scratch",
+                java.time.LocalDate.of(2026, 8, 15), "Variables",
+                java.time.LocalDate.of(2026, 8, 17), "Stylo"
+        );
+        assertEquals(dates, SeanceDureeRepartition.datesDePresence(dates, titres));
+    }
+
+    @Test
+    void deuxJoursConsecutifsModulesDifferentsRestentDeuxPassages() {
+        List<java.time.LocalDate> dates = List.of(
+                java.time.LocalDate.of(2026, 3, 2),
+                java.time.LocalDate.of(2026, 3, 3)
+        );
+        Map<java.time.LocalDate, String> titres = Map.of(
+                java.time.LocalDate.of(2026, 3, 2), "Scratch",
+                java.time.LocalDate.of(2026, 3, 3), "Variables"
+        );
+        assertEquals(dates, SeanceDureeRepartition.datesDePresence(dates, titres));
     }
 }

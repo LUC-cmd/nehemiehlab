@@ -152,7 +152,36 @@ public final class SeanceDureeRepartition {
         return baseTitre(titre) + " — Séance soirée";
     }
 
-    static String baseTitre(String titre) {
+    /**
+     * Jours où le formateur était au centre : on ignore le lendemain inventé
+     * (même module, jour calendaire suivant). Un vrai passage 2 jours plus tard est conservé.
+     */
+    public static List<LocalDate> datesDePresence(List<LocalDate> dates, Map<LocalDate, String> titreBaseParJour) {
+        List<LocalDate> visites = new ArrayList<>();
+        if (dates == null || dates.isEmpty()) {
+            return visites;
+        }
+        List<LocalDate> ordered = new ArrayList<>(dates);
+        ordered.sort(LocalDate::compareTo);
+        Map<LocalDate, String> titres = titreBaseParJour != null ? titreBaseParJour : Map.of();
+        for (LocalDate jour : ordered) {
+            if (visites.isEmpty()) {
+                visites.add(jour);
+                continue;
+            }
+            LocalDate dernier = visites.get(visites.size() - 1);
+            String t1 = baseTitre(titres.get(dernier));
+            String t2 = baseTitre(titres.get(jour));
+            boolean memeModule = t1.equalsIgnoreCase(t2);
+            if (memeModule && !jour.isAfter(dernier.plusDays(1))) {
+                continue;
+            }
+            visites.add(jour);
+        }
+        return visites;
+    }
+
+    public static String baseTitre(String titre) {
         if (titre == null || titre.isBlank()) {
             return "Séance";
         }
