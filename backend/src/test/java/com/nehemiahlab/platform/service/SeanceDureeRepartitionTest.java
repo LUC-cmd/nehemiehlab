@@ -63,4 +63,18 @@ class SeanceDureeRepartitionTest {
         assertEquals(1, creneaux.size());
         assertEquals(8, SeanceDureeRepartition.minutesRestantesHistorique(188));
     }
+
+    @Test
+    void aucuneSeanceNeDepasseDixSeptHeures() {
+        List<SeanceDureeRepartition.CreneauPlan> creneaux = SeanceDureeRepartition.planifierHistorique(List.of(
+                new SeanceDureeRepartition.SeanceSource(LocalDateTime.of(2026, 3, 2, 14, 30), 360, 0),
+                new SeanceDureeRepartition.SeanceSource(LocalDateTime.of(2026, 3, 3, 8, 40), 360, 1)
+        ));
+        assertEquals(4, creneaux.size());
+        for (SeanceDureeRepartition.CreneauPlan c : creneaux) {
+            assertTrue(SeanceDureeRepartition.tientDansJourneeScolaire(c.heureDebut()));
+            assertTrue(!c.heureFin().toLocalTime().isAfter(SeanceDureeRepartition.FIN_SCOLAIRE));
+            assertTrue(!c.heureDebut().toLocalTime().isBefore(SeanceDureeRepartition.DEBUT_SCOLAIRE));
+        }
+    }
 }

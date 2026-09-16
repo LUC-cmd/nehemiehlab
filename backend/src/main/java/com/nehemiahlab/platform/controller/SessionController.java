@@ -193,8 +193,8 @@ public class SessionController {
                 seanceRepartitionService.resoudreConflitsFormateur(user.getId());
             }
             return ResponseEntity.ok(Map.of(
-                    "message", result.seancesAvant() + " séance(s) redistribuée(s) en "
-                            + result.seancesApres() + " séance(s) de 3 h. Notes et présences conservées.",
+                    "message", result.seancesAvant() + " séance(s) en "
+                            + result.seancesApres() + " séance(s) de 3 h, entre 8 h et 17 h. Notes et présences conservées.",
                     "seancesAvant", result.seancesAvant(),
                     "seancesApres", result.seancesApres(),
                     "minutesReportees", result.minutesReportees()
@@ -209,7 +209,6 @@ public class SessionController {
                             + ". Tes comptes et tes données existantes restent."
             ));
         }
-    }
     }
 
     @PostMapping

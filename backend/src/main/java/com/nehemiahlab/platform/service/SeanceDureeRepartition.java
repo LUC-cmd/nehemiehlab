@@ -7,15 +7,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Une séance compte toujours 3 h. Les minutes de début et de fin varient
- * (plus ou moins) à partir de l'heure réelle déjà enregistrée — jamais toutes à 8h00 pile.
- * Au plus deux par jour dans le même centre, pause de plus de 15 min.
- * Au-delà de 6 h, le reste est reporté jusqu'à former d'autres blocs de 3 h.
+ * Une séance compte toujours 3 h, pendant la journée scolaire : 8 h → 17 h.
+ * 18 h est trop tard (les enfants sont à la maison) : le reste passe au lendemain.
+ * Les minutes de début varient un peu, jamais toutes à 8h00 pile.
  */
 public final class SeanceDureeRepartition {
 
     public static final int BLOC_MINUTES = 180;
     public static final int SEUIL_DOUBLE_MINUTES = 360;
+    public static final LocalTime DEBUT_SCOLAIRE = LocalTime.of(8, 0);
+    /** Fin souhaitée et maximale : jamais après 17 h. */
+    public static final LocalTime FIN_SCOLAIRE = LocalTime.of(17, 0);
 
     private SeanceDureeRepartition() {}
 
@@ -45,57 +47,99 @@ public final class SeanceDureeRepartition {
         return 20 + Math.floorMod(seed * 3, 8);
     }
 
+    public static boolean tientDansJourneeScolaire(LocalDateTime debut) {
+        if (debut == null) {
+            return false;
+        }
+        LocalDateTime fin = debut.plusMinutes(BLOC_MINUTES);
+        if (!fin.toLocalDate().equals(debut.toLocalDate())) {
+            return false;
+        }
+        if (debut.toLocalTime().isBefore(DEBUT_SCOLAIRE)) {
+            return false;
+        }
+        return !fin.toLocalTime().isAfter(FIN_SCOLAIRE);
+    }
+
+    public static LocalDateTime matinScolaire(LocalDate jour, int seed) {
+        int extra = Math.floorMod(seed * 7 + 3, 25);
+        return jour.atTime(DEBUT_SCOLAIRE).plusMinutes(extra);
+    }
+
+    public static LocalDateTime cadrerDebutScolaire(LocalDateTime brut, int seed) {
+        LocalDateTime d = brut != null
+                ? brut.plusMinutes(variationDebutMinutes(seed))
+                : matinScolaire(LocalDate.now(), seed);
+        if (d.toLocalTime().isBefore(DEBUT_SCOLAIRE)) {
+            d = matinScolaire(d.toLocalDate(), seed);
+        }
+        if (!tientDansJourneeScolaire(d)) {
+            LocalDate jour = d.toLocalDate().plusDays(1);
+            d = matinScolaire(jour, seed + 11);
+        }
+        return d;
+    }
+
     public static List<CreneauPlan> planifierHistorique(List<SeanceSource> sources) {
         List<CreneauPlan> out = new ArrayList<>();
         if (sources == null || sources.isEmpty()) {
             return out;
         }
         int carry = 0;
-        LocalDateTime dernierDebut = sources.get(0).heureDebut();
+        int seed = 0;
+        LocalDateTime candidate = null;
         int dernierIndex = sources.get(0).sourceIndex();
 
         for (SeanceSource source : sources) {
             int available = Math.max(0, source.minutes()) + carry;
-            LocalDateTime brut = source.heureDebut() != null
-                    ? source.heureDebut()
-                    : LocalDateTime.of(LocalDate.now(), LocalTime.of(8, 17));
-            LocalDateTime debutMatin = brut.plusMinutes(variationDebutMinutes(source.sourceIndex() + brut.getDayOfYear()));
-            dernierDebut = debutMatin;
             dernierIndex = source.sourceIndex();
-            int places = 0;
-            while (available >= BLOC_MINUTES && places < 2) {
-                if (places == 0) {
-                    out.add(creneau(debutMatin, TypeCreneau.MATIN, source.sourceIndex()));
-                } else {
-                    int pause = pauseMemeCentreMinutes(source.sourceIndex() + places);
-                    LocalDateTime debutSoir = debutMatin.plusMinutes(BLOC_MINUTES + pause);
-                    out.add(creneau(debutSoir, TypeCreneau.SOIREE, source.sourceIndex()));
+            candidate = cadrerDebutScolaire(source.heureDebut(), source.sourceIndex() + seed);
+            if (!out.isEmpty()) {
+                CreneauPlan last = out.get(out.size() - 1);
+                int pause = pauseMemeCentreMinutes(source.sourceIndex() + seed);
+                LocalDateTime minDebut = last.heureFin().plusMinutes(pause);
+                if (candidate.isBefore(minDebut)) {
+                    candidate = minDebut;
                 }
+            }
+            int places = 0;
+            while (available >= BLOC_MINUTES) {
+                if (places >= 2 || !tientDansJourneeScolaire(candidate)) {
+                    LocalDate lendemain = candidate.toLocalDate();
+                    if (!candidate.toLocalTime().isBefore(DEBUT_SCOLAIRE)) {
+                        lendemain = lendemain.plusDays(1);
+                    }
+                    candidate = matinScolaire(lendemain, seed++);
+                    places = 0;
+                    continue;
+                }
+                TypeCreneau type = places == 0 ? TypeCreneau.MATIN : TypeCreneau.SOIREE;
+                out.add(creneau(candidate, type, source.sourceIndex()));
                 available -= BLOC_MINUTES;
                 places++;
+                candidate = candidate.plusMinutes(BLOC_MINUTES + pauseMemeCentreMinutes(source.sourceIndex() + places));
             }
             carry = available;
         }
 
-        LocalDate jour = dernierDebut.toLocalDate().plusDays(1);
-        LocalTime heureMatin = dernierDebut.toLocalTime();
-        int overflow = 0;
         while (carry >= BLOC_MINUTES) {
+            if (candidate == null || !tientDansJourneeScolaire(candidate)) {
+                LocalDate jour = candidate != null ? candidate.toLocalDate().plusDays(1) : LocalDate.now().plusDays(1);
+                candidate = matinScolaire(jour, seed++);
+            }
             int places = 0;
-            LocalDateTime debutMatin = jour.atTime(heureMatin)
-                    .plusMinutes(variationDebutMinutes(dernierIndex + jour.getDayOfYear() + overflow));
             while (carry >= BLOC_MINUTES && places < 2) {
-                if (places == 0) {
-                    out.add(creneau(debutMatin, TypeCreneau.MATIN, dernierIndex));
-                } else {
-                    int pause = pauseMemeCentreMinutes(dernierIndex + overflow + places);
-                    out.add(creneau(debutMatin.plusMinutes(BLOC_MINUTES + pause), TypeCreneau.SOIREE, dernierIndex));
+                if (!tientDansJourneeScolaire(candidate)) {
+                    candidate = matinScolaire(candidate.toLocalDate().plusDays(1), seed++);
+                    places = 0;
+                    continue;
                 }
+                TypeCreneau type = places == 0 ? TypeCreneau.MATIN : TypeCreneau.SOIREE;
+                out.add(creneau(candidate, type, dernierIndex));
                 carry -= BLOC_MINUTES;
                 places++;
+                candidate = candidate.plusMinutes(BLOC_MINUTES + pauseMemeCentreMinutes(dernierIndex + places));
             }
-            jour = jour.plusDays(1);
-            overflow++;
         }
         return out;
     }

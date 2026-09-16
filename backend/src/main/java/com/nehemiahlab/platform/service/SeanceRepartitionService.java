@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -58,13 +59,15 @@ public class SeanceRepartitionService {
         Set<Long> formateurIds = new HashSet<>();
         for (Centre centre : centreRepository.findAll()) {
             try {
-                if (!aDesSeancesLongues(centre.getId())) {
-                    continue;
+                if (aDesSeancesLongues(centre.getId())) {
+                    HistoriqueResult result = repartirSeancesExistantes(centre);
+                    centresTraites++;
+                    log.info("Centre {} : {} séance(s) redistribuée(s) en {} séance(s) de 3 h (reste {} min).",
+                            centre.getNom(), result.seancesAvant(), result.seancesApres(), result.minutesReportees());
+                } else if (recalerHorairesScolaires(centre) > 0) {
+                    centresTraites++;
+                    log.info("Centre {} : horaires recadrés entre 8 h et 17 h.", centre.getNom());
                 }
-                HistoriqueResult result = repartirSeancesExistantes(centre);
-                centresTraites++;
-                log.info("Centre {} : {} séance(s) redistribuée(s) en {} séance(s) de 3 h (reste {} min).",
-                        centre.getNom(), result.seancesAvant(), result.seancesApres(), result.minutesReportees());
             } catch (ResponseStatusException ex) {
                 if (ex.getStatusCode() != HttpStatus.CONFLICT && ex.getStatusCode() != HttpStatus.BAD_REQUEST) {
                     throw ex;
@@ -90,13 +93,14 @@ public class SeanceRepartitionService {
         int centresTraites = 0;
         for (Centre centre : centreRepository.findByFormateurId(formateurId)) {
             try {
-                if (!aDesSeancesLongues(centre.getId())) {
-                    continue;
+                if (aDesSeancesLongues(centre.getId())) {
+                    HistoriqueResult result = repartirSeancesExistantes(centre);
+                    centresTraites++;
+                    log.info("Centre {} : {} séance(s) redistribuée(s) en {} séance(s) de 3 h (reste {} min).",
+                            centre.getNom(), result.seancesAvant(), result.seancesApres(), result.minutesReportees());
+                } else if (recalerHorairesScolaires(centre) > 0) {
+                    centresTraites++;
                 }
-                HistoriqueResult result = repartirSeancesExistantes(centre);
-                centresTraites++;
-                log.info("Centre {} : {} séance(s) redistribuée(s) en {} séance(s) de 3 h (reste {} min).",
-                        centre.getNom(), result.seancesAvant(), result.seancesApres(), result.minutesReportees());
             } catch (ResponseStatusException ex) {
                 if (ex.getStatusCode() != HttpStatus.CONFLICT && ex.getStatusCode() != HttpStatus.BAD_REQUEST) {
                     throw ex;
@@ -107,6 +111,71 @@ public class SeanceRepartitionService {
             resoudreConflitsFormateur(formateurId);
         }
         return centresTraites;
+    }
+
+    @Transactional
+    public int recalerHorairesScolaires(Centre centre) {
+        if (centre == null || centre.getId() == null) {
+            return 0;
+        }
+        List<SessionCours> cloturees = sessionCoursRepository.findByCentreIdOrderByHeureDebutAsc(centre.getId()).stream()
+                .filter(s -> "CLOTUREE".equals(s.getStatut()) && s.getHeureDebut() != null)
+                .toList();
+        int deplaces = 0;
+        LocalDateTime precedenteFin = null;
+        Long precedentCentreId = null;
+        int i = 0;
+        for (SessionCours session : cloturees) {
+            LocalDateTime debut = session.getHeureDebut();
+            if (precedenteFin != null && session.getCentre() != null) {
+                boolean memeCentre = session.getCentre().getId().equals(precedentCentreId);
+                int pause = memeCentre
+                        ? SeanceDureeRepartition.pauseMemeCentreMinutes(i)
+                        : SeanceDureeRepartition.pauseEntreCentresMinutes(i);
+                LocalDateTime minDebut = precedenteFin.plusMinutes(pause);
+                if (debut.isBefore(minDebut)) {
+                    debut = minDebut;
+                }
+            }
+            if (!SeanceDureeRepartition.tientDansJourneeScolaire(debut)) {
+                LocalDate jour = debut.toLocalDate();
+                if (precedenteFin != null && !jour.isAfter(precedenteFin.toLocalDate())) {
+                    jour = precedenteFin.toLocalDate().plusDays(1);
+                } else {
+                    jour = jour.plusDays(debut.toLocalTime().isBefore(SeanceDureeRepartition.DEBUT_SCOLAIRE) ? 0 : 1);
+                    if (jour.equals(debut.toLocalDate()) && debut.toLocalTime().isBefore(SeanceDureeRepartition.DEBUT_SCOLAIRE)) {
+                        jour = debut.toLocalDate();
+                    }
+                }
+                debut = SeanceDureeRepartition.matinScolaire(jour, i);
+                if (precedenteFin != null && !debut.isAfter(precedenteFin)) {
+                    debut = SeanceDureeRepartition.matinScolaire(precedenteFin.toLocalDate().plusDays(1), i + 3);
+                }
+            }
+            LocalDateTime fin = debut.plusMinutes(SeanceDureeRepartition.BLOC_MINUTES);
+            if (!debut.equals(session.getHeureDebut())
+                    || session.getHeureFin() == null
+                    || !fin.equals(session.getHeureFin())) {
+                session.setHeureDebut(debut);
+                session.setHeureFin(fin);
+                session.setDureeReelleMinutes((long) SeanceDureeRepartition.BLOC_MINUTES);
+                sessionCoursRepository.save(session);
+                List<EvaluationSession> evals = evaluationSessionRepository
+                        .findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId());
+                for (EvaluationSession eval : evals) {
+                    if (eval.isPresent()) {
+                        eval.setHeureArrivee(debut);
+                        eval.setHeureDepart(fin);
+                        evaluationSessionRepository.save(eval);
+                    }
+                }
+                deplaces++;
+            }
+            precedenteFin = fin;
+            precedentCentreId = session.getCentre() != null ? session.getCentre().getId() : null;
+            i++;
+        }
+        return deplaces;
     }
 
     @Transactional
@@ -126,8 +195,12 @@ public class SeanceRepartitionService {
         }
         boolean dejaFait = cloturees.stream().allMatch(s -> minutesSession(s) <= SeanceDureeRepartition.BLOC_MINUTES);
         if (dejaFait) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Ces séances sont déjà en blocs de 3 h. Aucune modification.");
+            int recales = recalerHorairesScolaires(managed);
+            if (recales == 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Ces séances sont déjà en blocs de 3 h entre 8 h et 17 h. Aucune modification.");
+            }
+            return new HistoriqueResult(cloturees.size(), cloturees.size(), 0);
         }
 
         List<SeanceDureeRepartition.SeanceSource> sources = new ArrayList<>();
@@ -226,10 +299,9 @@ public class SeanceRepartitionService {
                     ? SeanceDureeRepartition.pauseMemeCentreMinutes(i)
                     : SeanceDureeRepartition.pauseEntreCentresMinutes(i);
             LocalDateTime nouveauDebut = autreFin.plusMinutes(pause);
-            if (nouveauDebut.getHour() >= 19) {
-                nouveauDebut = nouveauDebut.toLocalDate().plusDays(1)
-                        .atTime(debut.toLocalTime())
-                        .plusMinutes(SeanceDureeRepartition.variationDebutMinutes(i + actuelJour(actuelle)));
+            if (!SeanceDureeRepartition.tientDansJourneeScolaire(nouveauDebut)) {
+                LocalDate lendemain = autreFin.toLocalDate().plusDays(1);
+                nouveauDebut = SeanceDureeRepartition.matinScolaire(lendemain, i);
             }
             actuelle.setHeureDebut(nouveauDebut);
             actuelle.setHeureFin(nouveauDebut.plusMinutes(SeanceDureeRepartition.BLOC_MINUTES));
@@ -250,10 +322,6 @@ public class SeanceRepartitionService {
     private boolean aDesSeancesLongues(Long centreId) {
         return sessionCoursRepository.findByCentreIdOrderByHeureDebutAsc(centreId).stream()
                 .anyMatch(s -> "CLOTUREE".equals(s.getStatut()) && minutesSession(s) > SeanceDureeRepartition.BLOC_MINUTES);
-    }
-
-    private static int actuelJour(SessionCours session) {
-        return session.getHeureDebut() != null ? session.getHeureDebut().getDayOfYear() : 0;
     }
 
     private static String nomCentre(SessionCours session) {

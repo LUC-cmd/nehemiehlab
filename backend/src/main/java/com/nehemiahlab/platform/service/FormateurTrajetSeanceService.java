@@ -36,7 +36,7 @@ public class FormateurTrajetSeanceService {
     public static final int BLOC_CIBLE_MINUTES = 180;
     public static final int MAX_SEANCES_PAR_CENTRE_PAR_JOUR = 2;
     public static final LocalTime DEBUT_JOURNEE = LocalTime.of(8, 0);
-    public static final LocalTime FIN_JOURNEE = LocalTime.of(18, 0);
+    public static final LocalTime FIN_JOURNEE = LocalTime.of(17, 0);
 
     private static final DateTimeFormatter HEURE = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -147,6 +147,9 @@ public class FormateurTrajetSeanceService {
         }
         LocalDate jour = premierDebut.toLocalDate();
         LocalTime heureBase = premierDebut.toLocalTime();
+        if (heureBase.isBefore(DEBUT_JOURNEE) || heureBase.plusMinutes(BLOC_CIBLE_MINUTES).isAfter(FIN_JOURNEE)) {
+            heureBase = LocalTime.of(8, 12);
+        }
         int seed = 0;
         LocalDateTime curseur = premierDebut.plusMinutes(SeanceDureeRepartition.variationDebutMinutes(seed++));
         Long dernierCentre = null;
