@@ -87,9 +87,15 @@ public class AuthController {
         Optional<User> userOpt = userRepository.findByEmailIgnoreCase(email);
 
         // Message générique : évite l'énumération de comptes.
-        if (userOpt.isEmpty() || isLoginLocked(userOpt.get())) {
+        if (userOpt.isEmpty()) {
             return ResponseEntity.status(401).body(Map.of(
                     "message", "Email ou mot de passe incorrect.",
+                    "field", "motDePasse"
+            ));
+        }
+        if (isLoginLocked(userOpt.get())) {
+            return ResponseEntity.status(429).body(Map.of(
+                    "message", "Trop de tentatives. Réessayez dans 15 minutes, ou utilisez Mot de passe oublié.",
                     "field", "motDePasse"
             ));
         }
@@ -150,10 +156,15 @@ public class AuthController {
         Optional<User> parentOpt = userRepository.findByEmail(parentActivationService.parentEmail(eleve));
         if (parentOpt.isEmpty()
                 || !parentOpt.get().isParentCredentialsActivated()
-                || !parentOpt.get().isActif()
-                || isLoginLocked(parentOpt.get())) {
+                || !parentOpt.get().isActif()) {
             return ResponseEntity.status(401).body(Map.of(
                     "message", "Matricule ou mot de passe incorrect. Activez d'abord le compte avec le code remis par le centre.",
+                    "field", "motDePasse"
+            ));
+        }
+        if (isLoginLocked(parentOpt.get())) {
+            return ResponseEntity.status(429).body(Map.of(
+                    "message", "Trop de tentatives. Réessayez dans 15 minutes.",
                     "field", "motDePasse"
             ));
         }
