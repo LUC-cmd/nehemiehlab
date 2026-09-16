@@ -168,4 +168,11 @@ class SeanceDureeRepartitionTest {
         );
         assertEquals(dates, SeanceDureeRepartition.datesDePresence(dates, titres));
     }
+
+    @Test
+    void clusterAnieEstReconnuMemeAvecAccent() {
+        assertTrue(SeanceDureeRepartition.estClusterAnie("Cluster Anié", null, null));
+        assertTrue(SeanceDureeRepartition.estClusterAnie(null, "CDEJ HOLA d'Anié Kpotamé", null));
+        assertTrue(!SeanceDureeRepartition.estClusterAnie("Cluster Lomé Est", "SKA Lomé", "Lomé"));
+    }
 }

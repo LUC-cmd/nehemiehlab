@@ -35,6 +35,11 @@ import { formatCoords } from '../../utils/geo';
 import { requireSessionGeolocation, warmUpSessionGeolocation } from '../../utils/sessionGeo';
 import GeolocationRequiredModal from '../../components/ui/GeolocationRequiredModal';
 
+function estClusterAnie(centre?: Centre | null) {
+  const blob = `${centre?.cluster || ''} ${centre?.nom || ''} ${centre?.ville || ''}`;
+  return blob.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().includes('anie');
+}
+
 function formatElapsed(totalMinutes: number) {
   const m = Math.max(0, Math.floor(totalMinutes));
   const h = Math.floor(m / 60);
@@ -1281,7 +1286,7 @@ export default function SessionsPage() {
         </div>
       ) : (
         <>
-          {isDirecteur && selectedFormateurId && selectedCentreId && (
+          {isDirecteur && selectedFormateurId && selectedCentreId && estClusterAnie(selectedCentre) && (
             <div className="mb-3">
               <button
                 type="button"
@@ -1422,7 +1427,7 @@ export default function SessionsPage() {
                 </div>
               </div>
             )}
-            {isFormateur && selectedFormateurCentreId && (
+            {isFormateur && selectedFormateurCentreId && estClusterAnie(centres.find((c) => c.id === Number(selectedFormateurCentreId))) && (
               <div className="mb-3">
                 <button
                   type="button"

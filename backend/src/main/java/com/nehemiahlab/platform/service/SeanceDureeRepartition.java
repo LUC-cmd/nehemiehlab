@@ -1,5 +1,6 @@
 package com.nehemiahlab.platform.service;
 
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -7,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -196,5 +198,26 @@ public final class SeanceDureeRepartition {
         trimmed = trimmed.replaceAll("\\s+[—–-]\\s+Séance matin$", "");
         trimmed = trimmed.replaceAll("\\s+[—–-]\\s+Séance soirée$", "");
         return trimmed.isBlank() ? "Séance" : trimmed;
+    }
+
+    public static boolean titreEstDecoupe3h(String titre) {
+        if (titre == null) {
+            return false;
+        }
+        return titre.contains("Séance matin") || titre.contains("Séance soirée");
+    }
+
+    public static boolean estClusterAnie(String cluster, String nom, String ville) {
+        return contientAnie(cluster) || contientAnie(nom) || contientAnie(ville);
+    }
+
+    static boolean contientAnie(String texte) {
+        if (texte == null || texte.isBlank()) {
+            return false;
+        }
+        String n = Normalizer.normalize(texte, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase(Locale.ROOT);
+        return n.contains("anie");
     }
 }
