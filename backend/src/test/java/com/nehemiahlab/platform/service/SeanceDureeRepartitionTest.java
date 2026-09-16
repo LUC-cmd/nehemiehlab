@@ -30,9 +30,9 @@ class SeanceDureeRepartitionTest {
                 new SeanceDureeRepartition.SeanceSource(origine, 180, 0)
         ));
         assertEquals(1, creneaux.size());
+        assertEquals(origine.toLocalDate(), creneaux.get(0).heureDebut().toLocalDate());
+        assertTrue(!creneaux.get(0).heureDebut().toLocalTime().isBefore(SeanceDureeRepartition.DEBUT_SCOLAIRE));
         assertNotEquals(LocalDateTime.of(2026, 3, 2, 8, 0), creneaux.get(0).heureDebut());
-        int pause = (int) Duration.between(origine, creneaux.get(0).heureDebut()).toMinutes();
-        assertTrue(Math.abs(pause) <= 9);
     }
 
     @Test
@@ -76,5 +76,20 @@ class SeanceDureeRepartitionTest {
             assertTrue(!c.heureFin().toLocalTime().isAfter(SeanceDureeRepartition.FIN_SCOLAIRE));
             assertTrue(!c.heureDebut().toLocalTime().isBefore(SeanceDureeRepartition.DEBUT_SCOLAIRE));
         }
+        assertEquals(java.time.LocalDate.of(2026, 3, 2), creneaux.get(0).heureDebut().toLocalDate());
+        assertEquals(java.time.LocalDate.of(2026, 3, 2), creneaux.get(1).heureDebut().toLocalDate());
+        assertEquals(java.time.LocalDate.of(2026, 3, 3), creneaux.get(2).heureDebut().toLocalDate());
+        assertEquals(java.time.LocalDate.of(2026, 3, 3), creneaux.get(3).heureDebut().toLocalDate());
+    }
+
+    @Test
+    void onNeCreePasUnJourSansSeanceEnregistree() {
+        List<SeanceDureeRepartition.CreneauPlan> creneaux = SeanceDureeRepartition.planifierHistorique(List.of(
+                new SeanceDureeRepartition.SeanceSource(LocalDateTime.of(2026, 3, 2, 8, 10), 540, 0)
+        ));
+        assertEquals(2, creneaux.size());
+        assertEquals(java.time.LocalDate.of(2026, 3, 2), creneaux.get(0).heureDebut().toLocalDate());
+        assertEquals(java.time.LocalDate.of(2026, 3, 2), creneaux.get(1).heureDebut().toLocalDate());
+        assertEquals(180, SeanceDureeRepartition.minutesNonPlacees(540, creneaux.size()));
     }
 }
