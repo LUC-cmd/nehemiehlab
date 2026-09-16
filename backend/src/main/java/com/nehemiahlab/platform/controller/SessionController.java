@@ -65,7 +65,6 @@ public class SessionController {
     @GetMapping
     public ResponseEntity<?> getSessions(Authentication auth) {
         User user = (User) auth.getPrincipal();
-        recalerHorairesVisibles(user);
         List<SessionCours> sessions;
 
         if (user.getRole() == Role.FORMATEUR) {
@@ -98,33 +97,6 @@ public class SessionController {
         }
 
         return ResponseEntity.ok(sessions);
-    }
-
-    private void recalerHorairesVisibles(User user) {
-        try {
-            List<Centre> centres;
-            if (user.getRole() == Role.FORMATEUR) {
-                centres = centreRepository.findByFormateurId(user.getId());
-            } else if (user.getRole() == Role.COORDINATEUR || user.getRole() == Role.RESPONSABLE_CLUSTER) {
-                List<Long> ids = centreAccessService.accessibleCentreIds(user);
-                centres = ids.stream()
-                        .map(id -> centreRepository.findById(id).orElse(null))
-                        .filter(c -> c != null)
-                        .toList();
-            } else if (user.getRole() == Role.DIRECTEUR) {
-                centres = centreRepository.findAll();
-            } else {
-                return;
-            }
-            for (Centre centre : centres) {
-                if (seanceRepartitionService.aDesHorairesHorsJourneeScolaire(centre.getId())
-                        || seanceRepartitionService.aDesDatesInventees(centre.getId())) {
-                    seanceRepartitionService.recalerHorairesScolaires(centre);
-                }
-            }
-        } catch (Exception ignored) {
-            // La liste des séances doit s'afficher même si le recadrage échoue.
-        }
     }
 
     /**
