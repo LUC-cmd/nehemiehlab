@@ -47,6 +47,20 @@ public final class SeanceDureeRepartition {
         return 20 + Math.floorMod(seed * 3, 8);
     }
 
+    public static boolean horaireHorsJourneeScolaire(LocalDateTime debut, LocalDateTime fin) {
+        if (debut == null) {
+            return false;
+        }
+        LocalDateTime f = fin != null ? fin : debut.plusMinutes(BLOC_MINUTES);
+        if (debut.toLocalTime().isBefore(DEBUT_SCOLAIRE)) {
+            return true;
+        }
+        if (!f.toLocalDate().equals(debut.toLocalDate())) {
+            return true;
+        }
+        return f.toLocalTime().isAfter(FIN_SCOLAIRE);
+    }
+
     public static boolean tientDansJourneeScolaire(LocalDateTime debut) {
         if (debut == null) {
             return false;

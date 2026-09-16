@@ -130,10 +130,20 @@ public class SeanceRepartitionService {
         }
         int i = 0;
         for (Map.Entry<LocalDate, List<SessionCours>> entree : parJour.entrySet()) {
+            List<SessionCours> duJour = new ArrayList<>(entree.getValue());
+            boolean jourARecaler = duJour.stream().anyMatch(s ->
+                    SeanceDureeRepartition.horaireHorsJourneeScolaire(s.getHeureDebut(), s.getHeureFin()));
+            if (!jourARecaler) {
+                continue;
+            }
             LocalDate jour = entree.getKey();
             LocalDateTime curseur = SeanceDureeRepartition.matinScolaire(jour, jour.getDayOfYear());
+            int places = 0;
             Long dernierCentre = null;
-            for (SessionCours session : entree.getValue()) {
+            for (SessionCours session : duJour) {
+                if (places >= SeanceDureeRepartition.MAX_BLOCS_PAR_JOUR) {
+                    break;
+                }
                 if (dernierCentre != null && session.getCentre() != null) {
                     boolean memeCentre = session.getCentre().getId().equals(dernierCentre);
                     int pause = memeCentre
@@ -142,34 +152,43 @@ public class SeanceRepartitionService {
                     curseur = curseur.plusMinutes(pause);
                 }
                 if (!SeanceDureeRepartition.tientDansJourneeScolaire(curseur)) {
-                    break;
+                    curseur = SeanceDureeRepartition.matinScolaire(jour, jour.getDayOfYear() + places + 1);
+                    if (places > 0) {
+                        break;
+                    }
                 }
                 LocalDateTime debut = curseur;
                 LocalDateTime fin = debut.plusMinutes(SeanceDureeRepartition.BLOC_MINUTES);
-                if (!debut.equals(session.getHeureDebut())
-                        || session.getHeureFin() == null
-                        || !fin.equals(session.getHeureFin())) {
-                    session.setHeureDebut(debut);
-                    session.setHeureFin(fin);
-                    session.setDureeReelleMinutes((long) SeanceDureeRepartition.BLOC_MINUTES);
-                    sessionCoursRepository.save(session);
-                    List<EvaluationSession> evals = evaluationSessionRepository
-                            .findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId());
-                    for (EvaluationSession eval : evals) {
-                        if (eval.isPresent()) {
-                            eval.setHeureArrivee(debut);
-                            eval.setHeureDepart(fin);
-                            evaluationSessionRepository.save(eval);
-                        }
+                session.setHeureDebut(debut);
+                session.setHeureFin(fin);
+                session.setDureeReelleMinutes((long) SeanceDureeRepartition.BLOC_MINUTES);
+                sessionCoursRepository.save(session);
+                List<EvaluationSession> evals = evaluationSessionRepository
+                        .findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId());
+                for (EvaluationSession eval : evals) {
+                    if (eval.isPresent()) {
+                        eval.setHeureArrivee(debut);
+                        eval.setHeureDepart(fin);
+                        evaluationSessionRepository.save(eval);
                     }
-                    deplaces++;
                 }
+                deplaces++;
                 curseur = fin;
                 dernierCentre = session.getCentre() != null ? session.getCentre().getId() : null;
+                places++;
                 i++;
             }
         }
         return deplaces;
+    }
+
+    public boolean aDesHorairesHorsJourneeScolaire(Long centreId) {
+        if (centreId == null) {
+            return false;
+        }
+        return sessionCoursRepository.findByCentreIdOrderByHeureDebutAsc(centreId).stream()
+                .anyMatch(s -> "CLOTUREE".equals(s.getStatut())
+                        && SeanceDureeRepartition.horaireHorsJourneeScolaire(s.getHeureDebut(), s.getHeureFin()));
     }
 
     @Transactional
