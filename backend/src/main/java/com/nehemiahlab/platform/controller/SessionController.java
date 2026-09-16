@@ -117,7 +117,8 @@ public class SessionController {
                 return;
             }
             for (Centre centre : centres) {
-                if (seanceRepartitionService.aDesHorairesHorsJourneeScolaire(centre.getId())) {
+                if (seanceRepartitionService.aDesHorairesHorsJourneeScolaire(centre.getId())
+                        || seanceRepartitionService.aDesDatesInventees(centre.getId())) {
                     seanceRepartitionService.recalerHorairesScolaires(centre);
                 }
             }

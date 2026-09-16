@@ -12,7 +12,7 @@ import java.util.Map;
  * Une séance compte toujours 3 h, pendant la journée scolaire : 8 h → 17 h.
  * On ne crée jamais un jour où le formateur n'a pas enregistré de séance :
  * seules les dates déjà saisies sont utilisées. Deux centres le même jour
- * restent possibles. Le surplus de 3 h va au prochain jour réellement travaillé.
+ * restent possibles. Le surplus d'un jour n'est pas posé sur un autre jour.
  */
 public final class SeanceDureeRepartition {
 
@@ -94,7 +94,8 @@ public final class SeanceDureeRepartition {
 
     /**
      * Découpe en 3 h uniquement sur les dates déjà enregistrées.
-     * Le surplus (≥ 3 h) est reporté au prochain jour travaillé, jamais sur un jour vide.
+     * Chaque jour ne reçoit que le temps de ce jour-là (max 2 séances).
+     * On ne reporte jamais sur un jour où personne n'a enregistré de séance.
      */
     public static List<CreneauPlan> planifierHistorique(List<SeanceSource> sources) {
         List<CreneauPlan> out = new ArrayList<>();
@@ -109,11 +110,10 @@ public final class SeanceDureeRepartition {
             parJour.computeIfAbsent(debut.toLocalDate(), d -> new ArrayList<>()).add(source);
         }
 
-        int carry = 0;
         int seed = 0;
         for (Map.Entry<LocalDate, List<SeanceSource>> entree : parJour.entrySet()) {
             LocalDate jour = entree.getKey();
-            int available = carry;
+            int available = 0;
             for (SeanceSource source : entree.getValue()) {
                 available += Math.max(0, source.minutes());
             }
@@ -127,7 +127,6 @@ public final class SeanceDureeRepartition {
                 places++;
                 curseur = curseur.plusMinutes(BLOC_MINUTES + pauseMemeCentreMinutes(jour.getDayOfYear() + places));
             }
-            carry = available;
             seed++;
         }
         return out;

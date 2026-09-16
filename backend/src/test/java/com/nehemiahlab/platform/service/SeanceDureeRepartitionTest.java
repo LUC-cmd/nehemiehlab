@@ -92,4 +92,16 @@ class SeanceDureeRepartitionTest {
         assertEquals(java.time.LocalDate.of(2026, 3, 2), creneaux.get(1).heureDebut().toLocalDate());
         assertEquals(180, SeanceDureeRepartition.minutesNonPlacees(540, creneaux.size()));
     }
+
+    @Test
+    void surplusDunJourNeVaPasSurUnAutreJourEnregistre() {
+        List<SeanceDureeRepartition.CreneauPlan> creneaux = SeanceDureeRepartition.planifierHistorique(List.of(
+                new SeanceDureeRepartition.SeanceSource(LocalDateTime.of(2026, 3, 2, 8, 10), 540, 0),
+                new SeanceDureeRepartition.SeanceSource(LocalDateTime.of(2026, 3, 4, 8, 40), 180, 1)
+        ));
+        assertEquals(3, creneaux.size());
+        assertEquals(java.time.LocalDate.of(2026, 3, 2), creneaux.get(0).heureDebut().toLocalDate());
+        assertEquals(java.time.LocalDate.of(2026, 3, 2), creneaux.get(1).heureDebut().toLocalDate());
+        assertEquals(java.time.LocalDate.of(2026, 3, 4), creneaux.get(2).heureDebut().toLocalDate());
+    }
 }
