@@ -13,10 +13,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Une séance compte toujours 3 h, pendant la journée scolaire : 8 h → 17 h.
- * On ne crée jamais un jour où le formateur n'a pas enregistré de séance :
- * seules les dates déjà saisies sont utilisées. Deux centres le même jour
- * restent possibles. Le surplus d'un jour n'est pas posé sur un autre jour.
+ * Découpage 3 h (8 h → 17 h) : cluster Anié uniquement.
+ * Hors Anié, les dates et horaires saisis par le formateur restent inchangés.
  */
 public final class SeanceDureeRepartition {
 

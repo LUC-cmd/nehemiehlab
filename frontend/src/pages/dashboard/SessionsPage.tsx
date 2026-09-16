@@ -51,6 +51,42 @@ function formatElapsed(totalMinutes: number) {
 // Objectif d'heures de formation par centre (fixe, identique pour tous les centres).
 const HEURES_OBJECTIF_CENTRE = 63;
 
+function HeuresParCentreCards({
+  centres,
+  sessions,
+}: {
+  centres: Centre[];
+  sessions: SessionCours[];
+}) {
+  if (centres.length === 0) return null;
+  return (
+    <div className="mb-4">
+      <p className="text-sm font-semibold text-slate-700 mb-2">Heures de formation par centre</p>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {centres.map((centre) => {
+          const totalMinutes = sessions
+            .filter((s) => s.centre?.id === centre.id && s.statut === 'CLOTUREE')
+            .reduce((sum, s) => sum + computeSessionDureeMinutes(s), 0);
+          const totalHeures = totalMinutes / 60;
+          const pct = Math.min(100, Math.round((totalHeures / HEURES_OBJECTIF_CENTRE) * 100));
+          return (
+            <div key={centre.id} className="card border border-slate-200 bg-white p-4">
+              <p className="text-sm font-semibold text-slate-900">{centreLabel(centre)}</p>
+              <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
+                <span className="font-bold text-primary-700">{totalHeures.toFixed(1)} h</span>
+                <span>/ {HEURES_OBJECTIF_CENTRE} h</span>
+              </div>
+              <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                <div className="h-full rounded-full bg-primary-500" style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Message d'erreur pour un échec d'appel serveur (démarrer/clôturer/enregistrer...).
  * A ne PAS utiliser pour les erreurs de géolocalisation (celles-ci ont leur propre
@@ -1169,6 +1205,19 @@ export default function SessionsPage() {
         </div>
       )}
 
+      {isDirecteur && selectedRegion && (
+        <HeuresParCentreCards
+          centres={
+            selectedCentreId
+              ? filteredCentresByRegion.filter((c) => String(c.id) === selectedCentreId)
+              : selectedFormateurId
+                ? formateurCentres
+                : filteredCentresByRegion
+          }
+          sessions={sessions}
+        />
+      )}
+
       {/* Statut terrain — formateur au centre, en train de travailler */}
       {isDirecteur && selectedFormateur && (
         <div
@@ -1401,31 +1450,8 @@ export default function SessionsPage() {
                 </select>
               </div>
             )}
-            {isFormateur && centres.length > 0 && (
-              <div className="mb-2">
-                <p className="text-sm font-semibold text-slate-700 mb-2">Heures de formation par centre</p>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {centres.map((centre) => {
-                    const totalMinutes = sessions
-                      .filter((s) => s.centre?.id === centre.id && s.statut === 'CLOTUREE')
-                      .reduce((sum, s) => sum + computeSessionDureeMinutes(s), 0);
-                    const totalHeures = totalMinutes / 60;
-                    const pct = Math.min(100, Math.round((totalHeures / HEURES_OBJECTIF_CENTRE) * 100));
-                    return (
-                      <div key={centre.id} className="card border border-slate-200 bg-white p-4">
-                        <p className="text-sm font-semibold text-slate-900">{centreLabel(centre)}</p>
-                        <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
-                          <span className="font-bold text-primary-700">{totalHeures.toFixed(1)} h</span>
-                          <span>/ {HEURES_OBJECTIF_CENTRE} h</span>
-                        </div>
-                        <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                          <div className="h-full rounded-full bg-primary-500" style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+            {isFormateur && (
+              <HeuresParCentreCards centres={centres} sessions={sessions} />
             )}
             {isFormateur && selectedFormateurCentreId && estClusterAnie(centres.find((c) => c.id === Number(selectedFormateurCentreId))) && (
               <div className="mb-3">

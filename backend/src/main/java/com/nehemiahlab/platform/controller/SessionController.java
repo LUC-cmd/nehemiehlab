@@ -95,7 +95,7 @@ public class SessionController {
             // La liste doit s'afficher même si le compactage échoue.
         }
         sessions = sessions.stream()
-                .filter(s -> !SeanceRepartitionService.sessionApresFinPeriode(s))
+                .filter(s -> !SeanceRepartitionService.sessionAnieApresFinPeriode(s))
                 .toList();
 
         // Une seule requête groupée pour toutes les séances au lieu d'une requête par

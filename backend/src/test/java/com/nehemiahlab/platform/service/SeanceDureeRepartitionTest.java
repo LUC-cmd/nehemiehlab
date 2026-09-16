@@ -174,5 +174,6 @@ class SeanceDureeRepartitionTest {
         assertTrue(SeanceDureeRepartition.estClusterAnie("Cluster Anié", null, null));
         assertTrue(SeanceDureeRepartition.estClusterAnie(null, "CDEJ HOLA d'Anié Kpotamé", null));
         assertTrue(!SeanceDureeRepartition.estClusterAnie("Cluster Lomé Est", "SKA Lomé", "Lomé"));
+        assertTrue(!SeanceDureeRepartition.estClusterAnie("Cluster Sotouboua", "CDEJ Sotouboua", "Sotouboua"));
     }
 }

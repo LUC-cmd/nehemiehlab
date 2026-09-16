@@ -8,8 +8,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Après démarrage : en arrière-plan, enlève les jours inventés (sans bloquer la connexion).
- * Ne touche pas aux comptes ni aux mots de passe.
+ * Après démarrage : en arrière-plan, compacte uniquement le cluster Anié (sans bloquer la connexion).
+ * Les autres centres ne sont pas touchés : dates et horaires restent ceux saisis.
  */
 @Component
 public class SeanceRepartitionBootstrap {
