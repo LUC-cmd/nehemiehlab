@@ -323,8 +323,8 @@ public class SeanceRepartitionService {
     }
 
     /**
-     * Enlève les jours inventés (lendemain du même module) et plafonne à 2 séances par jour réel.
-     * Les notes des séances conservées restent. Ne s'exécute pas à l'ouverture de la liste.
+     * Enlève les séances après le 12/09/2026 et plafonne à 2 par jour.
+     * Ne déplace pas une séance vers un autre jour. Notes conservées sur celles qui restent.
      */
     @Transactional
     public int compacteDatesPresence(Centre centre) {
@@ -338,51 +338,60 @@ public class SeanceRepartitionService {
         if (cloturees.isEmpty()) {
             return 0;
         }
-        Map<LocalDate, List<SessionCours>> parJour = new LinkedHashMap<>();
-        Map<LocalDate, String> titres = new LinkedHashMap<>();
-        for (SessionCours session : cloturees) {
-            LocalDate jour = session.getHeureDebut().toLocalDate();
-            parJour.computeIfAbsent(jour, d -> new ArrayList<>()).add(session);
-            titres.putIfAbsent(jour, SeanceDureeRepartition.baseTitre(session.getTitre()));
-        }
-        List<LocalDate> visites = SeanceDureeRepartition.datesDePresence(new ArrayList<>(parJour.keySet()), titres);
-        boolean tropParJour = parJour.values().stream()
-                .anyMatch(duJour -> duJour.size() > SeanceDureeRepartition.MAX_BLOCS_PAR_JOUR);
-        if (visites.size() == parJour.size() && !tropParJour) {
-            return 0;
-        }
-
-        List<SessionCours> file = new ArrayList<>(cloturees);
-        int idx = 0;
+        LocalDate dateFin = SeanceDureeRepartition.DATE_FIN_PERIODE;
         int changements = 0;
         Set<Long> formateurIds = new HashSet<>();
         Set<Long> eleveIds = new HashSet<>();
         List<SessionCours> aSupprimer = new ArrayList<>();
 
-        for (int v = 0; v < visites.size(); v++) {
-            LocalDate jour = visites.get(v);
-            for (int p = 0; p < SeanceDureeRepartition.MAX_BLOCS_PAR_JOUR && idx < file.size(); p++, idx++) {
-                SessionCours session = file.get(idx);
+        Map<LocalDate, List<SessionCours>> parJour = new LinkedHashMap<>();
+        for (SessionCours session : cloturees) {
+            LocalDate jour = session.getHeureDebut().toLocalDate();
+            if (jour.isAfter(dateFin)) {
+                aSupprimer.add(session);
+                continue;
+            }
+            parJour.computeIfAbsent(jour, d -> new ArrayList<>()).add(session);
+        }
+        for (List<SessionCours> duJour : parJour.values()) {
+            duJour.sort(Comparator.comparing(SessionCours::getHeureDebut));
+            for (int i = SeanceDureeRepartition.MAX_BLOCS_PAR_JOUR; i < duJour.size(); i++) {
+                aSupprimer.add(duJour.get(i));
+            }
+        }
+        Set<Long> idsSupprimes = aSupprimer.stream()
+                .map(SessionCours::getId)
+                .collect(java.util.stream.Collectors.toSet());
+
+        for (Map.Entry<LocalDate, List<SessionCours>> entree : parJour.entrySet()) {
+            LocalDate jour = entree.getKey();
+            int p = 0;
+            for (SessionCours session : entree.getValue()) {
+                if (idsSupprimes.contains(session.getId())) {
+                    continue;
+                }
+                if (p >= SeanceDureeRepartition.MAX_BLOCS_PAR_JOUR) {
+                    break;
+                }
                 LocalDateTime debut = SeanceDureeRepartition.matinScolaire(jour, jour.getDayOfYear() + p);
                 if (p > 0) {
                     debut = debut.plusMinutes(SeanceDureeRepartition.BLOC_MINUTES
                             + SeanceDureeRepartition.pauseMemeCentreMinutes(jour.getDayOfYear() + p));
                 }
-                if (!SeanceDureeRepartition.tientDansJourneeScolaire(debut)) {
-                    debut = SeanceDureeRepartition.matinScolaire(jour, jour.getDayOfYear() + p + 3);
-                }
                 LocalDateTime fin = debut.plusMinutes(SeanceDureeRepartition.BLOC_MINUTES);
-                boolean dateChangee = !session.getHeureDebut().toLocalDate().equals(jour);
-                boolean horaireChange = !debut.equals(session.getHeureDebut())
+                String titre = p == 0
+                        ? SeanceDureeRepartition.titreMatin(session.getTitre())
+                        : SeanceDureeRepartition.titreSoiree(session.getTitre());
+                boolean horaireChange = session.getHeureDebut() == null
+                        || !debut.equals(session.getHeureDebut())
                         || session.getHeureFin() == null
                         || !fin.equals(session.getHeureFin());
-                if (dateChangee || horaireChange) {
+                boolean titreChange = !titre.equals(session.getTitre());
+                if (horaireChange || titreChange) {
                     session.setHeureDebut(debut);
                     session.setHeureFin(fin);
                     session.setDureeReelleMinutes((long) SeanceDureeRepartition.BLOC_MINUTES);
-                    session.setTitre(p == 0
-                            ? SeanceDureeRepartition.titreMatin(session.getTitre())
-                            : SeanceDureeRepartition.titreSoiree(session.getTitre()));
+                    session.setTitre(titre);
                     sessionCoursRepository.save(session);
                     List<EvaluationSession> evals = evaluationSessionRepository
                             .findBySessionCoursIdOrderByEleve_NomAscEleve_PrenomAsc(session.getId());
@@ -395,11 +404,10 @@ public class SeanceRepartitionService {
                     }
                     changements++;
                 }
+                p++;
             }
         }
-        while (idx < file.size()) {
-            aSupprimer.add(file.get(idx++));
-        }
+
         for (SessionCours session : aSupprimer) {
             if (session.getFormateur() != null) {
                 formateurIds.add(session.getFormateur().getId());

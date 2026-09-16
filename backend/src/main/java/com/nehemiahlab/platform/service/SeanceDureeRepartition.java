@@ -4,9 +4,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Une séance compte toujours 3 h, pendant la journée scolaire : 8 h → 17 h.
@@ -21,6 +23,8 @@ public final class SeanceDureeRepartition {
     public static final int MAX_BLOCS_PAR_JOUR = 2;
     public static final LocalTime DEBUT_SCOLAIRE = LocalTime.of(8, 0);
     public static final LocalTime FIN_SCOLAIRE = LocalTime.of(17, 0);
+    /** Dernier jour de séance de la période : rien après pour aucun formateur. */
+    public static final LocalDate DATE_FIN_PERIODE = LocalDate.of(2026, 9, 12);
 
     private SeanceDureeRepartition() {}
 
@@ -153,30 +157,33 @@ public final class SeanceDureeRepartition {
     }
 
     /**
-     * Jours où le formateur était au centre : on ignore le lendemain inventé
-     * (même module, jour calendaire suivant). Un vrai passage 2 jours plus tard est conservé.
+     * Jours de présence : aucune séance après la fin de période (12/09/2026).
      */
     public static List<LocalDate> datesDePresence(List<LocalDate> dates, Map<LocalDate, String> titreBaseParJour) {
+        return datesDePresence(dates, titreBaseParJour, DATE_FIN_PERIODE);
+    }
+
+    public static List<LocalDate> datesDePresence(
+            List<LocalDate> dates,
+            Map<LocalDate, String> titreBaseParJour,
+            LocalDate dateFinInclusive
+    ) {
         List<LocalDate> visites = new ArrayList<>();
         if (dates == null || dates.isEmpty()) {
             return visites;
         }
+        Set<LocalDate> vus = new HashSet<>();
         List<LocalDate> ordered = new ArrayList<>(dates);
         ordered.sort(LocalDate::compareTo);
-        Map<LocalDate, String> titres = titreBaseParJour != null ? titreBaseParJour : Map.of();
         for (LocalDate jour : ordered) {
-            if (visites.isEmpty()) {
-                visites.add(jour);
+            if (jour == null || vus.contains(jour)) {
                 continue;
             }
-            LocalDate dernier = visites.get(visites.size() - 1);
-            String t1 = baseTitre(titres.get(dernier));
-            String t2 = baseTitre(titres.get(jour));
-            boolean memeModule = t1.equalsIgnoreCase(t2);
-            if (memeModule && !jour.isAfter(dernier.plusDays(1))) {
+            if (dateFinInclusive != null && jour.isAfter(dateFinInclusive)) {
                 continue;
             }
             visites.add(jour);
+            vus.add(jour);
         }
         return visites;
     }

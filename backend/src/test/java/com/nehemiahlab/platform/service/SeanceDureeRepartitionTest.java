@@ -107,16 +107,37 @@ class SeanceDureeRepartitionTest {
     }
 
     @Test
-    void lendemainMemeModuleNestPasUnJourDePresence() {
+    void lendemainApresLaFinDePeriodeEstIgnore() {
         List<java.time.LocalDate> dates = List.of(
-                java.time.LocalDate.of(2026, 9, 15),
-                java.time.LocalDate.of(2026, 9, 16)
+                java.time.LocalDate.of(2026, 9, 12),
+                java.time.LocalDate.of(2026, 9, 13),
+                java.time.LocalDate.of(2026, 9, 15)
         );
         Map<java.time.LocalDate, String> titres = Map.of(
-                java.time.LocalDate.of(2026, 9, 15), "Projet libre (Partie 1)",
-                java.time.LocalDate.of(2026, 9, 16), "Projet libre (Partie 1)"
+                java.time.LocalDate.of(2026, 9, 12), "Projet libre (Partie 1)",
+                java.time.LocalDate.of(2026, 9, 13), "Projet libre (Partie 1)",
+                java.time.LocalDate.of(2026, 9, 15), "Projet libre (Partie 1)"
         );
-        assertEquals(List.of(java.time.LocalDate.of(2026, 9, 15)),
+        assertEquals(List.of(java.time.LocalDate.of(2026, 9, 12)),
+                SeanceDureeRepartition.datesDePresence(dates, titres));
+    }
+
+    @Test
+    void suiteConsecutifMemeModuleNeCreePasDeJoursTousLesDeuxJours() {
+        List<java.time.LocalDate> dates = List.of(
+                java.time.LocalDate.of(2026, 9, 11),
+                java.time.LocalDate.of(2026, 9, 12),
+                java.time.LocalDate.of(2026, 9, 13),
+                java.time.LocalDate.of(2026, 9, 14),
+                java.time.LocalDate.of(2026, 9, 15)
+        );
+        Map<java.time.LocalDate, String> titres = new java.util.HashMap<>();
+        for (java.time.LocalDate d : dates) {
+            titres.put(d, "Projet libre (Partie 1)");
+        }
+        assertEquals(List.of(
+                        java.time.LocalDate.of(2026, 9, 11),
+                        java.time.LocalDate.of(2026, 9, 12)),
                 SeanceDureeRepartition.datesDePresence(dates, titres));
     }
 
