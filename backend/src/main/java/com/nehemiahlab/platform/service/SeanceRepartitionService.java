@@ -12,6 +12,8 @@ import com.nehemiahlab.platform.repository.SessionCoursRepository;
 import com.nehemiahlab.platform.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +40,7 @@ public class SeanceRepartitionService {
     private final EvaluationSessionRepository evaluationSessionRepository;
     private final EleveRepository eleveRepository;
     private final UserRepository userRepository;
+    private SeanceRepartitionService self;
 
     public SeanceRepartitionService(
             CentreRepository centreRepository,
@@ -51,6 +54,11 @@ public class SeanceRepartitionService {
         this.evaluationSessionRepository = evaluationSessionRepository;
         this.eleveRepository = eleveRepository;
         this.userRepository = userRepository;
+    }
+
+    @Autowired
+    public void setSelf(@Lazy SeanceRepartitionService self) {
+        this.self = self;
     }
 
     public record HistoriqueResult(int seancesAvant, int seancesApres, int minutesReportees) {}
@@ -306,9 +314,10 @@ public class SeanceRepartitionService {
 
     public int compacteDatesTousLesCentres() {
         int centres = 0;
+        SeanceRepartitionService proxy = self != null ? self : this;
         for (Centre centre : centreRepository.findAll()) {
             try {
-                int n = compacteDatesPresence(centre);
+                int n = proxy.compacteDatesPresence(centre);
                 if (n > 0) {
                     recalerHorairesScolaires(centre);
                     centres++;
@@ -320,6 +329,45 @@ public class SeanceRepartitionService {
             }
         }
         return centres;
+    }
+
+    public int compacteCentresEnDepassement(List<SessionCours> sessions) {
+        if (sessions == null || sessions.isEmpty()) {
+            return 0;
+        }
+        Set<Long> centreIds = new HashSet<>();
+        for (SessionCours session : sessions) {
+            if (sessionApresFinPeriode(session) && session.getCentre() != null) {
+                centreIds.add(session.getCentre().getId());
+            }
+        }
+        if (centreIds.isEmpty()) {
+            return 0;
+        }
+        SeanceRepartitionService proxy = self != null ? self : this;
+        int n = 0;
+        for (Long centreId : centreIds) {
+            Centre centre = centreRepository.findById(centreId).orElse(null);
+            if (centre == null) {
+                continue;
+            }
+            try {
+                n += proxy.compacteDatesPresence(centre);
+            } catch (Exception ex) {
+                log.error("Compactage hors période ignoré pour le centre {} : {}", centre.getNom(), ex.getMessage());
+            }
+        }
+        return n;
+    }
+
+    public static boolean sessionApresFinPeriode(SessionCours session) {
+        if (session == null || session.getHeureDebut() == null) {
+            return false;
+        }
+        if (!"CLOTUREE".equals(session.getStatut())) {
+            return false;
+        }
+        return session.getHeureDebut().toLocalDate().isAfter(SeanceDureeRepartition.DATE_FIN_PERIODE);
     }
 
     /**
