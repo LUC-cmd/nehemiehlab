@@ -704,6 +704,7 @@ export interface Banque {
 export interface FormateurAgendaEntry {
   id: number;
   centre: { id: number; nom: string };
+  centreId?: number;
   centreNom?: string;
   jourSemaine: number; // 1 = lundi ... 7 = dimanche
   heureDebut: string; // "HH:mm:ss" ou "HH:mm"

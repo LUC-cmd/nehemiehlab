@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalTime;
@@ -37,16 +38,17 @@ public class AgendaController {
 
     @GetMapping
     @PreAuthorize("hasRole('FORMATEUR')")
-    public ResponseEntity<List<FormateurAgendaEntry>> getMine(Authentication auth) {
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<Map<String, Object>>> getMine(Authentication auth) {
         User formateur = (User) auth.getPrincipal();
         List<FormateurAgendaEntry> entries =
                 agendaRepository.findByFormateurIdOrderByJourSemaineAscHeureDebutAsc(formateur.getId());
-        entries.forEach(this::enrich);
-        return ResponseEntity.ok(entries);
+        return ResponseEntity.ok(entries.stream().map(this::toResponse).toList());
     }
 
     @PostMapping
     @PreAuthorize("hasRole('FORMATEUR')")
+    @Transactional
     public ResponseEntity<?> create(@RequestBody Map<String, Object> body, Authentication auth) {
         User formateur = (User) auth.getPrincipal();
 
@@ -82,13 +84,13 @@ public class AgendaController {
                 .notes(readText(body.get("notes")))
                 .build();
 
-        agendaRepository.save(entry);
-        enrich(entry);
-        return ResponseEntity.ok(entry);
+        FormateurAgendaEntry saved = agendaRepository.save(entry);
+        return ResponseEntity.ok(toResponse(saved));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('FORMATEUR')")
+    @Transactional
     public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
         User formateur = (User) auth.getPrincipal();
         Optional<FormateurAgendaEntry> entryOpt = agendaRepository.findById(id);
@@ -131,13 +133,13 @@ public class AgendaController {
             entry.setNotes(readText(body.get("notes")));
         }
 
-        agendaRepository.save(entry);
-        enrich(entry);
-        return ResponseEntity.ok(entry);
+        FormateurAgendaEntry saved = agendaRepository.save(entry);
+        return ResponseEntity.ok(toResponse(saved));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('FORMATEUR')")
+    @Transactional
     public ResponseEntity<?> delete(@PathVariable Long id, Authentication auth) {
         User formateur = (User) auth.getPrincipal();
         Optional<FormateurAgendaEntry> entryOpt = agendaRepository.findById(id);
@@ -193,9 +195,20 @@ public class AgendaController {
         return ("null".equalsIgnoreCase(text) || text.isEmpty()) ? null : text;
     }
 
-    private void enrich(FormateurAgendaEntry entry) {
+    private Map<String, Object> toResponse(FormateurAgendaEntry entry) {
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("id", entry.getId());
         if (entry.getCentre() != null) {
-            entry.setCentreNom(entry.getCentre().getNom());
+            out.put("centreId", entry.getCentre().getId());
+            out.put("centreNom", entry.getCentre().getNom());
+            out.put("centre", Map.of("id", entry.getCentre().getId(), "nom", entry.getCentre().getNom()));
+        } else {
+            out.put("centreNom", entry.getCentreNom());
         }
+        out.put("jourSemaine", entry.getJourSemaine());
+        out.put("heureDebut", entry.getHeureDebut() != null ? entry.getHeureDebut().format(HHmm) : null);
+        out.put("heureFin", entry.getHeureFin() != null ? entry.getHeureFin().format(HHmm) : null);
+        out.put("notes", entry.getNotes());
+        return out;
     }
 }

@@ -27,14 +27,37 @@ type FormState = {
 const emptyForm: FormState = {
   centreId: '',
   jourSemaine: '1',
-  heureDebut: '',
-  heureFin: '',
+  heureDebut: '08:00',
+  heureFin: '11:00',
   notes: '',
 };
 
-function trimHeure(value?: string | null): string {
-  if (!value) return '';
-  return value.length > 5 ? value.slice(0, 5) : value;
+function formatHeure(value?: string | number[] | null): string {
+  if (value == null || value === '') return '';
+  if (Array.isArray(value) && value.length >= 2) {
+    return `${String(value[0]).padStart(2, '0')}:${String(value[1]).padStart(2, '0')}`;
+  }
+  const text = String(value);
+  return text.length > 5 ? text.slice(0, 5) : text;
+}
+
+function normalizeEntry(raw: FormateurAgendaEntry): FormateurAgendaEntry {
+  const centreId = raw.centre?.id ?? raw.centreId;
+  const centreNom = raw.centreNom || raw.centre?.nom || 'Centre';
+  return {
+    ...raw,
+    centre: { id: Number(centreId || 0), nom: centreNom },
+    centreNom,
+    jourSemaine: Number(raw.jourSemaine),
+    heureDebut: formatHeure(raw.heureDebut),
+    heureFin: formatHeure(raw.heureFin),
+    notes: raw.notes || null,
+  };
+}
+
+function todayJourId(): number {
+  const jsDay = new Date().getDay();
+  return jsDay === 0 ? 7 : jsDay;
 }
 
 export default function AgendaPage() {
@@ -46,6 +69,7 @@ export default function AgendaPage() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<FormateurAgendaEntry | null>(null);
+  const jourAujourdhui = todayJourId();
 
   const load = async () => {
     const [entriesRes, centresRes] = await Promise.allSettled([
@@ -53,7 +77,8 @@ export default function AgendaPage() {
       centreService.getMesCentres(),
     ]);
     if (entriesRes.status === 'fulfilled') {
-      setEntries(entriesRes.value.data || []);
+      const list = Array.isArray(entriesRes.value.data) ? entriesRes.value.data : [];
+      setEntries(list.map((item) => normalizeEntry(item)));
     } else {
       toast.error("Impossible de charger l'agenda.");
     }
@@ -64,8 +89,7 @@ export default function AgendaPage() {
   };
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void load();
   }, []);
 
   const entriesByJour = useMemo(() => {
@@ -76,13 +100,17 @@ export default function AgendaPage() {
       list.push(entry);
       map.set(entry.jourSemaine, list);
     });
-    map.forEach((list) => list.sort((a, b) => trimHeure(a.heureDebut).localeCompare(trimHeure(b.heureDebut))));
+    map.forEach((list) => list.sort((a, b) => formatHeure(a.heureDebut).localeCompare(formatHeure(b.heureDebut))));
     return map;
   }, [entries]);
 
-  const openCreate = () => {
+  const openCreate = (jourId?: number) => {
     setEditingId(null);
-    setForm({ ...emptyForm, centreId: centres[0] ? String(centres[0].id) : '' });
+    setForm({
+      ...emptyForm,
+      jourSemaine: String(jourId || jourAujourdhui),
+      centreId: centres[0] ? String(centres[0].id) : '',
+    });
     setShowForm(true);
   };
 
@@ -91,8 +119,8 @@ export default function AgendaPage() {
     setForm({
       centreId: String(entry.centre?.id ?? ''),
       jourSemaine: String(entry.jourSemaine),
-      heureDebut: trimHeure(entry.heureDebut),
-      heureFin: trimHeure(entry.heureFin),
+      heureDebut: formatHeure(entry.heureDebut),
+      heureFin: formatHeure(entry.heureFin),
       notes: entry.notes || '',
     });
     setShowForm(true);
@@ -130,17 +158,17 @@ export default function AgendaPage() {
     setSaving(true);
     try {
       if (editingId != null) {
-        const { data } = await agendaService.update(editingId, payload);
-        setEntries((prev) => prev.map((entry) => (entry.id === editingId ? data : entry)));
-        toast.success('Créneau modifié.');
+        await agendaService.update(editingId, payload);
+        toast.success('Créneau enregistré.');
       } else {
-        const { data } = await agendaService.create(payload);
-        setEntries((prev) => [...prev, data]);
+        await agendaService.create(payload);
         toast.success('Créneau ajouté.');
       }
       closeForm();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Impossible d'enregistrer ce créneau.");
+      await load();
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(message || "Impossible d'enregistrer ce créneau.");
     } finally {
       setSaving(false);
     }
@@ -150,8 +178,8 @@ export default function AgendaPage() {
     if (!toDelete) return;
     try {
       await agendaService.remove(toDelete.id);
-      setEntries((prev) => prev.filter((entry) => entry.id !== toDelete.id));
       toast.success('Créneau supprimé.');
+      await load();
     } catch {
       toast.error('Impossible de supprimer ce créneau.');
     } finally {
@@ -162,15 +190,26 @@ export default function AgendaPage() {
   if (loading) return <PageLoadingSkeleton cardCount={4} />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-5">
+      <div className="rounded-2xl bg-[#004b57] text-white px-5 py-5 sm:px-6 sm:py-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Mon agenda</h1>
-          <p className="mt-1 text-slate-500">
-            Planifiez vos créneaux récurrents par centre, jour et horaire.
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">Planning récurrent</p>
+          <h1 className="mt-1 text-2xl font-bold">Mon agenda</h1>
+          <p className="mt-1.5 text-sm text-white/80 max-w-xl">
+            Indiquez le jour, le centre et les horaires. Ce planning reste enregistré : il ne disparaît plus au rafraîchissement.
+          </p>
+          <p className="mt-2 text-sm font-medium text-teal-100">
+            {entries.length === 0
+              ? 'Aucun créneau pour l’instant'
+              : `${entries.length} créneau${entries.length > 1 ? 'x' : ''} cette semaine`}
           </p>
         </div>
-        <button type="button" className="btn-primary self-start" onClick={openCreate} disabled={centres.length === 0}>
+        <button
+          type="button"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-white text-[#004b57] font-semibold px-4 py-2.5 hover:bg-teal-50 disabled:opacity-50"
+          onClick={() => openCreate()}
+          disabled={centres.length === 0}
+        >
           <Plus className="w-4 h-4" /> Ajouter un créneau
         </button>
       </div>
@@ -182,16 +221,16 @@ export default function AgendaPage() {
       )}
 
       {showForm && (
-        <div className="card border border-slate-200 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-slate-900">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-slate-900">
               {editingId != null ? 'Modifier le créneau' : 'Nouveau créneau'}
             </h2>
-            <button type="button" onClick={closeForm} className="p-1.5 rounded text-slate-500 hover:bg-slate-100">
+            <button type="button" onClick={closeForm} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100">
               <X className="w-4 h-4" />
             </button>
           </div>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="lg:col-span-2">
               <label className="label">Centre</label>
               <select
@@ -216,25 +255,27 @@ export default function AgendaPage() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="label">Heure de début</label>
-              <input
-                type="time"
-                className="input-field"
-                value={form.heureDebut}
-                onChange={(e) => setForm((f) => ({ ...f, heureDebut: e.target.value }))}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Début</label>
+                <input
+                  type="time"
+                  className="input-field"
+                  value={form.heureDebut}
+                  onChange={(e) => setForm((f) => ({ ...f, heureDebut: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="label">Fin</label>
+                <input
+                  type="time"
+                  className="input-field"
+                  value={form.heureFin}
+                  onChange={(e) => setForm((f) => ({ ...f, heureFin: e.target.value }))}
+                />
+              </div>
             </div>
-            <div>
-              <label className="label">Heure de fin</label>
-              <input
-                type="time"
-                className="input-field"
-                value={form.heureFin}
-                onChange={(e) => setForm((f) => ({ ...f, heureFin: e.target.value }))}
-              />
-            </div>
-            <div className="sm:col-span-2 lg:col-span-5">
+            <div className="sm:col-span-2 lg:col-span-4">
               <label className="label">Notes (optionnel)</label>
               <input
                 type="text"
@@ -244,65 +285,88 @@ export default function AgendaPage() {
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               />
             </div>
-            <div className="sm:col-span-2 lg:col-span-5 flex gap-2 justify-end">
+            <div className="sm:col-span-2 lg:col-span-4 flex gap-2 justify-end">
               <button type="button" className="btn-ghost" onClick={closeForm}>Annuler</button>
               <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? 'Enregistrement…' : editingId != null ? 'Enregistrer' : 'Ajouter'}
+                {saving ? 'Enregistrement…' : 'Enregistrer'}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-3">
         {JOURS.map((jour) => {
           const dayEntries = entriesByJour.get(jour.id) || [];
+          const isToday = jour.id === jourAujourdhui;
           return (
-            <div key={jour.id} className="rounded-2xl border border-slate-200 overflow-hidden flex flex-col">
-              <div className="bg-slate-100 border-b border-slate-200 px-3 py-2 flex items-center gap-1.5">
-                <CalendarDays className="w-3.5 h-3.5 text-slate-500" />
-                <span className="text-xs font-bold uppercase tracking-wide text-slate-600">{jour.label}</span>
-              </div>
-              <div className="p-2 space-y-2 flex-1 min-h-[64px]">
+            <section
+              key={jour.id}
+              className={`rounded-2xl border bg-white flex flex-col min-h-[220px] overflow-hidden ${
+                isToday ? 'border-[#004b57] shadow-md' : 'border-slate-200'
+              }`}
+            >
+              <header className={`px-3 py-2.5 flex items-center justify-between ${
+                isToday ? 'bg-[#004b57] text-white' : 'bg-slate-50 text-slate-700 border-b border-slate-100'
+              }`}>
+                <div className="flex items-center gap-1.5">
+                  <CalendarDays className="w-4 h-4" />
+                  <div>
+                    <p className="text-sm font-bold leading-none">{jour.short}</p>
+                    <p className={`text-[11px] mt-0.5 ${isToday ? 'text-white/80' : 'text-slate-400'}`}>{jour.label}</p>
+                  </div>
+                </div>
+                {isToday && (
+                  <span className="text-[10px] font-semibold uppercase tracking-wide bg-white/20 rounded-full px-2 py-0.5">
+                    Aujourd’hui
+                  </span>
+                )}
+              </header>
+              <div className="p-2.5 space-y-2 flex-1">
                 {dayEntries.length === 0 ? (
-                  <p className="text-[11px] text-slate-300 text-center py-3">—</p>
+                  <button
+                    type="button"
+                    onClick={() => openCreate(jour.id)}
+                    disabled={centres.length === 0}
+                    className="w-full h-full min-h-[120px] rounded-xl border border-dashed border-slate-200 text-slate-400 text-xs hover:border-[#004b57]/40 hover:text-[#004b57] disabled:opacity-40"
+                  >
+                    Libre — ajouter
+                  </button>
                 ) : (
                   dayEntries.map((entry) => (
-                    <div key={entry.id} className="rounded-lg border border-primary-200 bg-primary-50 p-2">
-                      <div className="flex items-center gap-1 text-[11px] font-semibold text-primary-700">
-                        <Clock className="w-3 h-3" />
-                        {trimHeure(entry.heureDebut)}–{trimHeure(entry.heureFin)}
-                      </div>
-                      <div className="flex items-center gap-1 text-[11px] text-slate-600 mt-0.5">
-                        <MapPin className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{entry.centreNom || entry.centre?.nom}</span>
-                      </div>
+                    <article key={entry.id} className="rounded-xl border border-teal-100 bg-teal-50/70 p-3">
+                      <p className="flex items-center gap-1.5 text-sm font-bold text-[#004b57]">
+                        <Clock className="w-3.5 h-3.5" />
+                        {formatHeure(entry.heureDebut)} – {formatHeure(entry.heureFin)}
+                      </p>
+                      <p className="flex items-start gap-1.5 text-xs text-slate-700 mt-1.5">
+                        <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />
+                        <span className="leading-snug">{entry.centreNom || entry.centre?.nom}</span>
+                      </p>
                       {entry.notes && (
-                        <p className="text-[10px] text-slate-500 mt-1 leading-snug">{entry.notes}</p>
+                        <p className="text-xs text-slate-500 mt-1.5 leading-snug">{entry.notes}</p>
                       )}
-                      <div className="flex items-center gap-1 mt-1.5">
+                      <div className="flex items-center gap-1 mt-2">
                         <button
                           type="button"
                           onClick={() => openEdit(entry)}
-                          className="p-1 rounded text-slate-500 hover:text-primary-700 hover:bg-primary-100"
-                          title="Modifier"
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-white"
                         >
-                          <Pencil className="w-3 h-3" />
+                          <Pencil className="w-3 h-3" /> Modifier
                         </button>
                         <button
                           type="button"
                           onClick={() => setToDelete(entry)}
-                          className="p-1 rounded text-slate-500 hover:text-rose-600 hover:bg-rose-50"
-                          title="Supprimer"
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-rose-600 hover:bg-rose-50"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="w-3 h-3" /> Retirer
                         </button>
                       </div>
-                    </div>
+                    </article>
                   ))
                 )}
               </div>
-            </div>
+            </section>
           );
         })}
       </div>

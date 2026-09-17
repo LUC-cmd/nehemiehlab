@@ -1,5 +1,7 @@
 package com.nehemiahlab.platform.model;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -25,6 +27,7 @@ public class FormateurAgendaEntry {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "formateur_id", nullable = false)
+    @JsonIgnore
     private User formateur;
 
     @ManyToOne(fetch = FetchType.EAGER)
@@ -35,9 +38,11 @@ public class FormateurAgendaEntry {
     private Short jourSemaine;
 
     @Column(name = "heure_debut", nullable = false)
+    @JsonFormat(pattern = "HH:mm")
     private LocalTime heureDebut;
 
     @Column(name = "heure_fin", nullable = false)
+    @JsonFormat(pattern = "HH:mm")
     private LocalTime heureFin;
 
     @Column
@@ -53,4 +58,18 @@ public class FormateurAgendaEntry {
 
     @Transient
     private String centreNom;
+
+    @PrePersist
+    void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }
