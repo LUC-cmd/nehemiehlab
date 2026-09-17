@@ -166,22 +166,12 @@ public class SessionController {
     }
 
     @PostMapping("/centres/{centreId}/repartir-historique")
-    @PreAuthorize("hasAnyRole('DIRECTEUR', 'FORMATEUR')")
+    @PreAuthorize("hasRole('DIRECTEUR')")
     public ResponseEntity<?> repartirHistorique(@PathVariable Long centreId, Authentication auth) {
         User user = (User) auth.getPrincipal();
         Centre centre = centreRepository.findById(centreId).orElse(null);
         if (centre == null) {
             return ResponseEntity.notFound().build();
-        }
-        if (user.getRole() == Role.FORMATEUR) {
-            boolean assigne = centre.getFormateurs() != null
-                    && centre.getFormateurs().stream().anyMatch(f -> f.getId().equals(user.getId()));
-            boolean aDesSeances = sessionCoursRepository.findByFormateurIdOrderByHeureDebutDesc(user.getId())
-                    .stream()
-                    .anyMatch(s -> s.getCentre() != null && centreId.equals(s.getCentre().getId()));
-            if (!assigne && !aDesSeances) {
-                return ResponseEntity.status(403).body(Map.of("message", "Vous n'êtes pas formateur de ce centre."));
-            }
         }
         try {
             SeanceRepartitionService.HistoriqueResult result = seanceRepartitionService.repartirSeancesExistantes(centre);
