@@ -78,26 +78,6 @@ public class SessionController {
             sessions = sessionCoursRepository.findAllByOrderByHeureDebutDesc();
         }
 
-        try {
-            if (seanceRepartitionService.compacteCentresEnDepassement(sessions) > 0) {
-                if (user.getRole() == Role.FORMATEUR) {
-                    sessions = sessionCoursRepository.findByFormateurIdOrderByHeureDebutDesc(user.getId());
-                } else if (user.getRole() == Role.COORDINATEUR || user.getRole() == Role.RESPONSABLE_CLUSTER) {
-                    List<Long> centreIds = centreAccessService.accessibleCentreIds(user);
-                    sessions = sessionCoursRepository.findAllByOrderByHeureDebutDesc().stream()
-                            .filter(s -> s.getCentre() != null && centreIds.contains(s.getCentre().getId()))
-                            .toList();
-                } else {
-                    sessions = sessionCoursRepository.findAllByOrderByHeureDebutDesc();
-                }
-            }
-        } catch (Exception ignored) {
-            // La liste doit s'afficher même si le compactage échoue.
-        }
-        sessions = sessions.stream()
-                .filter(s -> !SeanceRepartitionService.sessionAnieApresFinPeriode(s))
-                .toList();
-
         // Une seule requête groupée pour toutes les séances au lieu d'une requête par
         // séance (évite le N+1 qui ralentissait le chargement de la liste des séances,
         // y compris juste après un démarrer/clôturer qui recharge cette liste).

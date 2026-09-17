@@ -24,17 +24,6 @@ public class SeanceRepartitionBootstrap {
 
     @EventListener(ApplicationReadyEvent.class)
     public void auDemarrage() {
-        Thread worker = new Thread(() -> {
-            try {
-                int n = seanceRepartitionService.compacteDatesTousLesCentres();
-                if (n > 0) {
-                    log.info("Séances ramenées aux jours de présence pour {} centre(s).", n);
-                }
-            } catch (Exception e) {
-                log.error("Compactage des dates ignoré : l'API reste disponible. {}", e.getMessage(), e);
-            }
-        }, "compact-dates-seances");
-        worker.setDaemon(true);
-        worker.start();
+        log.info("Aucun compactage au démarrage : les séances déjà en base ne sont ni supprimées ni recalé.");
     }
 }
