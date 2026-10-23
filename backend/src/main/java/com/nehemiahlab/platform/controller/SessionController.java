@@ -361,17 +361,10 @@ public class SessionController {
                         "message", "L'heure de fin doit être postérieure à l'heure de début."
                 ));
             }
-            if (session.getFormateur() != null && session.getCentre() != null) {
-                ResponseEntity<?> conflitTrajet = refuseSiConflitTrajet(
-                        session.getFormateur().getId(),
-                        session.getCentre().getId(),
-                        session.getHeureDebut(),
-                        fin,
-                        session.getId());
-                if (conflitTrajet != null) {
-                    return conflitTrajet;
-                }
-            }
+            // Pas de contrôle de chevauchement ici : il est déjà fait à la création et à
+            // chaque modification des horaires. Le refaire à la clôture laissait la séance
+            // bloquée EN_COURS pour toujours (impossible de la clôturer, et donc impossible
+            // d'en démarrer une autre puisqu'une seule séance ouverte est autorisée).
 
             // Le client peut regrouper ici le contexte de fin de séance (module, état des
             // équipements, défis) et la géolocalisation de fin, au lieu de faire deux

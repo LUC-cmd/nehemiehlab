@@ -417,7 +417,7 @@ export default function SessionsPage() {
     if (action !== 'new' || !centreIdParam) return;
     const centreId = Number(centreIdParam);
     if (!Number.isFinite(centreId) || !centres.some((c) => c.id === centreId)) return;
-    setNewSession((prev) => ({ ...prev, centreId: String(centreId) }));
+    setNewSession((prev) => ({ ...prev, centreId: String(centreId), heureDebut: nowForDatetimeLocal() }));
     setShowAddModal(true);
     void loadCentreEleves(centreId).catch(() => undefined);
     setSearchParams({}, { replace: true });
@@ -1122,6 +1122,9 @@ export default function SessionsPage() {
             <button
               type="button"
               onClick={() => {
+                // L'heure de début restait celle du chargement de la page : une 2e séance
+                // démarrée plus tard chevauchait la 1re et le serveur la refusait.
+                setNewSession((prev) => ({ ...prev, heureDebut: nowForDatetimeLocal() }));
                 setShowAddModal(true);
                 if (navigator.onLine) {
                   centres.forEach((centre) => {
