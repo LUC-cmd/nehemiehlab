@@ -17,4 +17,6 @@ public interface FormateurAgendaEntryRepository extends JpaRepository<FormateurA
             ORDER BY e.jourSemaine ASC, e.heureDebut ASC
             """)
     List<FormateurAgendaEntry> findByFormateurIdOrderByJourSemaineAscHeureDebutAsc(@Param("formateurId") Long formateurId);
+
+    List<FormateurAgendaEntry> findByCentreId(Long centreId);
 }

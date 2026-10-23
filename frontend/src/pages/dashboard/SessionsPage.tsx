@@ -106,7 +106,7 @@ function describeApiError(err: unknown, fallback: string): string {
 }
 
 export default function SessionsPage() {
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const { hasFeature } = useAccess();
   const [searchParams, setSearchParams] = useSearchParams();
   
@@ -226,6 +226,9 @@ export default function SessionsPage() {
   };
 
   const canEditTerrain = isFormateur && canManageSessions;
+  // Séance d'un formateur remplacé sur ce centre : consultable, pas modifiable.
+  const canEditSelected = canEditTerrain
+    && (Boolean(selectedOfflineDraftId) || !selectedSession?.formateur || selectedSession.formateur.id === user?.id);
 
   const handleRepartirHistorique = async (centreId: number) => {
     setRepartirLoading(true);
@@ -1816,7 +1819,7 @@ export default function SessionsPage() {
               </div>
             )}
 
-            {selectedSession?.statut === 'EN_COURS' && canEditTerrain && !detailLoading && (
+            {selectedSession?.statut === 'EN_COURS' && canEditSelected && !detailLoading && (
               <div className="flex items-center gap-3">
                 {!selectedOfflineDraftId && !selectedSession.manuelle && (!selectedSession.latitudeDebut || !selectedSession.longitudeDebut) ? (
                   <button onClick={markStartLocation} className="btn-ghost flex items-center gap-2 text-amber-400 hover:bg-amber-500/10">
@@ -1847,7 +1850,7 @@ export default function SessionsPage() {
             
             {selectedSession?.statut === 'CLOTUREE' && !detailLoading && (
               <div className="flex flex-wrap items-center gap-3">
-                {canEditTerrain && (
+                {canEditSelected && (
                   <button
                     type="button"
                     onClick={() => handleUpdateEvaluations()}
@@ -1857,7 +1860,7 @@ export default function SessionsPage() {
                     <Save className="w-4 h-4" /> Sauvegarder les corrections
                   </button>
                 )}
-                {(canEditTerrain || isDirecteur) && !selectedOfflineDraftId && (
+                {(canEditSelected || isDirecteur) && !selectedOfflineDraftId && (
                   <button
                     type="button"
                     onClick={() => setDeleteSessionTarget(selectedSession)}
@@ -1949,7 +1952,7 @@ export default function SessionsPage() {
 
             <SessionHorairesCard
               session={selectedSession}
-              readOnly={!canEditTerrain || isDirecteur}
+              readOnly={!canEditSelected || isDirecteur}
               onUpdated={() => selectedSession.id > 0 && openSessionDetail(selectedSession)}
             />
 
@@ -2014,9 +2017,9 @@ export default function SessionsPage() {
                 <SessionAttendanceBoard
                   evaluations={evaluations}
                   session={selectedSession}
-                  readOnly={!canEditTerrain}
+                  readOnly={!canEditSelected}
                   supervisionMode={isDirecteur && selectedSession.statut === 'EN_COURS'}
-                  canSignal={canEditTerrain && selectedSession.statut === 'EN_COURS' && !selectedOfflineDraftId}
+                  canSignal={canEditSelected && selectedSession.statut === 'EN_COURS' && !selectedOfflineDraftId}
                   sessionId={selectedSession.id > 0 ? selectedSession.id : undefined}
                   onEvaluationsChange={setEvaluations}
                   onNoteChange={handleNoteChange}

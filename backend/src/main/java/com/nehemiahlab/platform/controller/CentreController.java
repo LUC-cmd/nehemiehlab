@@ -10,6 +10,7 @@ import com.nehemiahlab.platform.security.InputSanitizer;
 import com.nehemiahlab.platform.service.CentreAccessService;
 import com.nehemiahlab.platform.service.CentreExcelService;
 import com.nehemiahlab.platform.service.EmailNotificationService;
+import com.nehemiahlab.platform.service.PassationFormateurService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -46,6 +47,9 @@ public class CentreController {
 
     @Autowired
     private EmailNotificationService emailNotificationService;
+
+    @Autowired
+    private PassationFormateurService passationFormateurService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('DIRECTEUR', 'COMPTABLE', 'FORMATEUR', 'COORDINATEUR', 'RESPONSABLE_CLUSTER')")
@@ -323,6 +327,18 @@ public class CentreController {
         userRepository.save(formateur);
 
         return ResponseEntity.ok(Map.of("message", "Formateur assigné avec succès."));
+    }
+
+    /** Passation : le nouveau formateur remplace l'ancien et reprend sa séance ouverte et son agenda du centre. */
+    @PutMapping("/{centreId}/formateur/remplacer/{nouveauId}")
+    @PreAuthorize("hasRole('DIRECTEUR')")
+    public ResponseEntity<?> remplacerFormateur(@PathVariable Long centreId, @PathVariable Long nouveauId) {
+        PassationFormateurService.Resultat r = passationFormateurService.remplacer(centreId, nouveauId);
+        String message = r.ancienNom().isBlank()
+                ? r.nouveauNom() + " est maintenant formateur du centre."
+                : r.nouveauNom() + " remplace " + r.ancienNom() + " : " + r.seancesReprises()
+                        + " séance ouverte et " + r.creneauxRepris() + " créneau(x) d'agenda repris.";
+        return ResponseEntity.ok(Map.of("message", message));
     }
 
     @DeleteMapping("/{centreId}/formateurs/{formateurId}")

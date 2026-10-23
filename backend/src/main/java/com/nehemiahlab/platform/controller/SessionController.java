@@ -68,7 +68,21 @@ public class SessionController {
         List<SessionCours> sessions;
 
         if (user.getRole() == Role.FORMATEUR) {
-            sessions = sessionCoursRepository.findByFormateurIdOrderByHeureDebutDesc(user.getId());
+            // Ses séances + l'historique de ses centres actuels (séances d'un formateur
+            // remplacé), pour qu'il reprenne le suivi là où l'autre l'avait laissé.
+            Map<Long, SessionCours> parId = new java.util.LinkedHashMap<>();
+            for (SessionCours s : sessionCoursRepository.findByFormateurIdOrderByHeureDebutDesc(user.getId())) {
+                parId.put(s.getId(), s);
+            }
+            for (Centre centre : centreRepository.findByFormateurId(user.getId())) {
+                for (SessionCours s : sessionCoursRepository.findByCentreIdOrderByHeureDebutAsc(centre.getId())) {
+                    parId.putIfAbsent(s.getId(), s);
+                }
+            }
+            sessions = parId.values().stream()
+                    .sorted(java.util.Comparator.comparing(SessionCours::getHeureDebut,
+                            java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+                    .toList();
         } else if (user.getRole() == Role.COORDINATEUR || user.getRole() == Role.RESPONSABLE_CLUSTER) {
             List<Long> centreIds = centreAccessService.accessibleCentreIds(user);
             sessions = sessionCoursRepository.findAllByOrderByHeureDebutDesc().stream()
@@ -827,7 +841,12 @@ public class SessionController {
     private boolean canAccessSession(User user, SessionCours session) {
         if (user.getRole() == Role.DIRECTEUR) return true;
         if (user.getRole() == Role.FORMATEUR) {
-            return session.getFormateur() != null && session.getFormateur().getId().equals(user.getId());
+            if (session.getFormateur() != null && session.getFormateur().getId().equals(user.getId())) {
+                return true;
+            }
+            // Lecture seule de l'historique du centre dont il a repris la charge.
+            return session.getCentre() != null && centreRepository.findByFormateurId(user.getId()).stream()
+                    .anyMatch(c -> c.getId().equals(session.getCentre().getId()));
         }
         if (user.getRole() == Role.COORDINATEUR || user.getRole() == Role.RESPONSABLE_CLUSTER) {
             return session.getCentre() != null

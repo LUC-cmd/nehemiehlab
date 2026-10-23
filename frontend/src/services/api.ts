@@ -388,6 +388,8 @@ export const centreService = {
     api.post(`/centres/${centreId}/formateurs/${formateurId}`),
   retirerFormateur: (centreId: number, formateurId: number) =>
     api.delete(`/centres/${centreId}/formateurs/${formateurId}`),
+  remplacerFormateur: (centreId: number, nouveauId: number) =>
+    api.put(`/centres/${centreId}/formateur/remplacer/${nouveauId}`),
   assignerCoordinateur: (centreId: number, coordinateurId: number) =>
     api.put(`/centres/${centreId}/coordinateur/${coordinateurId}`),
   getMesCentres: () => api.get('/centres/mes-centres'),

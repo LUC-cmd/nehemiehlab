@@ -598,8 +598,13 @@ export default function CentresPage() {
     if (!selectedCentre) return;
     try {
       if (assignFormateurId) {
-        await centreService.assignerFormateur(selectedCentre.id, Number(assignFormateurId));
-        toast.success('Formateur assigné.');
+        if (selectedCentre.formateurs?.length) {
+          const res = await centreService.remplacerFormateur(selectedCentre.id, Number(assignFormateurId));
+          toast.success(res.data?.message || 'Formateur remplacé.');
+        } else {
+          await centreService.assignerFormateur(selectedCentre.id, Number(assignFormateurId));
+          toast.success('Formateur assigné.');
+        }
       }
       if (assignCoordinateurId) {
         await centreService.assignerCoordinateur(selectedCentre.id, Number(assignCoordinateurId));
@@ -609,8 +614,9 @@ export default function CentresPage() {
       setAssignFormateurId('');
       setAssignCoordinateurId('');
       fetchData();
-    } catch {
-      toast.error('Erreur lors des affectations.');
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(message || 'Erreur lors des affectations.');
     }
   };
 
@@ -1568,20 +1574,29 @@ export default function CentresPage() {
             </select>
           </div>
           <div>
-            <label className="label">Formateur du centre (1 par centre, plusieurs centres possibles)</label>
+            <label className="label">
+              {selectedCentre?.formateurs?.length
+                ? 'Remplacer le formateur du centre'
+                : 'Formateur du centre (1 par centre, plusieurs centres possibles)'}
+            </label>
             {selectedCentre?.formateurs?.length ? (
               <p className="mb-2 text-xs text-amber-700">
-                Ce centre a déjà un formateur. Retirez-le avant d’en assigner un autre.
+                Actuel : {selectedCentre.formateurs.map((f) => formatFullName(f.prenom, f.nom)).join(', ')}.
+                Le nouveau formateur reprend la séance en cours et l’agenda du centre, et voit tout
+                l’historique des séances. Les heures déjà faites restent à l’ancien formateur.
               </p>
             ) : null}
             <select
               className="input-field"
               value={assignFormateurId}
               onChange={(e) => setAssignFormateurId(e.target.value)}
-              disabled={Boolean(selectedCentre?.formateurs?.length)}
             >
-              <option value="">Sélectionner un formateur...</option>
-              {formateurs.map((f) => (
+              <option value="">
+                {selectedCentre?.formateurs?.length ? 'Choisir le nouveau formateur...' : 'Sélectionner un formateur...'}
+              </option>
+              {formateurs
+                .filter((f) => !selectedCentre?.formateurs?.some((cur) => cur.id === f.id))
+                .map((f) => (
                 <option key={f.id} value={f.id}>
                   {formatFullName(f.prenom, f.nom)}
                 </option>
