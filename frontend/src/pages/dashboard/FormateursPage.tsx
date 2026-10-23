@@ -46,6 +46,18 @@ function centreLabel(c: Centre): string {
 function centreHasOtherFormateur(centre: Centre, formateurId: number): boolean {
   return (centre.formateurs ?? []).some((f) => f.id !== formateurId);
 }
+function ExperienceBadge({ formateur, className = '' }: { formateur: User; className?: string }) {
+  const experience = computeFormateurExperience(formateur);
+  return (
+    <span
+      className={`inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full border ${experience.badgeClass} ${className}`}
+      title="Ancienneté depuis la date d'entrée : un formateur arrivé plus tard ne peut pas dépasser un plus ancien."
+    >
+      {experience.label}
+    </span>
+  );
+}
+
 function CniBadge({ formateur }: { formateur: User }) {
   const ok = Boolean(formateur.carteIdentiteRecto && formateur.carteIdentiteVerso);
   const partial = Boolean(formateur.carteIdentiteRecto || formateur.carteIdentiteVerso);
@@ -314,7 +326,10 @@ export default function FormateursPage() {
     if (centreFilter && !f.centres?.some((c) => c.id === Number(centreFilter))) return false;
 
     return true;
-  }), [formateurs, search, regionFilter, clusterFilter, centreFilter]);
+  })
+    // Seniors (par ancienneté) d'abord, puis juniors, puis nouveaux.
+    .sort((a, b) => computeFormateurExperience(b).rang - computeFormateurExperience(a).rang),
+  [formateurs, search, regionFilter, clusterFilter, centreFilter]);
 
   const downloadFile = (blob: Blob, filename: string) => {
     const url = window.URL.createObjectURL(blob);
@@ -588,6 +603,7 @@ export default function FormateursPage() {
                     <span className={`badge mt-1 ${formateur.actif ? 'badge-success' : 'badge-warning'}`}>
                       {formateur.actif ? 'Compte validé' : 'En attente'}
                     </span>
+                    <ExperienceBadge formateur={formateur} className="ml-2" />
                     {formateur.centres && formateur.centres.length > 0 && (
                       <span className="ml-2 badge bg-blue-500/10 text-blue-400 border-blue-500/20 text-[10px]">
                         {formateur.centres.length} centre{formateur.centres.length > 1 ? 's' : ''}
@@ -698,7 +714,6 @@ export default function FormateursPage() {
                   {isDir && formateur.actif && (() => {
                     const picker = getPicker(formateur.id);
                     const options = availableCentresFor(formateur);
-                    const experience = computeFormateurExperience(formateur.totalHeuresSeances);
                     return (
                       <div className="space-y-2 rounded-xl border border-dashed border-dark-600 p-3 bg-dark-900/30">
                         <div className="flex items-center justify-between gap-2">
@@ -706,8 +721,8 @@ export default function FormateursPage() {
                             <Building2 className="w-3.5 h-3.5" />
                             {formateur.centres?.length ? 'Ajouter un centre' : 'Assigner un centre'}
                           </label>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${experience.badgeClass}`}>
-                            {experience.label} · {Math.round(formateur.totalHeuresSeances ?? 0)} h
+                          <span className="text-[10px] text-dark-400">
+                            {Math.round(formateur.totalHeuresSeances ?? 0)} h de séances
                           </span>
                         </div>
                         <select
@@ -787,6 +802,7 @@ export default function FormateursPage() {
                   <span className={`badge ${detailFormateur.actif ? 'badge-success' : 'badge-warning'}`}>
                     {detailFormateur.actif ? 'Compte validé' : 'En attente'}
                   </span>
+                  <ExperienceBadge formateur={detailFormateur} />
                   <CniBadge formateur={detailFormateur} />
                 </div>
               </div>
