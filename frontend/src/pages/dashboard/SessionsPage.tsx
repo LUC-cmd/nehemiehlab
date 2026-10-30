@@ -204,7 +204,7 @@ export default function SessionsPage() {
     setGeoModal((prev) => ({ ...prev, retrying: true, message: undefined }));
     let geo: { latitude: number; longitude: number; precisionMetres?: number };
     try {
-      geo = await captureSessionGeo(geoModal.phase, geoModal.phase === 'debut');
+      geo = await captureSessionGeo(geoModal.phase, true);
     } catch (err) {
       setGeoModal((prev) => ({
         ...prev,
@@ -681,8 +681,10 @@ export default function SessionsPage() {
     setShowSessionDetail(true);
   };
 
-  const handleUpdateEvaluations = async (options?: { skipReload?: boolean }) => {
-    if (!selectedSession) return;
+  // Renvoie true si les présences/notes sont bien enregistrées, false sinon : la
+  // clôture s'appuie dessus pour ne PAS continuer quand l'enregistrement a échoué.
+  const handleUpdateEvaluations = async (options?: { skipReload?: boolean }): Promise<boolean> => {
+    if (!selectedSession) return false;
     try {
       if (selectedOfflineDraftId) {
         const draft = getOfflineSessionDraft(selectedOfflineDraftId);
@@ -707,12 +709,14 @@ export default function SessionsPage() {
         });
         setOfflineDrafts(listOfflineSessionDrafts());
         toast.success('Présences sauvegardées hors ligne.');
-        return;
+        return true;
       }
       const data = evaluations.map(ev => ({
         id: ev.id,
         present: ev.present,
-        note: ev.note,
+        // Sans ce champ le serveur remettait « en retard » à false à chaque sauvegarde.
+        enRetard: ev.present ? !!ev.enRetard : false,
+        note: ev.present ? ev.note : undefined,
         commentaire: ev.commentaire,
         projetTravaille: ev.projetTravaille,
         projetFinal: ev.projetFinal ?? false,
@@ -725,11 +729,13 @@ export default function SessionsPage() {
       // GET (et sa reconciliation des évaluations côté serveur) n'aurait servi à rien
       // — c'était un aller-retour réseau entier gaspillé à chaque clôture, ce qui
       // contribuait à la lenteur ressentie par les formateurs.
-      if (options?.skipReload) return;
+      if (options?.skipReload) return true;
       toast.success('Évaluations sauvegardées');
       openSessionDetail(selectedSession);
-    } catch {
-      toast.error('Erreur lors de la sauvegarde.');
+      return true;
+    } catch (err) {
+      toast.error(describeApiError(err, 'Erreur lors de la sauvegarde.'));
+      return false;
     }
   };
 
@@ -794,7 +800,13 @@ export default function SessionsPage() {
     // session" redevenir cliquable et permettait de relancer une deuxième clôture
     // en parallèle pendant que la première était encore en cours.
     try {
-      await handleUpdateEvaluations({ skipReload: true });
+      const saved = await handleUpdateEvaluations({ skipReload: true });
+      if (!saved) {
+        // L'erreur précise a déjà été affichée : on arrête là plutôt que de clôturer
+        // une séance dont les présences/notes ne sont pas enregistrées.
+        setConfirmClotureId(null);
+        return;
+      }
 
       const finishClose = async (
         geoFin: { latitude: number; longitude: number; precisionMetres?: number } | null,
@@ -845,7 +857,10 @@ export default function SessionsPage() {
           geoFin ? 'Session clôturée avec localisation de fin.' : 'Séance manuelle clôturée.',
         );
         setConfirmClotureId(null);
-        setShowSessionDetail(false);
+        // Garder le panneau ouvert et recharger les infos de clôture (heureFin,
+        // durée réelle, GPS fin, statut CLOTUREE) pour que le formateur les voie
+        // immédiatement sans devoir fermer et réouvrir la séance manuellement.
+        await openSessionDetail(selectedSession);
         refreshSessionsOnly();
       };
 
@@ -869,7 +884,7 @@ export default function SessionsPage() {
         }
       } else {
         try {
-          geoFin = await captureSessionGeo('fin');
+          geoFin = await captureSessionGeo('fin', true);
         } catch (geoErr) {
           // On bascule vers la modale de géolocalisation : celle-ci a son propre
           // bouton "Réessayer" déjà protégé contre le double-clic.
@@ -1807,15 +1822,6 @@ export default function SessionsPage() {
                   <Radio className="w-4 h-4 animate-pulse" />
                   Consultation en direct — actualisation auto
                 </span>
-                {!selectedOfflineDraftId && (
-                  <button
-                    type="button"
-                    onClick={() => setDeleteSessionTarget(selectedSession)}
-                    className="btn-ghost flex items-center gap-2 text-rose-400 hover:bg-rose-500/10"
-                  >
-                    <Trash2 className="w-4 h-4" /> Supprimer
-                  </button>
-                )}
               </div>
             )}
 

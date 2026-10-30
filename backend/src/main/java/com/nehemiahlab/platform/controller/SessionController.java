@@ -411,11 +411,15 @@ public class SessionController {
                 Object latitude = body.get("latitude");
                 Object longitude = body.get("longitude");
                 if (latitude != null && longitude != null) {
-                    session.setLatitudeFin(((Number) latitude).doubleValue());
-                    session.setLongitudeFin(((Number) longitude).doubleValue());
-                    Object precision = body.get("precisionMetres");
-                    if (precision != null) {
-                        session.setPrecisionFinMetres(((Number) precision).doubleValue());
+                    Double lat = toDoubleOrNull(latitude);
+                    Double lon = toDoubleOrNull(longitude);
+                    if (lat != null && lon != null) {
+                        session.setLatitudeFin(lat);
+                        session.setLongitudeFin(lon);
+                        Double precision = toDoubleOrNull(body.get("precisionMetres"));
+                        if (precision != null) {
+                            session.setPrecisionFinMetres(precision);
+                        }
                     }
                 }
                 stampModification(session, user);
@@ -603,6 +607,7 @@ public class SessionController {
         // pour garder un historique visible, comme pour les autres modifications post-clôture.
 
         for (EvaluationRequest req : requests) {
+            if (req == null || req.getId() == null) continue;
             EvaluationSession eval = evaluationSessionRepository.findById(req.getId()).orElse(null);
             if (eval != null && eval.getSessionCours() != null && eval.getSessionCours().getId().equals(id)) {
                 boolean nowPresent = req.isPresent();
@@ -795,6 +800,16 @@ public class SessionController {
         evaluationSessionRepository.deleteAll(evals);
         sessionCoursRepository.delete(session);
         return ResponseEntity.ok(Map.of("message", "Séance supprimée définitivement."));
+    }
+
+    private static Double toDoubleOrNull(Object raw) {
+        if (raw == null) return null;
+        if (raw instanceof Number n) return n.doubleValue();
+        try {
+            return Double.parseDouble(raw.toString().trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static LocalDateTime parseDateTime(Object raw) {
