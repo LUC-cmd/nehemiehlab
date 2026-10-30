@@ -5,6 +5,7 @@ import {
 import type { SessionCours } from '../../types';
 import { centreLabel } from '../../utils/centreLabel';
 import { formatCoords } from '../../utils/geo';
+import { computeSessionDureeMinutes } from '../../utils/datetime';
 
 type Props = {
   session: SessionCours;
@@ -119,8 +120,8 @@ export default function SessionDetailHero({
             <div>
               <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Durée</p>
               <p className="text-sm text-slate-900 font-medium">
-                {session.statut === 'CLOTUREE' && session.dureeReelleMinutes != null
-                  ? formatElapsed(session.dureeReelleMinutes)
+                {session.statut === 'CLOTUREE'
+                  ? formatElapsed(computeSessionDureeMinutes(session))
                   : `${session.dureePrevueMinutes} min prévues`}
               </p>
             </div>
